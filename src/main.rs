@@ -2,7 +2,6 @@
 // - Undo/redo
 // - Icons for tool pickers
 // - Select/move/cut/copy/paste
-// - Unsaved changes indicator
 
 extern crate ahi;
 extern crate sdl2;
@@ -41,6 +40,7 @@ struct EditorState {
   current_image: usize,
   tool: Tool,
   prev_tool: Tool,
+  unsaved: bool,
 }
 
 impl EditorState {
@@ -55,25 +55,28 @@ impl EditorState {
       current_image: 0,
       tool: Tool::Pencil,
       prev_tool: Tool::Pencil,
+      unsaved: false,
     }
   }
 
   fn image(&self) -> &Image {
-    return &self.images[self.current_image];
+    &self.images[self.current_image]
   }
 
   fn image_mut(&mut self) -> &mut Image {
-    return &mut self.images[self.current_image];
+    self.unsaved = true;
+    &mut self.images[self.current_image]
   }
 
   fn image_at(&self, index: usize) -> &Image {
-    return &self.images[index];
+    &self.images[index]
   }
 
   fn add_new_image(&mut self) {
     let (width, height) = self.image().size();
     self.current_image += 1;
     self.images.insert(self.current_image, Image::new(width, height));
+    self.unsaved = true;
   }
 
   fn try_delete_image(&mut self) -> bool {
@@ -82,13 +85,16 @@ impl EditorState {
       if self.current_image == self.images.len() {
         self.current_image -= 1;
       }
+      self.unsaved = true;
       true
     } else { false }
   }
 
-  fn save_to_file(&self) -> io::Result<()> {
+  fn save_to_file(&mut self) -> io::Result<()> {
     let mut file = try!(File::create(&self.filepath));
-    Image::write(&mut file, &self.images)
+    try!(Image::write(&mut file, &self.images));
+    self.unsaved = false;
+    Ok(())
   }
 }
 
@@ -153,7 +159,7 @@ impl GuiElement<EditorState> for ColorPicker {
       },
       _ => {}
     }
-    return false;
+    false
   }
 }
 
@@ -212,7 +218,7 @@ impl GuiElement<EditorState> for ToolPicker {
       },
       _ => {}
     }
-    return false;
+    false
   }
 }
 
@@ -277,7 +283,7 @@ impl GuiElement<EditorState> for ImagePicker {
       },
       _ => {}
     }
-    return false;
+    false
   }
 }
 
@@ -331,7 +337,40 @@ impl GuiElement<EditorState> for NextPrevImage {
       },
       _ => {}
     }
-    return false;
+    false
+  }
+}
+
+/*===========================================================================*/
+
+struct UnsavedIndicator {
+  left: i32,
+  top: i32,
+}
+
+impl UnsavedIndicator {
+  fn new(left: i32, top: i32) -> UnsavedIndicator {
+    UnsavedIndicator {
+      left: left,
+      top: top,
+    }
+  }
+
+  fn rect(&self) -> Rect {
+    Rect::new(self.left, self.top, 16, 16)
+  }
+}
+
+impl GuiElement<EditorState> for UnsavedIndicator {
+  fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    if state.unsaved {
+      renderer.set_draw_color(Color::RGB(255, 127, 0));
+      renderer.fill_rect(self.rect()).unwrap();
+    }
+  }
+
+  fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
+    false
   }
 }
 
@@ -546,6 +585,8 @@ fn main() {
 
   let mut state = EditorState::new(filepath, images);
   let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
+    Box::new(UnsavedIndicator::new(462, 2)),
+    // Color palette:
     Box::new(ColorPicker::new(  2, 2, 0x0, Keycode::Num0)),
     Box::new(ColorPicker::new( 20, 2, 0x1, Keycode::Num1)),
     Box::new(ColorPicker::new( 38, 2, 0x2, Keycode::Num2)),
@@ -562,11 +603,14 @@ fn main() {
     Box::new(ColorPicker::new(236, 2, 0xD, Keycode::D)),
     Box::new(ColorPicker::new(254, 2, 0xE, Keycode::E)),
     Box::new(ColorPicker::new(272, 2, 0xF, Keycode::F)),
+    // Toolbox:
     Box::new(ToolPicker::new( 2, 302, Tool::Pencil,      Keycode::P)),
     Box::new(ToolPicker::new(20, 302, Tool::PaintBucket, Keycode::K)),
     Box::new(ToolPicker::new(38, 302, Tool::Eyedropper,  Keycode::Y)),
+    // Canvases:
     Box::new(Canvas::new(8, 32, 256)),
     Box::new(Canvas::new(300, 32, 64)),
+    // Images scrollbar:
     Box::new(NextPrevImage::new(374, 8, -1, Keycode::Up)),
     Box::new(ImagePicker::new(372, 32, -2)),
     Box::new(ImagePicker::new(372, 70, -1)),
@@ -595,7 +639,10 @@ fn main() {
             state.add_new_image();
             needs_redraw = true;
           },
-          Keycode::S => { state.save_to_file().unwrap(); },
+          Keycode::S => {
+            state.save_to_file().unwrap();
+            needs_redraw = true;
+          },
           _ => {}
         }
       },
