@@ -1,5 +1,4 @@
 // TODO:
-// - Load/save
 // - Undo/redo
 // - Go back to prev tool after using eyedropper
 // - Icons for tool pickers
@@ -7,17 +6,21 @@
 // - Switching between images
 // - Select/move/cut/copy/paste
 // - Support non-32x32 images
+// - Unsaved changes indicator
 
 extern crate ahi;
 extern crate sdl2;
 
 use ahi::Image;
 use sdl2::event::Event;
+use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
 use sdl2::render::Renderer;
+use std::io;
+use std::fs::File;
 
 /*===========================================================================*/
 
@@ -37,17 +40,32 @@ enum Tool {
 
 struct EditorState {
   color: u8,
-  image: Image,
+  filepath: String,
+  images: Vec<Image>,
   tool: Tool,
 }
 
 impl EditorState {
-  fn new() -> EditorState {
+  fn new(filepath: String, images: Vec<Image>) -> EditorState {
     EditorState {
       color: 1,
-      image: Image::new(32, 32),
+      filepath: filepath,
+      images: images,
       tool: Tool::Pencil,
     }
+  }
+
+  fn image(&self) -> &Image {
+    return &self.images[0];
+  }
+
+  fn image_mut(&mut self) -> &mut Image {
+    return &mut self.images[0];
+  }
+
+  fn save_to_file(&self) -> io::Result<()> {
+    let mut file = try!(File::create(&self.filepath));
+    Image::write(&mut file, &self.images)
   }
 }
 
@@ -207,7 +225,7 @@ impl Canvas {
 
   fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
     if let Some((col, row)) = self.mouse_to_row_col(x, y) {
-      state.color = state.image.pixels[(32 * row + col) as usize];
+      state.color = state.image().pixels[(32 * row + col) as usize];
       true
     } else { false }
   }
@@ -241,7 +259,7 @@ impl GuiElement<EditorState> for Canvas {
   fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
     renderer.set_draw_color(Color::RGB(255, 255, 255));
     renderer.draw_rect(expand(self.rect(), 2)).unwrap();
-    render_image(renderer, &state.image, self.left, self.top, self.scale);
+    render_image(renderer, state.image(), self.left, self.top, self.scale);
   }
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
@@ -249,10 +267,10 @@ impl GuiElement<EditorState> for Canvas {
       &Event::MouseButtonDown{x, y, ..} => {
         match state.tool {
           Tool::PaintBucket => {
-            return self.try_flood_fill(x, y, state.color, &mut state.image);
+            return self.try_flood_fill(x, y, state.color, state.image_mut());
           },
           Tool::Pencil => {
-            return self.try_paint(x, y, state.color, &mut state.image);
+            return self.try_paint(x, y, state.color, state.image_mut());
           },
           Tool::Eyedropper => {
             return self.try_eyedrop(x, y, state);
@@ -263,7 +281,7 @@ impl GuiElement<EditorState> for Canvas {
         if mousestate.left() {
           match state.tool {
             Tool::Pencil => {
-              return self.try_paint(x, y, state.color, &mut state.image);
+              return self.try_paint(x, y, state.color, state.image_mut());
             },
             _ => {}
           }
@@ -329,7 +347,20 @@ fn render_screen(renderer: &mut Renderer, state: &EditorState,
   renderer.present();
 }
 
+fn load_from_file(path: &String) -> io::Result<Vec<Image>> {
+  let mut file = try!(File::open(path));
+  Image::read(&mut file)
+}
+
 fn main() {
+  let args: Vec<String> = std::env::args().collect();
+  let (filepath, images) = if args.len() >= 2 {
+    let filepath = &args[1];
+    (filepath.clone(), load_from_file(filepath).unwrap())
+  } else {
+    ("out.ahi".to_string(), vec![Image::new(32, 32)])
+  };
+
   let sdl_context = sdl2::init().unwrap();
   let video_subsystem = sdl_context.video().unwrap();
 
@@ -344,7 +375,7 @@ fn main() {
   let mut renderer = window.renderer().build().unwrap();
   renderer.set_logical_size(width, height).unwrap();
 
-  let mut state = EditorState::new();
+  let mut state = EditorState::new(filepath, images);
   let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(ColorPicker::new(  2, 2, 0x0, Keycode::Num0)),
     Box::new(ColorPicker::new( 20, 2, 0x1, Keycode::Num1)),
@@ -376,6 +407,13 @@ fn main() {
   loop {
     match event_pump.wait_event() {
       Event::Quit{..} => return,
+      Event::KeyDown{keycode: Some(key), keymod: kmod, ..} if
+          kmod.intersects(keyboard::LGUIMOD | keyboard::RGUIMOD) => {
+        match key {
+          Keycode::S => { state.save_to_file().unwrap(); },
+          _ => {}
+        }
+      },
       event => {
         let mut needs_redraw = false;
         for element in elements.iter_mut() {
