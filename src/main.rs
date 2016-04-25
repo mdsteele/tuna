@@ -366,14 +366,14 @@ impl Canvas {
 
   fn try_paint(&self, x: i32, y: i32, color: u8, image: &mut Image) -> bool {
     if let Some((col, row)) = self.mouse_to_row_col(x, y) {
-      image.pixels[(row * 32 + col) as usize] = color;
+      image[(col, row)] = color;
       true
     } else { false }
   }
 
   fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
     if let Some((col, row)) = self.mouse_to_row_col(x, y) {
-      state.color = state.image().pixels[(32 * row + col) as usize];
+      state.color = state.image()[(col, row)];
       state.tool = state.prev_tool;
       true
     } else { false }
@@ -382,9 +382,9 @@ impl Canvas {
   fn try_flood_fill(&self, x: i32, y: i32, to_color: u8,
                     image: &mut Image) -> bool {
     if let Some((col, row)) = self.mouse_to_row_col(x, y) {
-      let from_color = image.pixels[(row * 32 + col) as usize];
+      let from_color = image[(col, row)];
       if from_color == to_color { return false; }
-      image.pixels[(row * 32 + col) as usize] = to_color;
+      image[(col, row)] = to_color;
       let mut stack: Vec<(u32, u32)> = vec![(col, row)];
       while let Some((col, row)) = stack.pop() {
         let mut next: Vec<(u32, u32)> = vec![];
@@ -392,10 +392,10 @@ impl Canvas {
         if col < 31 { next.push((col + 1, row)); }
         if row > 0 { next.push((col, row - 1)); }
         if row < 31 { next.push((col, row + 1)); }
-        for (col, row) in next {
-          if image.pixels[(row * 32 + col) as usize] == from_color {
-            image.pixels[(row * 32 + col) as usize] = to_color;
-            stack.push((col, row));
+        for coords in next {
+          if image[coords] == from_color {
+            image[coords] = to_color;
+            stack.push(coords);
           }
         }
       }
@@ -481,9 +481,9 @@ fn hex_pixel_to_sdl_color(pixel: u8) -> Color {
 
 fn render_image(renderer: &mut Renderer, image: &Image,
                 left: i32, top: i32, scale: u32) {
-  for row in 0..image.height {
-    for col in 0..image.width {
-      let pixel: u8 = image.pixels[(row * image.width + col) as usize];
+  for row in 0..image.height() {
+    for col in 0..image.width() {
+      let pixel: u8 = image[(col, row)];
       if pixel != 0 {
           renderer.set_draw_color(hex_pixel_to_sdl_color(pixel));
           renderer.fill_rect(Rect::new(left + (scale * col) as i32,
