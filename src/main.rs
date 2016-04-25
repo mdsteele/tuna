@@ -1,6 +1,5 @@
 // TODO:
 // - Undo/redo
-// - Go back to prev tool after using eyedropper
 // - Icons for tool pickers
 // - Editing multiple images
 // - Switching between images
@@ -43,6 +42,7 @@ struct EditorState {
   filepath: String,
   images: Vec<Image>,
   tool: Tool,
+  prev_tool: Tool,
 }
 
 impl EditorState {
@@ -52,6 +52,7 @@ impl EditorState {
       filepath: filepath,
       images: images,
       tool: Tool::Pencil,
+      prev_tool: Tool::Pencil,
     }
   }
 
@@ -156,6 +157,13 @@ impl ToolPicker {
   fn rect(&self) -> Rect {
     Rect::new(self.left, self.top, 16, 16)
   }
+
+  fn pick_tool(&self, state: &mut EditorState) -> bool {
+    if state.tool == self.tool { return false; }
+    state.prev_tool = state.tool;
+    state.tool = self.tool;
+    true
+  }
 }
 
 impl GuiElement<EditorState> for ToolPicker {
@@ -172,14 +180,12 @@ impl GuiElement<EditorState> for ToolPicker {
     match event {
       &Event::MouseButtonDown{x, y, ..} => {
         if self.rect().contains((x, y)) {
-          state.tool = self.tool;
-          return true;
+          return self.pick_tool(state);
         }
       },
       &Event::KeyDown{keycode: Some(key), ..} => {
         if key == self.key {
-          state.tool = self.tool;
-          return true;
+          return self.pick_tool(state);
         }
       },
       _ => {}
@@ -226,6 +232,7 @@ impl Canvas {
   fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
     if let Some((col, row)) = self.mouse_to_row_col(x, y) {
       state.color = state.image().pixels[(32 * row + col) as usize];
+      state.tool = state.prev_tool;
       true
     } else { false }
   }
