@@ -2,7 +2,6 @@
 // - Undo/redo
 // - Icons for tool pickers
 // - Select/move/cut/copy/paste
-// - Support non-32x32 images
 // - Unsaved changes indicator
 
 extern crate ahi;
@@ -341,47 +340,59 @@ impl GuiElement<EditorState> for NextPrevImage {
 struct Canvas {
   left: i32,
   top: i32,
-  scale: u32,
+  max_size: u32,
 }
 
 impl Canvas {
-  fn new(left: i32, top: i32, scale: u32) -> Canvas {
+  fn new(left: i32, top: i32, max_size: u32) -> Canvas {
     Canvas {
       left: left,
       top: top,
-      scale: scale,
+      max_size: max_size,
     }
   }
 
-  fn rect(&self) -> Rect {
-    Rect::new(self.left, self.top, 32 * self.scale, 32 * self.scale)
+  fn scale(&self, state: &EditorState) -> u32 {
+    let (width, height) = state.image().size();
+    std::cmp::max(1, self.max_size / std::cmp::max(width, height))
   }
 
-  fn mouse_to_row_col(&self, x: i32, y: i32) -> Option<(u32, u32)> {
-    let col = (x - self.left) / (self.scale as i32);
-    let row = (y - self.top) / (self.scale as i32);
-    if col < 0 || col >= 32 || row < 0 || row >= 32 { None }
+  fn rect(&self, state: &EditorState) -> Rect {
+    let scale = self.scale(state);
+    let (width, height) = state.image().size();
+    Rect::new(self.left, self.top, width * scale, height * scale)
+  }
+
+  fn mouse_to_row_col(&self, x: i32, y: i32,
+                      state: &EditorState) -> Option<(u32, u32)> {
+    let scale = self.scale(state) as i32;
+    let col = (x - self.left) / scale;
+    let row = (y - self.top) / scale;
+    let (width, height) = state.image().size();
+    if col < 0 || col >= (width as i32) ||
+       row < 0 || row >= (height as i32) { None }
     else { Some((col as u32, row as u32)) }
   }
 
-  fn try_paint(&self, x: i32, y: i32, color: u8, image: &mut Image) -> bool {
-    if let Some((col, row)) = self.mouse_to_row_col(x, y) {
-      image[(col, row)] = color;
+  fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
+    if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
+      state.image_mut()[(col, row)] = state.color;
       true
     } else { false }
   }
 
   fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
-    if let Some((col, row)) = self.mouse_to_row_col(x, y) {
+    if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
       state.color = state.image()[(col, row)];
       state.tool = state.prev_tool;
       true
     } else { false }
   }
 
-  fn try_flood_fill(&self, x: i32, y: i32, to_color: u8,
-                    image: &mut Image) -> bool {
-    if let Some((col, row)) = self.mouse_to_row_col(x, y) {
+  fn try_flood_fill(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
+    if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
+      let to_color = state.color;
+      let image = state.image_mut();
       let from_color = image[(col, row)];
       if from_color == to_color { return false; }
       image[(col, row)] = to_color;
@@ -407,8 +418,9 @@ impl Canvas {
 impl GuiElement<EditorState> for Canvas {
   fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
     renderer.set_draw_color(Color::RGB(255, 255, 255));
-    renderer.draw_rect(expand(self.rect(), 2)).unwrap();
-    render_image(renderer, state.image(), self.left, self.top, self.scale);
+    renderer.draw_rect(expand(self.rect(state), 2)).unwrap();
+    render_image(renderer, state.image(), self.left, self.top,
+                 self.scale(state));
   }
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
@@ -416,10 +428,10 @@ impl GuiElement<EditorState> for Canvas {
       &Event::MouseButtonDown{x, y, ..} => {
         match state.tool {
           Tool::PaintBucket => {
-            return self.try_flood_fill(x, y, state.color, state.image_mut());
+            return self.try_flood_fill(x, y, state);
           },
           Tool::Pencil => {
-            return self.try_paint(x, y, state.color, state.image_mut());
+            return self.try_paint(x, y, state);
           },
           Tool::Eyedropper => {
             return self.try_eyedrop(x, y, state);
@@ -430,7 +442,7 @@ impl GuiElement<EditorState> for Canvas {
         if mousestate.left() {
           match state.tool {
             Tool::Pencil => {
-              return self.try_paint(x, y, state.color, state.image_mut());
+              return self.try_paint(x, y, state);
             },
             _ => {}
           }
@@ -553,8 +565,8 @@ fn main() {
     Box::new(ToolPicker::new( 2, 302, Tool::Pencil,      Keycode::P)),
     Box::new(ToolPicker::new(20, 302, Tool::PaintBucket, Keycode::K)),
     Box::new(ToolPicker::new(38, 302, Tool::Eyedropper,  Keycode::Y)),
-    Box::new(Canvas::new(32, 32, 8)),
-    Box::new(Canvas::new(300, 32, 2)),
+    Box::new(Canvas::new(8, 32, 256)),
+    Box::new(Canvas::new(300, 32, 64)),
     Box::new(NextPrevImage::new(374, 8, -1, Keycode::Up)),
     Box::new(ImagePicker::new(372, 32, -2)),
     Box::new(ImagePicker::new(372, 70, -1)),
