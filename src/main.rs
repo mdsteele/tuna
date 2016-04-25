@@ -1,8 +1,6 @@
 // TODO:
 // - Undo/redo
 // - Icons for tool pickers
-// - Editing multiple images
-// - Switching between images
 // - Select/move/cut/copy/paste
 // - Support non-32x32 images
 // - Unsaved changes indicator
@@ -41,27 +39,52 @@ struct EditorState {
   color: u8,
   filepath: String,
   images: Vec<Image>,
+  current_image: usize,
   tool: Tool,
   prev_tool: Tool,
 }
 
 impl EditorState {
-  fn new(filepath: String, images: Vec<Image>) -> EditorState {
+  fn new(filepath: String, mut images: Vec<Image>) -> EditorState {
+    if images.is_empty() {
+      images.push(Image::new(32, 32));
+    }
     EditorState {
       color: 1,
       filepath: filepath,
       images: images,
+      current_image: 0,
       tool: Tool::Pencil,
       prev_tool: Tool::Pencil,
     }
   }
 
   fn image(&self) -> &Image {
-    return &self.images[0];
+    return &self.images[self.current_image];
   }
 
   fn image_mut(&mut self) -> &mut Image {
-    return &mut self.images[0];
+    return &mut self.images[self.current_image];
+  }
+
+  fn image_at(&self, index: usize) -> &Image {
+    return &self.images[index];
+  }
+
+  fn add_new_image(&mut self) {
+    let (width, height) = self.image().size();
+    self.current_image += 1;
+    self.images.insert(self.current_image, Image::new(width, height));
+  }
+
+  fn try_delete_image(&mut self) -> bool {
+    if self.images.len() > 1 {
+      self.images.remove(self.current_image);
+      if self.current_image == self.images.len() {
+        self.current_image -= 1;
+      }
+      true
+    } else { false }
   }
 
   fn save_to_file(&self) -> io::Result<()> {
@@ -196,6 +219,125 @@ impl GuiElement<EditorState> for ToolPicker {
 
 /*===========================================================================*/
 
+struct ImagePicker {
+  left: i32,
+  top: i32,
+  delta: i32,
+}
+
+impl ImagePicker {
+  fn new(left: i32, top: i32, delta: i32) -> ImagePicker {
+    ImagePicker {
+      left: left,
+      top: top,
+      delta: delta,
+    }
+  }
+
+  fn rect(&self) -> Rect {
+    Rect::new(self.left, self.top, 36, 36)
+  }
+
+  fn index(&self, state: &EditorState) -> Option<usize> {
+    let index = (state.current_image as i32) + self.delta;
+    if index >= 0 && index < (state.images.len() as i32) {
+      Some(index as usize)
+    } else { None }
+  }
+
+  fn pick(&self, state: &mut EditorState) -> bool {
+    if let Some(index) = self.index(state) {
+      state.current_image = index;
+      true
+    } else { false }
+  }
+}
+
+impl GuiElement<EditorState> for ImagePicker {
+  fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    if let Some(index) = self.index(state) {
+      render_image(renderer, state.image_at(index),
+                   self.left + 2, self.top + 2, 1);
+      if self.delta == 0 {
+        renderer.set_draw_color(Color::RGB(255, 255, 127));
+      } else {
+        renderer.set_draw_color(Color::RGB(127, 127, 63));
+      }
+    } else {
+      renderer.set_draw_color(Color::RGB(0, 0, 0));
+    }
+    renderer.draw_rect(self.rect()).unwrap();
+  }
+
+  fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
+    match event {
+      &Event::MouseButtonDown{x, y, ..} => {
+        if self.rect().contains((x, y)) {
+          return self.pick(state);
+        }
+      },
+      _ => {}
+    }
+    return false;
+  }
+}
+
+/*===========================================================================*/
+
+struct NextPrevImage {
+  left: i32,
+  top: i32,
+  delta: i32,
+  key: Keycode,
+}
+
+impl NextPrevImage {
+  fn new(left: i32, top: i32, delta: i32, key: Keycode) -> NextPrevImage {
+    NextPrevImage {
+      left: left,
+      top: top,
+      delta: delta,
+      key: key,
+    }
+  }
+
+  fn rect(&self) -> Rect {
+    Rect::new(self.left, self.top, 32, 16)
+  }
+
+  fn increment(&self, state: &mut EditorState) -> bool {
+    state.current_image = modulo((state.current_image as i32) + self.delta,
+                                 state.images.len() as i32) as usize;
+    true
+  }
+}
+
+impl GuiElement<EditorState> for NextPrevImage {
+  fn draw(&self, _: &EditorState, renderer: &mut Renderer) {
+    renderer.set_draw_color(Color::RGB(63, 0, 127));
+    renderer.fill_rect(self.rect()).unwrap();
+  }
+
+  fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
+    match event {
+      &Event::MouseButtonDown{x, y, ..} => {
+        if self.rect().contains((x, y)) {
+          return self.increment(state);
+        }
+      },
+      &Event::KeyDown{keycode: Some(key), ..} => {
+        if key == self.key {
+          return self.increment(state);
+        }
+      },
+      _ => {}
+    }
+    return false;
+  }
+}
+
+/*===========================================================================*/
+
 struct Canvas {
   left: i32,
   top: i32,
@@ -302,6 +444,14 @@ impl GuiElement<EditorState> for Canvas {
 
 /*===========================================================================*/
 
+fn modulo(a: i32, b: i32) -> i32 {
+  if b == 0 { panic!(); }
+  let remainder = a % b;
+  if remainder == 0 { 0 }
+  else if (a < 0) ^ (b < 0) { remainder + b }
+  else { remainder }
+}
+
 fn expand(rect: Rect, by: i32) -> Rect {
   Rect::new(rect.x() - by, rect.y() - by,
             ((rect.width() as i32) + 2 * by) as u32,
@@ -365,7 +515,7 @@ fn main() {
     let filepath = &args[1];
     (filepath.clone(), load_from_file(filepath).unwrap())
   } else {
-    ("out.ahi".to_string(), vec![Image::new(32, 32)])
+    ("out.ahi".to_string(), vec![])
   };
 
   let sdl_context = sdl2::init().unwrap();
@@ -405,33 +555,48 @@ fn main() {
     Box::new(ToolPicker::new(38, 302, Tool::Eyedropper,  Keycode::Y)),
     Box::new(Canvas::new(32, 32, 8)),
     Box::new(Canvas::new(300, 32, 2)),
-    Box::new(Canvas::new(300, 128, 1)),
+    Box::new(NextPrevImage::new(374, 8, -1, Keycode::Up)),
+    Box::new(ImagePicker::new(372, 32, -2)),
+    Box::new(ImagePicker::new(372, 70, -1)),
+    Box::new(ImagePicker::new(372, 108, 0)),
+    Box::new(ImagePicker::new(372, 146, 1)),
+    Box::new(ImagePicker::new(372, 184, 2)),
+    Box::new(NextPrevImage::new(374, 222, 1, Keycode::Down)),
   ];
 
   render_screen(&mut renderer, &state, &elements);
 
   let mut event_pump = sdl_context.event_pump().unwrap();
   loop {
+    let mut needs_redraw = false;
     match event_pump.wait_event() {
       Event::Quit{..} => return,
       Event::KeyDown{keycode: Some(key), keymod: kmod, ..} if
           kmod.intersects(keyboard::LGUIMOD | keyboard::RGUIMOD) => {
         match key {
+          Keycode::Backspace => {
+            if state.try_delete_image() {
+              needs_redraw = true;
+            }
+          },
+          Keycode::N => {
+            state.add_new_image();
+            needs_redraw = true;
+          },
           Keycode::S => { state.save_to_file().unwrap(); },
           _ => {}
         }
       },
       event => {
-        let mut needs_redraw = false;
         for element in elements.iter_mut() {
           if element.handle_event(&event, &mut state) {
             needs_redraw = true;
           }
         }
-        if needs_redraw {
-          render_screen(&mut renderer, &state, &elements);
-        }
       }
+    }
+    if needs_redraw {
+      render_screen(&mut renderer, &state, &elements);
     }
   }
 }
