@@ -1,7 +1,8 @@
 // TODO:
 // - Undo/redo
-// - Icons for tool pickers
 // - Select/move/cut/copy/paste
+// - Image resizing
+// - Open-file/Save-as
 
 extern crate ahi;
 extern crate sdl2;
@@ -11,9 +12,12 @@ use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
 use sdl2::render::Renderer;
+use sdl2::render::Texture;
+use sdl2::surface::Surface;
 use std::io;
 use std::fs::File;
 
@@ -170,20 +174,23 @@ struct ToolPicker {
   key: Keycode,
   left: i32,
   top: i32,
+  icon: Texture,
 }
 
 impl ToolPicker {
-  fn new(left: i32, top: i32, tool: Tool, key: Keycode) -> ToolPicker {
+  fn new(left: i32, top: i32, tool: Tool, key: Keycode,
+         icon: Texture) -> ToolPicker {
     ToolPicker {
       tool: tool,
       key: key,
       left: left,
       top: top,
+      icon: icon,
     }
   }
 
   fn rect(&self) -> Rect {
-    Rect::new(self.left, self.top, 16, 16)
+    Rect::new(self.left, self.top, 20, 20)
   }
 
   fn pick_tool(&self, state: &mut EditorState) -> bool {
@@ -196,12 +203,13 @@ impl ToolPicker {
 
 impl GuiElement<EditorState> for ToolPicker {
   fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
-    renderer.set_draw_color(Color::RGB(127, 63, 0));
-    renderer.fill_rect(self.rect()).unwrap();
     if state.tool == self.tool {
       renderer.set_draw_color(Color::RGB(255, 255, 255));
-      renderer.draw_rect(self.rect()).unwrap();
+      renderer.fill_rect(self.rect()).unwrap();
     }
+    renderer.copy(&self.icon, None, Some(expand(self.rect(), -2)));
+    renderer.set_draw_color(Color::RGB(191, 191, 191));
+    renderer.draw_rect(self.rect()).unwrap();
   }
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
@@ -404,6 +412,7 @@ impl Canvas {
 
   fn mouse_to_row_col(&self, x: i32, y: i32,
                       state: &EditorState) -> Option<(u32, u32)> {
+    if x < self.left || y < self.top { return None; }
     let scale = self.scale(state) as i32;
     let col = (x - self.left) / scale;
     let row = (y - self.top) / scale;
@@ -432,6 +441,7 @@ impl Canvas {
     if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
       let to_color = state.color;
       let image = state.image_mut();
+      let (width, height) = image.size();
       let from_color = image[(col, row)];
       if from_color == to_color { return false; }
       image[(col, row)] = to_color;
@@ -439,9 +449,9 @@ impl Canvas {
       while let Some((col, row)) = stack.pop() {
         let mut next: Vec<(u32, u32)> = vec![];
         if col > 0 { next.push((col - 1, row)); }
-        if col < 31 { next.push((col + 1, row)); }
+        if col < width - 1 { next.push((col + 1, row)); }
         if row > 0 { next.push((col, row - 1)); }
-        if row < 31 { next.push((col, row + 1)); }
+        if row < height - 1 { next.push((col, row + 1)); }
         for coords in next {
           if image[coords] == from_color {
             image[coords] = to_color;
@@ -530,6 +540,22 @@ fn hex_pixel_to_sdl_color(pixel: u8) -> Color {
   }
 }
 
+fn image_to_sdl_surface(image: &Image) -> Surface {
+  let mut surface = Surface::new(image.width(), image.height(),
+                                 PixelFormatEnum::RGBA8888).unwrap();
+  for row in 0..image.height() {
+    for col in 0..image.width() {
+      surface.fill_rect(Some(Rect::new(col as i32, row as i32, 1, 1)),
+                        hex_pixel_to_sdl_color(image[(col, row)])).unwrap();
+    }
+  }
+  surface
+}
+
+fn image_to_sdl_texture(renderer: &Renderer, image: &Image) -> Texture {
+  renderer.create_texture_from_surface(&image_to_sdl_surface(image)).unwrap()
+}
+
 fn render_image(renderer: &mut Renderer, image: &Image,
                 left: i32, top: i32, scale: u32) {
   for row in 0..image.height() {
@@ -583,6 +609,8 @@ fn main() {
   let mut renderer = window.renderer().build().unwrap();
   renderer.set_logical_size(width, height).unwrap();
 
+  let tool_icons = load_from_file(&"data/tool_icons.ahi".to_string()).unwrap();
+
   let mut state = EditorState::new(filepath, images);
   let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(UnsavedIndicator::new(462, 2)),
@@ -604,9 +632,12 @@ fn main() {
     Box::new(ColorPicker::new(254, 2, 0xE, Keycode::E)),
     Box::new(ColorPicker::new(272, 2, 0xF, Keycode::F)),
     // Toolbox:
-    Box::new(ToolPicker::new( 2, 302, Tool::Pencil,      Keycode::P)),
-    Box::new(ToolPicker::new(20, 302, Tool::PaintBucket, Keycode::K)),
-    Box::new(ToolPicker::new(38, 302, Tool::Eyedropper,  Keycode::Y)),
+    Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
+                             image_to_sdl_texture(&renderer, &tool_icons[0]))),
+    Box::new(ToolPicker::new(28, 296, Tool::PaintBucket, Keycode::K,
+                             image_to_sdl_texture(&renderer, &tool_icons[1]))),
+    Box::new(ToolPicker::new(52, 296, Tool::Eyedropper,  Keycode::Y,
+                             image_to_sdl_texture(&renderer, &tool_icons[2]))),
     // Canvases:
     Box::new(Canvas::new(8, 32, 256)),
     Box::new(Canvas::new(300, 32, 64)),
