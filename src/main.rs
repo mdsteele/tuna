@@ -1,6 +1,5 @@
 // TODO:
 // - Undo/redo
-// - Select/move/cut/copy/paste
 // - Image resizing
 // - Open-file/Save-as
 
@@ -11,6 +10,7 @@ use ahi::Image;
 use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::Mouse;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Point;
@@ -35,6 +35,7 @@ enum Tool {
   Eyedropper,
   PaintBucket,
   Pencil,
+  Select,
 }
 
 struct EditorState {
@@ -42,6 +43,8 @@ struct EditorState {
   filepath: String,
   images: Vec<Image>,
   current_image: usize,
+  selection: Option<(Image, i32, i32)>,
+  clipboard: Option<(Image, i32, i32)>,
   tool: Tool,
   prev_tool: Tool,
   unsaved: bool,
@@ -57,6 +60,8 @@ impl EditorState {
       filepath: filepath,
       images: images,
       current_image: 0,
+      selection: None,
+      clipboard: None,
       tool: Tool::Pencil,
       prev_tool: Tool::Pencil,
       unsaved: false,
@@ -77,6 +82,7 @@ impl EditorState {
   }
 
   fn add_new_image(&mut self) {
+    self.unselect();
     let (width, height) = self.image().size();
     self.current_image += 1;
     self.images.insert(self.current_image, Image::new(width, height));
@@ -85,6 +91,7 @@ impl EditorState {
 
   fn try_delete_image(&mut self) -> bool {
     if self.images.len() > 1 {
+      self.unselect();
       self.images.remove(self.current_image);
       if self.current_image == self.images.len() {
         self.current_image -= 1;
@@ -94,7 +101,52 @@ impl EditorState {
     } else { false }
   }
 
+  fn select(&mut self, rect: &Rect) {
+    self.unselect();
+    let mut selected = Image::new(rect.width(), rect.height());
+    selected.copy_from(self.image(), -rect.x(), -rect.y());
+    self.selection = Some((selected, rect.x(), rect.y()));
+    self.image_mut().clear_rect(rect.x(), rect.y(),
+                                rect.width(), rect.height());
+    self.tool = Tool::Select;
+  }
+
+  fn select_all(&mut self) {
+    let (width, height) = self.image().size();
+    self.select(&Rect::new(0, 0, width, height));
+  }
+
+  fn unselect(&mut self) {
+    if let Some((selected, x, y)) = self.selection.take() {
+      self.image_mut().copy_from(&selected, x, y);
+    }
+  }
+
+  fn cut_selection(&mut self) {
+    if self.selection.is_some() {
+      self.clipboard = self.selection.take();
+    } else {
+      self.clipboard = Some((self.image().clone(), 0, 0));
+      self.image_mut().clear();
+    }
+  }
+
+  fn copy_selection(&mut self) {
+    if self.selection.is_some() {
+      self.clipboard = self.selection.clone();
+    } else {
+      self.clipboard = Some((self.image().clone(), 0, 0));
+    }
+  }
+
+  fn paste_selection(&mut self) {
+    self.unselect();
+    self.selection = self.clipboard.clone();
+    self.tool = Tool::Select;
+  }
+
   fn save_to_file(&mut self) -> io::Result<()> {
+    self.unselect();
     let mut file = try!(File::create(&self.filepath));
     try!(Image::write(&mut file, &self.images));
     self.unsaved = false;
@@ -195,6 +247,7 @@ impl ToolPicker {
 
   fn pick_tool(&self, state: &mut EditorState) -> bool {
     if state.tool == self.tool { return false; }
+    state.unselect();
     state.prev_tool = state.tool;
     state.tool = self.tool;
     true
@@ -319,6 +372,7 @@ impl NextPrevImage {
   }
 
   fn increment(&self, state: &mut EditorState) -> bool {
+    state.unselect();
     state.current_image = modulo((state.current_image as i32) + self.delta,
                                  state.images.len() as i32) as usize;
     true
@@ -384,10 +438,17 @@ impl GuiElement<EditorState> for UnsavedIndicator {
 
 /*===========================================================================*/
 
+struct CanvasDrag {
+  from_selection: (i32, i32),
+  from_pixel: (i32, i32),
+  to_pixel: (i32, i32),
+}
+
 struct Canvas {
   left: i32,
   top: i32,
   max_size: u32,
+  drag_from_to: Option<CanvasDrag>,
 }
 
 impl Canvas {
@@ -396,6 +457,7 @@ impl Canvas {
       left: left,
       top: top,
       max_size: max_size,
+      drag_from_to: None,
     }
   }
 
@@ -410,6 +472,20 @@ impl Canvas {
     Rect::new(self.left, self.top, width * scale, height * scale)
   }
 
+  fn dragged_rect(&self, state: &EditorState) -> Option<Rect> {
+    if let Some(ref drag) = self.drag_from_to {
+      let (fpx, fpy) = drag.from_pixel;
+      let (tpx, tpy) = drag.to_pixel;
+      let (from_col, from_row) = self.clamp_mouse_to_row_col(fpx, fpy, state);
+      let (to_col, to_row) = self.clamp_mouse_to_row_col(tpx, tpy, state);
+      let x = std::cmp::min(from_col, to_col) as i32;
+      let y = std::cmp::min(from_row, to_row) as i32;
+      let w = ((from_col as i32 - to_col as i32).abs() + 1) as u32;
+      let h = ((from_row as i32 - to_row as i32).abs() + 1) as u32;
+      Some(Rect::new(x, y, w, h))
+    } else { None }
+  }
+
   fn mouse_to_row_col(&self, x: i32, y: i32,
                       state: &EditorState) -> Option<(u32, u32)> {
     if x < self.left || y < self.top { return None; }
@@ -420,6 +496,16 @@ impl Canvas {
     if col < 0 || col >= (width as i32) ||
        row < 0 || row >= (height as i32) { None }
     else { Some((col as u32, row as u32)) }
+  }
+
+  fn clamp_mouse_to_row_col(&self, x: i32, y: i32,
+                            state: &EditorState) -> (u32, u32) {
+    let scale = self.scale(state) as i32;
+    let col = (x - self.left) / scale;
+    let row = (y - self.top) / scale;
+    let (width, height) = state.image().size();
+    (std::cmp::max(0, std::cmp::min(col, width as i32)) as u32,
+     std::cmp::max(0, std::cmp::min(row, height as i32)) as u32)
   }
 
   fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
@@ -466,32 +552,105 @@ impl Canvas {
 
 impl GuiElement<EditorState> for Canvas {
   fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    let scale = self.scale(state);
     renderer.set_draw_color(Color::RGB(255, 255, 255));
     renderer.draw_rect(expand(self.rect(state), 2)).unwrap();
-    render_image(renderer, state.image(), self.left, self.top,
-                 self.scale(state));
+    render_image(renderer, state.image(), self.left, self.top, scale);
+    if let Some((ref selected, x, y)) = state.selection {
+      let left = self.left + x * (scale as i32);
+      let top = self.top + y * (scale as i32);
+      render_image(renderer, selected, left, top, scale);
+      renderer.set_draw_color(Color::RGB(255, 191, 255));
+      renderer.draw_rect(Rect::new(left, top, selected.width() * scale,
+                                   selected.height() * scale)).unwrap();
+    } else if let Some(rect) = self.dragged_rect(state) {
+      renderer.set_draw_color(Color::RGB(255, 255, 191));
+      renderer.draw_rect(Rect::new(self.left + rect.x() * (scale as i32),
+                                   self.top + rect.y() * (scale as i32),
+                                   rect.width() * scale,
+                                   rect.height() * scale)).unwrap();
+    }
   }
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
-      &Event::MouseButtonDown{x, y, ..} => {
-        match state.tool {
-          Tool::PaintBucket => {
-            return self.try_flood_fill(x, y, state);
-          },
-          Tool::Pencil => {
-            return self.try_paint(x, y, state);
-          },
-          Tool::Eyedropper => {
-            return self.try_eyedrop(x, y, state);
-          },
+      &Event::KeyDown{keycode: Some(Keycode::Escape), ..} => {
+        if state.selection.is_some() {
+          state.unselect();
+          return true;
         }
+      },
+      &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
+        if self.rect(state).contains((x, y)) {
+          match state.tool {
+            Tool::Eyedropper => {
+              return self.try_eyedrop(x, y, state);
+            },
+            Tool::PaintBucket => {
+              return self.try_flood_fill(x, y, state);
+            },
+            Tool::Pencil => {
+              return self.try_paint(x, y, state);
+            },
+            Tool::Select => {
+              let rect = if let Some((ref selected, x, y)) = state.selection {
+                Some(Rect::new(x, y, selected.width(), selected.height()))
+              } else { None };
+              if let Some(rect) = rect {
+                let scale = self.scale(state);
+                if !Rect::new(self.left + rect.x() * (scale as i32),
+                              self.top + rect.y() * (scale as i32),
+                              rect.width() * scale,
+                              rect.height() * scale).contains((x, y)) {
+                  state.unselect();
+                }
+              }
+              self.drag_from_to = Some(CanvasDrag{
+                from_selection: if let Some(r) = rect { (r.x(), r.y()) }
+                                else { (0, 0) },
+                from_pixel: (x, y),
+                to_pixel: (x, y),
+              });
+              return true;
+            },
+          }
+        } else {
+          self.drag_from_to = None;
+        }
+      },
+      &Event::MouseButtonUp{mouse_btn: Mouse::Left, ..} => {
+        match state.tool {
+          Tool::Select => {
+            if state.selection.is_none() {
+              if let Some(rect) = self.dragged_rect(state) {
+                state.select(&rect);
+                self.drag_from_to = None;
+                return true;
+              }
+            }
+          },
+          _ => {}
+        }
+        self.drag_from_to = None;
       },
       &Event::MouseMotion{x, y, mousestate, ..} => {
         if mousestate.left() {
           match state.tool {
             Tool::Pencil => {
               return self.try_paint(x, y, state);
+            },
+            Tool::Select => {
+              let scale = self.scale(state) as i32;
+              if let Some(ref mut drag) = self.drag_from_to {
+                drag.to_pixel = (x, y);
+                if let Some((_, ref mut sx, ref mut sy)) = state.selection {
+                  let (fsx, fsy) = drag.from_selection;
+                  let (fpx, fpy) = drag.from_pixel;
+                  *sx = fsx + (x - fpx) / scale;
+                  *sy = fsy + (y - fpy) / scale;
+                }
+                return true;
+              }
             },
             _ => {}
           }
@@ -638,6 +797,8 @@ fn main() {
                              image_to_sdl_texture(&renderer, &tool_icons[1]))),
     Box::new(ToolPicker::new(52, 296, Tool::Eyedropper,  Keycode::Y,
                              image_to_sdl_texture(&renderer, &tool_icons[2]))),
+    Box::new(ToolPicker::new(76, 296, Tool::Select,      Keycode::S,
+                             image_to_sdl_texture(&renderer, &tool_icons[3]))),
     // Canvases:
     Box::new(Canvas::new(8, 32, 256)),
     Box::new(Canvas::new(300, 32, 64)),
@@ -666,12 +827,27 @@ fn main() {
               needs_redraw = true;
             }
           },
+          Keycode::A => {
+            state.select_all();
+            needs_redraw = true;
+          },
+          Keycode::C => {
+            state.copy_selection();
+          },
           Keycode::N => {
             state.add_new_image();
             needs_redraw = true;
           },
           Keycode::S => {
             state.save_to_file().unwrap();
+            needs_redraw = true;
+          },
+          Keycode::V => {
+            state.paste_selection();
+            needs_redraw = true;
+          },
+          Keycode::X => {
+            state.cut_selection();
             needs_redraw = true;
           },
           _ => {}
