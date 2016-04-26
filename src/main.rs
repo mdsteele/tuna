@@ -113,6 +113,11 @@ impl EditorState {
     self.image_mut().flip_horz();
   }
 
+  fn flip_image_vert(&mut self) {
+    self.push_change();
+    self.image_mut().flip_vert();
+  }
+
   fn add_new_image(&mut self) {
     self.unselect();
     let (width, height) = self.image().size();
@@ -1031,7 +1036,9 @@ fn main() {
             needs_redraw = true;
           },
           Keycode::V => {
-            state.paste_selection();
+            if kmod.intersects(keyboard::LSHIFTMOD | keyboard::RSHIFTMOD) {
+              state.flip_image_vert();
+            } else { state.paste_selection(); }
             needs_redraw = true;
           },
           Keycode::X => {
