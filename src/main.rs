@@ -1,5 +1,4 @@
 // TODO:
-// - Undo/redo
 // - Image resizing
 // - Open-file/Save-as
 
@@ -38,6 +37,30 @@ enum Tool {
   Select,
 }
 
+const MAX_UNDOS: usize = 100;
+
+enum Undo {
+  AddImage(usize),
+  ChangeImage(usize, Image),
+  RemoveImage(usize, Image),
+  SelectionBegin,
+  SelectionCut(Image, i32, i32),
+  SelectionEnd(Rect),
+  SelectionMove(i32, i32),
+  SelectionPaste,
+}
+
+enum Redo {
+  AddImage(usize),
+  ChangeImage(usize, Image),
+  RemoveImage(usize),
+  SelectionBegin(Rect),
+  SelectionCut,
+  SelectionEnd,
+  SelectionMove(i32, i32),
+  SelectionPaste(Image, i32, i32),
+}
+
 struct EditorState {
   color: u8,
   filepath: String,
@@ -47,6 +70,8 @@ struct EditorState {
   clipboard: Option<(Image, i32, i32)>,
   tool: Tool,
   prev_tool: Tool,
+  undo_stack: Vec<Undo>,
+  redo_stack: Vec<Redo>,
   unsaved: bool,
 }
 
@@ -64,6 +89,8 @@ impl EditorState {
       clipboard: None,
       tool: Tool::Pencil,
       prev_tool: Tool::Pencil,
+      undo_stack: Vec::new(),
+      redo_stack: Vec::new(),
       unsaved: false,
     }
   }
@@ -86,13 +113,17 @@ impl EditorState {
     let (width, height) = self.image().size();
     self.current_image += 1;
     self.images.insert(self.current_image, Image::new(width, height));
+    let undo = Undo::AddImage(self.current_image);
+    self.push_undo(undo);
     self.unsaved = true;
   }
 
   fn try_delete_image(&mut self) -> bool {
     if self.images.len() > 1 {
       self.unselect();
-      self.images.remove(self.current_image);
+      let image = self.images.remove(self.current_image);
+      let undo = Undo::RemoveImage(self.current_image, image);
+      self.push_undo(undo);
       if self.current_image == self.images.len() {
         self.current_image -= 1;
       }
@@ -101,33 +132,44 @@ impl EditorState {
     } else { false }
   }
 
-  fn select(&mut self, rect: &Rect) {
-    self.unselect();
-    let mut selected = Image::new(rect.width(), rect.height());
-    selected.copy_from(self.image(), -rect.x(), -rect.y());
-    self.selection = Some((selected, rect.x(), rect.y()));
-    self.image_mut().clear_rect(rect.x(), rect.y(),
-                                rect.width(), rect.height());
+  fn select_with_undo(&mut self, rect: &Rect) {
+    self.select(rect);
+    self.push_undo(Undo::SelectionBegin);
     self.tool = Tool::Select;
   }
 
-  fn select_all(&mut self) {
+  fn select_all_with_undo(&mut self) {
     let (width, height) = self.image().size();
-    self.select(&Rect::new(0, 0, width, height));
+    self.select_with_undo(&Rect::new(0, 0, width, height));
   }
 
-  fn unselect(&mut self) {
+  fn try_unselect_with_undo(&mut self) -> bool {
+    if let Some(rect) = self.unselect() {
+      self.push_undo(Undo::SelectionEnd(rect));
+      true
+    } else { false }
+  }
+
+  fn select(&mut self, rect: &Rect) {
+    self.unselect();
+    let mut selected = Image::new(rect.width(), rect.height());
+    selected.draw(self.image(), -rect.x(), -rect.y());
+    self.selection = Some((selected, rect.x(), rect.y()));
+    self.image_mut().clear_rect(rect.x(), rect.y(),
+                                rect.width(), rect.height());
+  }
+
+  fn unselect(&mut self) -> Option<Rect> {
     if let Some((selected, x, y)) = self.selection.take() {
-      self.image_mut().copy_from(&selected, x, y);
-    }
+      self.image_mut().draw(&selected, x, y);
+      Some(Rect::new(x, y, selected.width(), selected.height()))
+    } else { None }
   }
 
   fn cut_selection(&mut self) {
-    if self.selection.is_some() {
-      self.clipboard = self.selection.take();
-    } else {
-      self.clipboard = Some((self.image().clone(), 0, 0));
-      self.image_mut().clear();
+    if let Some((selected, x, y)) = self.selection.take() {
+      self.push_undo(Undo::SelectionCut(selected.clone(), x, y));
+      self.clipboard = Some((selected, x, y));
     }
   }
 
@@ -141,8 +183,135 @@ impl EditorState {
 
   fn paste_selection(&mut self) {
     self.unselect();
-    self.selection = self.clipboard.clone();
-    self.tool = Tool::Select;
+    if self.clipboard.is_some() {
+      self.selection = self.clipboard.clone();
+      self.push_undo(Undo::SelectionPaste);
+      self.tool = Tool::Select;
+    }
+  }
+
+  fn push_undo(&mut self, undo: Undo) {
+    self.undo_stack.push(undo);
+    self.redo_stack.clear();
+    if self.undo_stack.len() > MAX_UNDOS {
+      self.undo_stack.remove(0);
+    }
+  }
+
+  fn push_change(&mut self) {
+    let image = self.image().clone();
+    let undo = Undo::ChangeImage(self.current_image, image);
+    self.push_undo(undo);
+  }
+
+  fn push_selection_move(&mut self) {
+    let &(_, x, y) = self.selection.as_ref().unwrap();
+    self.push_undo(Undo::SelectionMove(x, y));
+  }
+
+  fn undo(&mut self) -> bool {
+    if let Some(undo) = self.undo_stack.pop() {
+      match undo {
+        Undo::AddImage(index) => {
+          self.images.remove(index);
+          self.redo_stack.push(Redo::AddImage(index));
+        },
+        Undo::ChangeImage(index, mut image) => {
+          std::mem::swap(&mut image, &mut self.images[index]);
+          self.redo_stack.push(Redo::ChangeImage(index, image));
+        },
+        Undo::RemoveImage(index, image) => {
+          self.images.insert(index, image);
+          self.redo_stack.push(Redo::RemoveImage(index));
+        },
+        Undo::SelectionBegin => {
+          let rect = {
+            let &(ref image, x, y) = self.selection.as_ref().unwrap();
+            Rect::new(x, y, image.width(), image.height())
+          };
+          self.unselect();
+          self.redo_stack.push(Redo::SelectionBegin(rect));
+        },
+        Undo::SelectionCut(image, x, y) => {
+          self.selection = Some((image, x, y));
+          self.redo_stack.push(Redo::SelectionCut);
+        },
+        Undo::SelectionEnd(rect) => {
+          self.select(&rect);
+          self.redo_stack.push(Redo::SelectionEnd);
+        },
+        Undo::SelectionMove(old_x, old_y) => {
+          let (new_x, new_y) = {
+            let &mut (_, ref mut x, ref mut y) =
+                self.selection.as_mut().unwrap();
+            let new = (*x, *y);
+            *x = old_x;
+            *y = old_y;
+            new
+          };
+          self.redo_stack.push(Redo::SelectionMove(new_x, new_y));
+        },
+        Undo::SelectionPaste => {
+          let (image, x, y) = self.selection.take().unwrap();
+          self.redo_stack.push(Redo::SelectionPaste(image, x, y));
+        },
+      }
+      self.unsaved = true;
+      true
+    } else { false }
+  }
+
+  fn redo(&mut self) -> bool {
+    if let Some(redo) = self.redo_stack.pop() {
+      match redo {
+        Redo::AddImage(index) => {
+          let (width, height) = self.image().size();
+          self.images.insert(index, Image::new(width, height));
+          self.undo_stack.push(Undo::AddImage(index));
+        },
+        Redo::ChangeImage(index, mut image) => {
+          std::mem::swap(&mut image, &mut self.images[index]);
+          self.undo_stack.push(Undo::ChangeImage(index, image));
+        },
+        Redo::RemoveImage(index) => {
+          let image = self.images.remove(index);
+          self.undo_stack.push(Undo::RemoveImage(index, image));
+        },
+        Redo::SelectionBegin(rect) => {
+          self.select(&rect);
+          self.undo_stack.push(Undo::SelectionBegin);
+        },
+        Redo::SelectionCut => {
+          let (image, x, y) = self.selection.take().unwrap();
+          self.undo_stack.push(Undo::SelectionCut(image, x, y));
+        },
+        Redo::SelectionEnd => {
+          let rect = {
+            let &(ref image, x, y) = self.selection.as_ref().unwrap();
+            Rect::new(x, y, image.width(), image.height())
+          };
+          self.unselect();
+          self.undo_stack.push(Undo::SelectionEnd(rect));
+        },
+        Redo::SelectionMove(new_x, new_y) => {
+          let (old_x, old_y) = {
+            let &mut (_, ref mut x, ref mut y) =
+                self.selection.as_mut().unwrap();
+            let old = (*x, *y);
+            *x = new_x;
+            *y = new_y;
+            old
+          };
+          self.undo_stack.push(Undo::SelectionMove(old_x, old_y));
+        },
+        Redo::SelectionPaste(image, x, y) => {
+          self.selection = Some((image, x, y));
+          self.undo_stack.push(Undo::SelectionPaste);
+        },
+      }
+      self.unsaved = true;
+      true
+    } else { false }
   }
 
   fn save_to_file(&mut self) -> io::Result<()> {
@@ -176,6 +345,15 @@ impl ColorPicker {
   fn rect(&self) -> Rect {
     Rect::new(self.left, self.top, 16, 16)
   }
+
+  fn pick_color(&self, state: &mut EditorState) -> bool {
+    state.unselect();
+    state.color = self.color;
+    if state.tool == Tool::Select {
+      state.tool = Tool::Pencil;
+    }
+    true
+  }
 }
 
 impl GuiElement<EditorState> for ColorPicker {
@@ -201,16 +379,14 @@ impl GuiElement<EditorState> for ColorPicker {
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
-      &Event::MouseButtonDown{x, y, ..} => {
+      &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
         if self.rect().contains((x, y)) {
-          state.color = self.color;
-          return true;
+          return self.pick_color(state);
         }
       },
       &Event::KeyDown{keycode: Some(key), ..} => {
         if key == self.key {
-          state.color = self.color;
-          return true;
+          return self.pick_color(state);
         }
       },
       _ => {}
@@ -267,7 +443,7 @@ impl GuiElement<EditorState> for ToolPicker {
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
-      &Event::MouseButtonDown{x, y, ..} => {
+      &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
         if self.rect().contains((x, y)) {
           return self.pick_tool(state);
         }
@@ -337,7 +513,7 @@ impl GuiElement<EditorState> for ImagePicker {
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
-      &Event::MouseButtonDown{x, y, ..} => {
+      &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
         if self.rect().contains((x, y)) {
           return self.pick(state);
         }
@@ -387,7 +563,7 @@ impl GuiElement<EditorState> for NextPrevImage {
 
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
-      &Event::MouseButtonDown{x, y, ..} => {
+      &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
         if self.rect().contains((x, y)) {
           return self.increment(state);
         }
@@ -575,10 +751,7 @@ impl GuiElement<EditorState> for Canvas {
   fn handle_event(&mut self, event: &Event, state: &mut EditorState) -> bool {
     match event {
       &Event::KeyDown{keycode: Some(Keycode::Escape), ..} => {
-        if state.selection.is_some() {
-          state.unselect();
-          return true;
-        }
+        return state.try_unselect_with_undo();
       },
       &Event::MouseButtonDown{mouse_btn: Mouse::Left, x, y, ..} => {
         if self.rect(state).contains((x, y)) {
@@ -587,9 +760,11 @@ impl GuiElement<EditorState> for Canvas {
               return self.try_eyedrop(x, y, state);
             },
             Tool::PaintBucket => {
+              state.push_change();
               return self.try_flood_fill(x, y, state);
             },
             Tool::Pencil => {
+              state.push_change();
               return self.try_paint(x, y, state);
             },
             Tool::Select => {
@@ -602,7 +777,9 @@ impl GuiElement<EditorState> for Canvas {
                               self.top + rect.y() * (scale as i32),
                               rect.width() * scale,
                               rect.height() * scale).contains((x, y)) {
-                  state.unselect();
+                  state.try_unselect_with_undo();
+                } else {
+                  state.push_selection_move();
                 }
               }
               self.drag_from_to = Some(CanvasDrag{
@@ -623,7 +800,7 @@ impl GuiElement<EditorState> for Canvas {
           Tool::Select => {
             if state.selection.is_none() {
               if let Some(rect) = self.dragged_rect(state) {
-                state.select(&rect);
+                state.select_with_undo(&rect);
                 self.drag_from_to = None;
                 return true;
               }
@@ -828,7 +1005,7 @@ fn main() {
             }
           },
           Keycode::A => {
-            state.select_all();
+            state.select_all_with_undo();
             needs_redraw = true;
           },
           Keycode::C => {
@@ -849,6 +1026,11 @@ fn main() {
           Keycode::X => {
             state.cut_selection();
             needs_redraw = true;
+          },
+          Keycode::Z => {
+            if kmod.intersects(keyboard::LSHIFTMOD | keyboard::RSHIFTMOD) {
+              if state.redo() { needs_redraw = true; }
+            } else if state.undo() { needs_redraw = true; }
           },
           _ => {}
         }
