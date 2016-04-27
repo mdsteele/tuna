@@ -17,8 +17,9 @@ use sdl2::rect::Rect;
 use sdl2::render::Renderer;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
-use std::io;
 use std::fs::File;
+use std::io;
+use std::rc::Rc;
 
 /*===========================================================================*/
 
@@ -624,6 +625,42 @@ impl GuiElement<EditorState> for UnsavedIndicator {
 
 /*===========================================================================*/
 
+struct FilePathTextBox {
+  left: i32,
+  top: i32,
+  font: Rc<Vec<Texture>>,
+}
+
+impl FilePathTextBox {
+  fn new(left: i32, top: i32, font: Rc<Vec<Texture>>) -> FilePathTextBox {
+    FilePathTextBox {
+      left: left,
+      top: top,
+      font: font,
+    }
+  }
+
+  fn rect(&self) -> Rect {
+    Rect::new(self.left, self.top, 324, 20)
+  }
+}
+
+impl GuiElement<EditorState> for FilePathTextBox {
+  fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    let rect = self.rect();
+    render_string(renderer, &self.font, rect.x() + 2, rect.y() + 2,
+                  &state.filepath);
+    renderer.set_draw_color(Color::RGB(255, 255, 255));
+    renderer.draw_rect(rect).unwrap();
+  }
+
+  fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
+    false
+  }
+}
+
+/*===========================================================================*/
+
 struct CanvasDrag {
   from_selection: (i32, i32),
   from_pixel: (i32, i32),
@@ -917,6 +954,26 @@ fn render_image(renderer: &mut Renderer, image: &Image,
   }
 }
 
+fn render_string(renderer: &mut Renderer, font: &Vec<Texture>,
+                 left: i32, top: i32, string: &str) {
+  let mut x = left;
+  let mut y = top;
+  for ch in string.chars() {
+    if ch == '\n' {
+      x = left;
+      y += 24;
+    } else {
+      if ch >= '!' {
+        let index = ch as usize - '!' as usize;
+        if index < font.len() {
+          renderer.copy(&font[index], None, Some(Rect::new(x, y, 16, 16)));
+        }
+      }
+      x += 16;
+    }
+  }
+}
+
 fn render_screen(renderer: &mut Renderer, state: &EditorState,
                  elements: &Vec<Box<GuiElement<EditorState>>>) {
   renderer.set_draw_color(Color::RGB(64, 64, 64));
@@ -956,6 +1013,11 @@ fn main() {
   renderer.set_logical_size(width, height).unwrap();
 
   let tool_icons = load_from_file(&"data/tool_icons.ahi".to_string()).unwrap();
+  let font: Rc<Vec<Texture>> =
+    Rc::new(load_from_file(&"data/font.ahi".to_string())
+            .unwrap().iter().map(|image| {
+                image_to_sdl_texture(&renderer, image)
+            }).collect());
 
   let mut state = EditorState::new(filepath, images);
   let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
@@ -986,6 +1048,8 @@ fn main() {
                              image_to_sdl_texture(&renderer, &tool_icons[2]))),
     Box::new(ToolPicker::new(76, 296, Tool::Select,      Keycode::S,
                              image_to_sdl_texture(&renderer, &tool_icons[3]))),
+    // Text box:
+    Box::new(FilePathTextBox::new(152, 296, font.clone())),
     // Canvases:
     Box::new(Canvas::new(8, 32, 256)),
     Box::new(Canvas::new(300, 32, 64)),
