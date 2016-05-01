@@ -63,7 +63,7 @@ enum Redo {
 }
 
 struct EditorState {
-  color: u8,
+  color: ahi::Color,
   filepath: String,
   images: Vec<Image>,
   current_image: usize,
@@ -82,7 +82,7 @@ impl EditorState {
       images.push(Image::new(32, 32));
     }
     EditorState {
-      color: 1,
+      color: ahi::Color::Black,
       filepath: filepath,
       images: images,
       current_image: 0,
@@ -340,11 +340,11 @@ struct ColorPicker {
   key: Keycode,
   left: i32,
   top: i32,
-  color: u8,
+  color: ahi::Color,
 }
 
 impl ColorPicker {
-  fn new(left: i32, top: i32, color: u8, key: Keycode) -> ColorPicker {
+  fn new(left: i32, top: i32, color: ahi::Color, key: Keycode) -> ColorPicker {
     ColorPicker {
       left: left,
       top: top,
@@ -370,7 +370,7 @@ impl ColorPicker {
 impl GuiElement<EditorState> for ColorPicker {
   fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
     let inner = expand(self.rect(), -2);
-    if self.color == 0 {
+    if self.color == ahi::Color::Transparent {
       renderer.set_draw_color(Color::RGB(0, 0, 0));
       renderer.draw_rect(inner).unwrap();
       renderer.draw_line(Point::new(inner.left(), inner.top()),
@@ -379,7 +379,7 @@ impl GuiElement<EditorState> for ColorPicker {
       renderer.draw_line(Point::new(inner.left(), inner.bottom() - 1),
                          Point::new(inner.right() - 1, inner.top())).unwrap();
     } else {
-      renderer.set_draw_color(hex_pixel_to_sdl_color(self.color));
+      renderer.set_draw_color(ahi_color_to_sdl_color(self.color));
       renderer.fill_rect(inner).unwrap();
     }
     if state.color == self.color {
@@ -902,53 +902,30 @@ fn expand(rect: Rect, by: i32) -> Rect {
             ((rect.height() as i32) + 2 * by) as u32)
 }
 
-fn hex_pixel_to_sdl_color(pixel: u8) -> Color {
-  return match pixel {
-    0x1 => Color::RGB(  0,   0,   0),
-    0x2 => Color::RGB(127,   0,   0),
-    0x3 => Color::RGB(255,   0,   0),
-    0x4 => Color::RGB(  0, 127,   0),
-    0x5 => Color::RGB(  0, 255,   0),
-    0x6 => Color::RGB(127, 127,   0),
-    0x7 => Color::RGB(255, 255,   0),
-    0x8 => Color::RGB(  0,   0, 127),
-    0x9 => Color::RGB(  0,   0, 255),
-    0xA => Color::RGB(127,   0, 127),
-    0xB => Color::RGB(255,   0, 255),
-    0xC => Color::RGB(  0, 127, 127),
-    0xD => Color::RGB(  0, 255, 255),
-    0xE => Color::RGB(127, 127, 127),
-    0xF => Color::RGB(255, 255, 255),
-    _ => Color::RGBA(0, 0, 0, 0),
-  }
-}
-
-fn image_to_sdl_surface(image: &Image) -> Surface {
-  let mut surface = Surface::new(image.width(), image.height(),
-                                 PixelFormatEnum::RGBA8888).unwrap();
-  for row in 0..image.height() {
-    for col in 0..image.width() {
-      surface.fill_rect(Some(Rect::new(col as i32, row as i32, 1, 1)),
-                        hex_pixel_to_sdl_color(image[(col, row)])).unwrap();
-    }
-  }
-  surface
+fn ahi_color_to_sdl_color(color: ahi::Color) -> Color {
+  let (r, g, b, a) = color.rgba();
+  Color::RGBA(r, g, b, a)
 }
 
 fn image_to_sdl_texture(renderer: &Renderer, image: &Image) -> Texture {
-  renderer.create_texture_from_surface(&image_to_sdl_surface(image)).unwrap()
+  let mut data = image.rgba_data();
+  let format = if cfg!(target_endian = "big") { PixelFormatEnum::RGBA8888 }
+               else { PixelFormatEnum::ABGR8888 };
+  let surface = Surface::from_data(&mut data, image.width(), image.height(),
+                                   image.width() * 4, format).unwrap();
+  renderer.create_texture_from_surface(&surface).unwrap()
 }
 
 fn render_image(renderer: &mut Renderer, image: &Image,
                 left: i32, top: i32, scale: u32) {
   for row in 0..image.height() {
     for col in 0..image.width() {
-      let pixel: u8 = image[(col, row)];
-      if pixel != 0 {
-          renderer.set_draw_color(hex_pixel_to_sdl_color(pixel));
-          renderer.fill_rect(Rect::new(left + (scale * col) as i32,
-                                       top + (scale * row) as i32,
-                                       scale, scale)).unwrap();
+      let pixel = image[(col, row)];
+      if pixel != ahi::Color::Transparent {
+        renderer.set_draw_color(ahi_color_to_sdl_color(pixel));
+        renderer.fill_rect(Rect::new(left + (scale * col) as i32,
+                                     top + (scale * row) as i32,
+                                     scale, scale)).unwrap();
       }
     }
   }
@@ -1023,22 +1000,22 @@ fn main() {
   let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(UnsavedIndicator::new(462, 2)),
     // Color palette:
-    Box::new(ColorPicker::new(  2, 2, 0x0, Keycode::Num0)),
-    Box::new(ColorPicker::new( 20, 2, 0x1, Keycode::Num1)),
-    Box::new(ColorPicker::new( 38, 2, 0x2, Keycode::Num2)),
-    Box::new(ColorPicker::new( 56, 2, 0x3, Keycode::Num3)),
-    Box::new(ColorPicker::new( 74, 2, 0x4, Keycode::Num4)),
-    Box::new(ColorPicker::new( 92, 2, 0x5, Keycode::Num5)),
-    Box::new(ColorPicker::new(110, 2, 0x6, Keycode::Num6)),
-    Box::new(ColorPicker::new(128, 2, 0x7, Keycode::Num7)),
-    Box::new(ColorPicker::new(146, 2, 0x8, Keycode::Num8)),
-    Box::new(ColorPicker::new(164, 2, 0x9, Keycode::Num9)),
-    Box::new(ColorPicker::new(182, 2, 0xA, Keycode::A)),
-    Box::new(ColorPicker::new(200, 2, 0xB, Keycode::B)),
-    Box::new(ColorPicker::new(218, 2, 0xC, Keycode::C)),
-    Box::new(ColorPicker::new(236, 2, 0xD, Keycode::D)),
-    Box::new(ColorPicker::new(254, 2, 0xE, Keycode::E)),
-    Box::new(ColorPicker::new(272, 2, 0xF, Keycode::F)),
+    Box::new(ColorPicker::new(  2, 2, ahi::Color::Transparent, Keycode::Num0)),
+    Box::new(ColorPicker::new( 20, 2, ahi::Color::Black, Keycode::Num1)),
+    Box::new(ColorPicker::new( 38, 2, ahi::Color::DarkRed, Keycode::Num2)),
+    Box::new(ColorPicker::new( 56, 2, ahi::Color::Red, Keycode::Num3)),
+    Box::new(ColorPicker::new( 74, 2, ahi::Color::DarkGreen, Keycode::Num4)),
+    Box::new(ColorPicker::new( 92, 2, ahi::Color::Green, Keycode::Num5)),
+    Box::new(ColorPicker::new(110, 2, ahi::Color::DarkYellow, Keycode::Num6)),
+    Box::new(ColorPicker::new(128, 2, ahi::Color::Yellow, Keycode::Num7)),
+    Box::new(ColorPicker::new(146, 2, ahi::Color::DarkBlue, Keycode::Num8)),
+    Box::new(ColorPicker::new(164, 2, ahi::Color::Blue, Keycode::Num9)),
+    Box::new(ColorPicker::new(182, 2, ahi::Color::DarkMagenta, Keycode::A)),
+    Box::new(ColorPicker::new(200, 2, ahi::Color::Magenta, Keycode::B)),
+    Box::new(ColorPicker::new(218, 2, ahi::Color::DarkCyan, Keycode::C)),
+    Box::new(ColorPicker::new(236, 2, ahi::Color::Cyan, Keycode::D)),
+    Box::new(ColorPicker::new(254, 2, ahi::Color::Gray, Keycode::E)),
+    Box::new(ColorPicker::new(272, 2, ahi::Color::White, Keycode::F)),
     // Toolbox:
     Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
                              image_to_sdl_texture(&renderer, &tool_icons[0]))),
