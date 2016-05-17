@@ -3,11 +3,6 @@ name = "rustsdl"
 version = "0.1.0"
 authors = ["Matthew D. Steele <mdsteele@alum.mit.edu>"]
 
-[dependencies.ahi]
-path = "../ahi"
-version = "0.1.0"
-
-[dependencies.sdl2]
-features = ["use_mac_framework"]
-path = "../rust-sdl2"
-version = "0.18.0"
+[dependencies]
+ahi = { git = "https://github.com/mdsteele/ahi" }
+sdl2 = { version = "0.19.0", features = ["use_mac_framework"] }

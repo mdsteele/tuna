@@ -96,6 +96,11 @@ impl EditorState {
     }
   }
 
+  fn image_size(&self) -> (u32, u32) {
+    let image = self.image();
+    (image.width(), image.height())
+  }
+
   fn image(&self) -> &Image {
     &self.images[self.current_image]
   }
@@ -121,7 +126,7 @@ impl EditorState {
 
   fn add_new_image(&mut self) {
     self.unselect();
-    let (width, height) = self.image().size();
+    let (width, height) = self.image_size();
     self.current_image += 1;
     self.images.insert(self.current_image, Image::new(width, height));
     let undo = Undo::AddImage(self.current_image);
@@ -150,7 +155,7 @@ impl EditorState {
   }
 
   fn select_all_with_undo(&mut self) {
-    let (width, height) = self.image().size();
+    let (width, height) = self.image_size();
     self.select_with_undo(&Rect::new(0, 0, width, height));
   }
 
@@ -166,8 +171,9 @@ impl EditorState {
     let mut selected = Image::new(rect.width(), rect.height());
     selected.draw(self.image(), -rect.x(), -rect.y());
     self.selection = Some((selected, rect.x(), rect.y()));
-    self.image_mut().clear_rect(rect.x(), rect.y(),
-                                rect.width(), rect.height());
+    self.image_mut().fill_rect(rect.x(), rect.y(),
+                               rect.width(), rect.height(),
+                               ahi::Color::Transparent);
   }
 
   fn unselect(&mut self) -> Option<Rect> {
@@ -276,7 +282,7 @@ impl EditorState {
     if let Some(redo) = self.redo_stack.pop() {
       match redo {
         Redo::AddImage(index) => {
-          let (width, height) = self.image().size();
+          let (width, height) = self.image_size();
           self.images.insert(index, Image::new(width, height));
           self.undo_stack.push(Undo::AddImage(index));
         },
@@ -328,7 +334,7 @@ impl EditorState {
   fn save_to_file(&mut self) -> io::Result<()> {
     self.unselect();
     let mut file = try!(File::create(&self.filepath));
-    try!(Image::write(&mut file, &self.images));
+    try!(Image::write_all(&mut file, &self.images));
     self.unsaved = false;
     Ok(())
   }
@@ -685,13 +691,13 @@ impl Canvas {
   }
 
   fn scale(&self, state: &EditorState) -> u32 {
-    let (width, height) = state.image().size();
+    let (width, height) = state.image_size();
     std::cmp::max(1, self.max_size / std::cmp::max(width, height))
   }
 
   fn rect(&self, state: &EditorState) -> Rect {
     let scale = self.scale(state);
-    let (width, height) = state.image().size();
+    let (width, height) = state.image_size();
     Rect::new(self.left, self.top, width * scale, height * scale)
   }
 
@@ -715,7 +721,7 @@ impl Canvas {
     let scale = self.scale(state) as i32;
     let col = (x - self.left) / scale;
     let row = (y - self.top) / scale;
-    let (width, height) = state.image().size();
+    let (width, height) = state.image_size();
     if col < 0 || col >= (width as i32) ||
        row < 0 || row >= (height as i32) { None }
     else { Some((col as u32, row as u32)) }
@@ -726,7 +732,7 @@ impl Canvas {
     let scale = self.scale(state) as i32;
     let col = (x - self.left) / scale;
     let row = (y - self.top) / scale;
-    let (width, height) = state.image().size();
+    let (width, height) = state.image_size();
     (std::cmp::max(0, std::cmp::min(col, width as i32)) as u32,
      std::cmp::max(0, std::cmp::min(row, height as i32)) as u32)
   }
@@ -750,7 +756,8 @@ impl Canvas {
     if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
       let to_color = state.color;
       let image = state.image_mut();
-      let (width, height) = image.size();
+      let width = image.width();
+      let height = image.height();
       let from_color = image[(col, row)];
       if from_color == to_color { return false; }
       image[(col, row)] = to_color;
@@ -963,7 +970,7 @@ fn render_screen(renderer: &mut Renderer, state: &EditorState,
 
 fn load_from_file(path: &String) -> io::Result<Vec<Image>> {
   let mut file = try!(File::open(path));
-  Image::read(&mut file)
+  Image::read_all(&mut file)
 }
 
 fn main() {
