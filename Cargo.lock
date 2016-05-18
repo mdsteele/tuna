@@ -1,5 +1,5 @@
 [root]
-name = "rustsdl"
+name = "tuna"
 version = "0.1.0"
 dependencies = [
  "ahi 0.1.0 (git+https://github.com/mdsteele/ahi)",
