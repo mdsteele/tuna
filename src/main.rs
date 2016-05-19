@@ -24,14 +24,14 @@
 extern crate ahi;
 extern crate sdl2;
 
+mod canvas;
+use self::canvas::{Canvas, Sprite};
+
 use ahi::Image;
 use sdl2::event::Event;
 use sdl2::keyboard::{self, Keycode};
 use sdl2::mouse::Mouse;
-use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
-use sdl2::render::{Renderer, Texture};
-use sdl2::surface::Surface;
 use std::fs::File;
 use std::io;
 use std::rc::Rc;
@@ -39,7 +39,7 @@ use std::rc::Rc;
 // ========================================================================= //
 
 trait GuiElement<S> {
-    fn draw(&self, state: &S, renderer: &mut Renderer);
+    fn draw(&self, state: &S, canvas: &mut Canvas);
     fn handle_event(&mut self, event: &Event, state: &mut S) -> bool;
 }
 
@@ -411,25 +411,17 @@ impl ColorPicker {
 }
 
 impl GuiElement<EditorState> for ColorPicker {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let inner = expand(self.rect(), -2);
         if self.color == ahi::Color::Transparent {
-            renderer.set_draw_color(Color::RGB(0, 0, 0));
-            renderer.draw_rect(inner).unwrap();
-            renderer.draw_line(Point::new(inner.left(), inner.top()),
-                               Point::new(inner.right() - 1,
-                                          inner.bottom() - 1))
-                    .unwrap();
-            renderer.draw_line(Point::new(inner.left(), inner.bottom() - 1),
-                               Point::new(inner.right() - 1, inner.top()))
-                    .unwrap();
+            canvas.draw_rect((0, 0, 0, 255), inner);
+            canvas.draw_rect((0, 0, 0, 255), expand(inner, -2));
+            canvas.draw_rect((0, 0, 0, 255), expand(inner, -4));
         } else {
-            renderer.set_draw_color(ahi_color_to_sdl_color(self.color));
-            renderer.fill_rect(inner).unwrap();
+            canvas.fill_rect(self.color.rgba(), inner);
         }
         if state.color == self.color {
-            renderer.set_draw_color(Color::RGB(255, 255, 255));
-            renderer.draw_rect(self.rect()).unwrap();
+            canvas.draw_rect((255, 255, 255, 255), self.rect());
         }
     }
 
@@ -461,7 +453,7 @@ struct ToolPicker {
     key: Keycode,
     left: i32,
     top: i32,
-    icon: Texture,
+    icon: Sprite,
 }
 
 impl ToolPicker {
@@ -469,7 +461,7 @@ impl ToolPicker {
            top: i32,
            tool: Tool,
            key: Keycode,
-           icon: Texture)
+           icon: Sprite)
            -> ToolPicker {
         ToolPicker {
             tool: tool,
@@ -496,14 +488,14 @@ impl ToolPicker {
 }
 
 impl GuiElement<EditorState> for ToolPicker {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+        let mut canvas = canvas.subcanvas(self.rect());
         if state.tool == self.tool {
-            renderer.set_draw_color(Color::RGB(255, 255, 255));
-            renderer.fill_rect(self.rect()).unwrap();
+            canvas.clear((255, 255, 255, 255));
+        } else {
+            canvas.clear((95, 95, 95, 255));
         }
-        renderer.copy(&self.icon, None, Some(expand(self.rect(), -2)));
-        renderer.set_draw_color(Color::RGB(191, 191, 191));
-        renderer.draw_rect(self.rect()).unwrap();
+        canvas.draw_sprite(&self.icon, Point::new(2, 2));
     }
 
     fn handle_event(&mut self,
@@ -568,22 +560,22 @@ impl ImagePicker {
 }
 
 impl GuiElement<EditorState> for ImagePicker {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
-        if let Some(index) = self.index(state) {
-            render_image(renderer,
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+        let color = if let Some(index) = self.index(state) {
+            render_image(canvas,
                          state.image_at(index),
                          self.left + 2,
                          self.top + 2,
                          1);
             if self.delta == 0 {
-                renderer.set_draw_color(Color::RGB(255, 255, 127));
+                (255, 255, 127, 255)
             } else {
-                renderer.set_draw_color(Color::RGB(127, 127, 63));
+                (127, 127, 63, 255)
             }
         } else {
-            renderer.set_draw_color(Color::RGB(0, 0, 0));
-        }
-        renderer.draw_rect(self.rect()).unwrap();
+            (0, 0, 0, 255)
+        };
+        canvas.draw_rect(color, self.rect());
     }
 
     fn handle_event(&mut self,
@@ -635,9 +627,8 @@ impl NextPrevImage {
 }
 
 impl GuiElement<EditorState> for NextPrevImage {
-    fn draw(&self, _: &EditorState, renderer: &mut Renderer) {
-        renderer.set_draw_color(Color::RGB(63, 0, 127));
-        renderer.fill_rect(self.rect()).unwrap();
+    fn draw(&self, _: &EditorState, canvas: &mut Canvas) {
+        canvas.fill_rect((63, 0, 127, 255), self.rect());
     }
 
     fn handle_event(&mut self,
@@ -682,10 +673,9 @@ impl UnsavedIndicator {
 }
 
 impl GuiElement<EditorState> for UnsavedIndicator {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         if state.unsaved {
-            renderer.set_draw_color(Color::RGB(255, 127, 0));
-            renderer.fill_rect(self.rect()).unwrap();
+            canvas.fill_rect((255, 127, 0, 255), self.rect());
         }
     }
 
@@ -699,11 +689,11 @@ impl GuiElement<EditorState> for UnsavedIndicator {
 struct FilePathTextBox {
     left: i32,
     top: i32,
-    font: Rc<Vec<Texture>>,
+    font: Rc<Vec<Sprite>>,
 }
 
 impl FilePathTextBox {
-    fn new(left: i32, top: i32, font: Rc<Vec<Texture>>) -> FilePathTextBox {
+    fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> FilePathTextBox {
         FilePathTextBox {
             left: left,
             top: top,
@@ -717,15 +707,14 @@ impl FilePathTextBox {
 }
 
 impl GuiElement<EditorState> for FilePathTextBox {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let rect = self.rect();
-        render_string(renderer,
+        render_string(canvas,
                       &self.font,
                       rect.x() + 2,
                       rect.y() + 2,
                       &state.filepath);
-        renderer.set_draw_color(Color::RGB(255, 255, 255));
-        renderer.draw_rect(rect).unwrap();
+        canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
@@ -735,22 +724,22 @@ impl GuiElement<EditorState> for FilePathTextBox {
 
 // ========================================================================= //
 
-struct CanvasDrag {
+struct ImageCanvasDrag {
     from_selection: (i32, i32),
     from_pixel: (i32, i32),
     to_pixel: (i32, i32),
 }
 
-struct Canvas {
+struct ImageCanvas {
     left: i32,
     top: i32,
     max_size: u32,
-    drag_from_to: Option<CanvasDrag>,
+    drag_from_to: Option<ImageCanvasDrag>,
 }
 
-impl Canvas {
-    fn new(left: i32, top: i32, max_size: u32) -> Canvas {
-        Canvas {
+impl ImageCanvas {
+    fn new(left: i32, top: i32, max_size: u32) -> ImageCanvas {
+        ImageCanvas {
             left: left,
             top: top,
             max_size: max_size,
@@ -881,31 +870,26 @@ impl Canvas {
     }
 }
 
-impl GuiElement<EditorState> for Canvas {
-    fn draw(&self, state: &EditorState, renderer: &mut Renderer) {
+impl GuiElement<EditorState> for ImageCanvas {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let scale = self.scale(state);
-        renderer.set_draw_color(Color::RGB(255, 255, 255));
-        renderer.draw_rect(expand(self.rect(state), 2)).unwrap();
-        render_image(renderer, state.image(), self.left, self.top, scale);
+        canvas.draw_rect((255, 255, 255, 255), expand(self.rect(state), 2));
+        render_image(canvas, state.image(), self.left, self.top, scale);
         if let Some((ref selected, x, y)) = state.selection {
             let left = self.left + x * (scale as i32);
             let top = self.top + y * (scale as i32);
-            render_image(renderer, selected, left, top, scale);
-            renderer.set_draw_color(Color::RGB(255, 191, 255));
-            renderer.draw_rect(Rect::new(left,
-                                         top,
-                                         selected.width() * scale,
-                                         selected.height() * scale))
-                    .unwrap();
+            render_image(canvas, selected, left, top, scale);
+            canvas.draw_rect((255, 191, 255, 255),
+                             Rect::new(left,
+                                       top,
+                                       selected.width() * scale,
+                                       selected.height() * scale));
         } else if let Some(rect) = self.dragged_rect(state) {
-            renderer.set_draw_color(Color::RGB(255, 255, 191));
-            renderer.draw_rect(Rect::new(self.left +
-                                         rect.x() * (scale as i32),
-                                         self.top +
-                                         rect.y() * (scale as i32),
-                                         rect.width() * scale,
-                                         rect.height() * scale))
-                    .unwrap();
+            canvas.draw_rect((255, 255, 191, 255),
+                             Rect::new(self.left + rect.x() * (scale as i32),
+                                       self.top + rect.y() * (scale as i32),
+                                       rect.width() * scale,
+                                       rect.height() * scale));
         }
     }
 
@@ -955,7 +939,7 @@ impl GuiElement<EditorState> for Canvas {
                                     state.push_selection_move();
                                 }
                             }
-                            self.drag_from_to = Some(CanvasDrag {
+                            self.drag_from_to = Some(ImageCanvasDrag {
                                 from_selection: if let Some(r) = rect {
                                     (r.x(), r.y())
                                 } else {
@@ -1039,28 +1023,7 @@ fn expand(rect: Rect, by: i32) -> Rect {
               ((rect.height() as i32) + 2 * by) as u32)
 }
 
-fn ahi_color_to_sdl_color(color: ahi::Color) -> Color {
-    let (r, g, b, a) = color.rgba();
-    Color::RGBA(r, g, b, a)
-}
-
-fn image_to_sdl_texture(renderer: &Renderer, image: &Image) -> Texture {
-    let mut data = image.rgba_data();
-    let format = if cfg!(target_endian = "big") {
-        PixelFormatEnum::RGBA8888
-    } else {
-        PixelFormatEnum::ABGR8888
-    };
-    let surface = Surface::from_data(&mut data,
-                                     image.width(),
-                                     image.height(),
-                                     image.width() * 4,
-                                     format)
-                      .unwrap();
-    renderer.create_texture_from_surface(&surface).unwrap()
-}
-
-fn render_image(renderer: &mut Renderer,
+fn render_image(canvas: &mut Canvas,
                 image: &Image,
                 left: i32,
                 top: i32,
@@ -1069,19 +1032,18 @@ fn render_image(renderer: &mut Renderer,
         for col in 0..image.width() {
             let pixel = image[(col, row)];
             if pixel != ahi::Color::Transparent {
-                renderer.set_draw_color(ahi_color_to_sdl_color(pixel));
-                renderer.fill_rect(Rect::new(left + (scale * col) as i32,
-                                             top + (scale * row) as i32,
-                                             scale,
-                                             scale))
-                        .unwrap();
+                canvas.fill_rect(pixel.rgba(),
+                                 Rect::new(left + (scale * col) as i32,
+                                           top + (scale * row) as i32,
+                                           scale,
+                                           scale));
             }
         }
     }
 }
 
-fn render_string(renderer: &mut Renderer,
-                 font: &Vec<Texture>,
+fn render_string(canvas: &mut Canvas,
+                 font: &Vec<Sprite>,
                  left: i32,
                  top: i32,
                  string: &str) {
@@ -1095,9 +1057,7 @@ fn render_string(renderer: &mut Renderer,
             if ch >= '!' {
                 let index = ch as usize - '!' as usize;
                 if index < font.len() {
-                    renderer.copy(&font[index],
-                                  None,
-                                  Some(Rect::new(x, y, 16, 16)));
+                    canvas.draw_sprite(&font[index], Point::new(x, y));
                 }
             }
             x += 16;
@@ -1105,15 +1065,14 @@ fn render_string(renderer: &mut Renderer,
     }
 }
 
-fn render_screen(renderer: &mut Renderer,
+fn render_screen(canvas: &mut Canvas,
                  state: &EditorState,
                  elements: &Vec<Box<GuiElement<EditorState>>>) {
-    renderer.set_draw_color(Color::RGB(64, 64, 64));
-    renderer.clear();
+    canvas.clear((64, 64, 64, 255));
     for element in elements {
-        element.draw(state, renderer);
+        element.draw(state, canvas);
     }
-    renderer.present();
+    canvas.present();
 }
 
 fn load_from_file(path: &String) -> io::Result<Vec<Image>> {
@@ -1143,15 +1102,18 @@ fn main() {
 
     let mut renderer = window.renderer().build().unwrap();
     renderer.set_logical_size(width, height).unwrap();
+    let mut canvas = Canvas::from_renderer(&mut renderer);
 
     let tool_icons = load_from_file(&"data/tool_icons.ahi".to_string())
                          .unwrap();
-    let font: Rc<Vec<Texture>> =
-        Rc::new(load_from_file(&"data/font.ahi".to_string())
-                    .unwrap()
-                    .iter()
-                    .map(|image| image_to_sdl_texture(&renderer, image))
-                    .collect());
+    let font: Rc<Vec<Sprite>> = Rc::new(load_from_file(&"data/font.ahi"
+                                                            .to_string())
+                                            .unwrap()
+                                            .iter()
+                                            .map(|image| {
+                                                canvas.new_sprite(image)
+                                            })
+                                            .collect());
 
     let mut state = EditorState::new(filepath, images);
     let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
@@ -1175,18 +1137,18 @@ fn main() {
     Box::new(ColorPicker::new(272, 2, ahi::Color::White, Keycode::F)),
     // Toolbox:
     Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
-                             image_to_sdl_texture(&renderer, &tool_icons[0]))),
+                             canvas.new_sprite(&tool_icons[0]))),
     Box::new(ToolPicker::new(28, 296, Tool::PaintBucket, Keycode::K,
-                             image_to_sdl_texture(&renderer, &tool_icons[1]))),
+                             canvas.new_sprite(&tool_icons[1]))),
     Box::new(ToolPicker::new(52, 296, Tool::Eyedropper,  Keycode::Y,
-                             image_to_sdl_texture(&renderer, &tool_icons[2]))),
+                             canvas.new_sprite(&tool_icons[2]))),
     Box::new(ToolPicker::new(76, 296, Tool::Select,      Keycode::S,
-                             image_to_sdl_texture(&renderer, &tool_icons[3]))),
+                             canvas.new_sprite(&tool_icons[3]))),
     // Text box:
     Box::new(FilePathTextBox::new(152, 296, font.clone())),
-    // Canvases:
-    Box::new(Canvas::new(8, 32, 256)),
-    Box::new(Canvas::new(300, 32, 64)),
+    // Image canvases:
+    Box::new(ImageCanvas::new(8, 32, 256)),
+    Box::new(ImageCanvas::new(300, 32, 64)),
     // Images scrollbar:
     Box::new(NextPrevImage::new(374, 8, -1, Keycode::Up)),
     Box::new(ImagePicker::new(372, 32, -2)),
@@ -1197,7 +1159,7 @@ fn main() {
     Box::new(NextPrevImage::new(374, 222, 1, Keycode::Down)),
   ];
 
-    render_screen(&mut renderer, &state, &elements);
+    render_screen(&mut canvas, &state, &elements);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     loop {
@@ -1270,7 +1232,7 @@ fn main() {
             }
         }
         if needs_redraw {
-            render_screen(&mut renderer, &state, &elements);
+            render_screen(&mut canvas, &state, &elements);
         }
     }
 }
