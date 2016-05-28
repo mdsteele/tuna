@@ -84,8 +84,8 @@ impl GuiElement<EditorState> for ColorPalette {
         if new_color != state.color {
             state.unselect();
             state.color = new_color;
-            if state.tool == Tool::Select {
-                state.tool = Tool::Pencil;
+            if state.tool() == Tool::Select {
+                state.set_tool(Tool::Pencil);
             }
         }
         result

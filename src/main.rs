@@ -45,81 +45,11 @@ use self::palette::ColorPalette;
 mod state;
 use self::state::{EditorState, Tool};
 
+mod toolbox;
+use self::toolbox::Toolbox;
+
 mod unsaved;
 use self::unsaved::UnsavedIndicator;
-
-// ========================================================================= //
-
-struct ToolPicker {
-    tool: Tool,
-    key: Keycode,
-    left: i32,
-    top: i32,
-    icon: Sprite,
-}
-
-impl ToolPicker {
-    fn new(left: i32,
-           top: i32,
-           tool: Tool,
-           key: Keycode,
-           icon: Sprite)
-           -> ToolPicker {
-        ToolPicker {
-            tool: tool,
-            key: key,
-            left: left,
-            top: top,
-            icon: icon,
-        }
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 20, 20)
-    }
-
-    fn pick_tool(&self, state: &mut EditorState) -> bool {
-        if state.tool == self.tool {
-            return false;
-        }
-        state.unselect();
-        state.prev_tool = state.tool;
-        state.tool = self.tool;
-        true
-    }
-}
-
-impl GuiElement<EditorState> for ToolPicker {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let mut canvas = canvas.subcanvas(self.rect());
-        if state.tool == self.tool {
-            canvas.clear((255, 255, 255, 255));
-        } else {
-            canvas.clear((95, 95, 95, 255));
-        }
-        canvas.draw_sprite(&self.icon, Point::new(2, 2));
-    }
-
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
-                    -> bool {
-        match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
-                if self.rect().contains((x, y)) {
-                    return self.pick_tool(state);
-                }
-            }
-            &Event::KeyDown { keycode: Some(key), .. } => {
-                if key == self.key {
-                    return self.pick_tool(state);
-                }
-            }
-            _ => {}
-        }
-        false
-    }
-}
 
 // ========================================================================= //
 
@@ -272,7 +202,7 @@ impl FilePathTextBox {
     }
 
     fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 324, 20)
+        Rect::new(self.left, self.top, 472, 20)
     }
 }
 
@@ -391,9 +321,8 @@ impl ImageCanvas {
     }
 
     fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
-        if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
-            state.color = state.image()[(col, row)];
-            state.tool = state.prev_tool;
+        if let Some(position) = self.mouse_to_row_col(x, y, state) {
+            state.eyedrop_at(position);
             true
         } else {
             false
@@ -473,7 +402,7 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
                 if self.rect(state).contains((x, y)) {
-                    match state.tool {
+                    match state.tool() {
                         Tool::Eyedropper => {
                             return self.try_eyedrop(x, y, state);
                         }
@@ -526,7 +455,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                 }
             }
             &Event::MouseButtonUp { mouse_btn: Mouse::Left, .. } => {
-                match state.tool {
+                match state.tool() {
                     Tool::Select => {
                         if state.selection.is_none() {
                             if let Some(rect) = self.dragged_rect(state) {
@@ -542,7 +471,7 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseMotion { x, y, mousestate, .. } => {
                 if mousestate.left() {
-                    match state.tool {
+                    match state.tool() {
                         Tool::Pencil => {
                             return self.try_paint(x, y, state);
                         }
@@ -674,8 +603,12 @@ fn main() {
     renderer.set_logical_size(width, height).unwrap();
     let mut canvas = Canvas::from_renderer(&mut renderer);
 
-    let tool_icons = load_from_file(&"data/tool_icons.ahi".to_string())
-                         .unwrap();
+    let tool_icons: Vec<Sprite> = load_from_file(&"data/tool_icons.ahi"
+                                                      .to_string())
+                                      .unwrap()
+                                      .iter()
+                                      .map(|image| canvas.new_sprite(image))
+                                      .collect();
     let unsaved_sprite = {
         let images = load_from_file(&"data/unsaved.ahi".to_string()).unwrap();
         canvas.new_sprite(&images[0])
@@ -692,21 +625,12 @@ fn main() {
     let mut state = EditorState::new(filepath, images);
     let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(UnsavedIndicator::new(462, 2, unsaved_sprite)),
-    Box::new(ColorPalette::new(4, 4)),
-    // Toolbox:
-    Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
-                             canvas.new_sprite(&tool_icons[0]))),
-    Box::new(ToolPicker::new(28, 296, Tool::PaintBucket, Keycode::K,
-                             canvas.new_sprite(&tool_icons[1]))),
-    Box::new(ToolPicker::new(52, 296, Tool::Eyedropper,  Keycode::Y,
-                             canvas.new_sprite(&tool_icons[2]))),
-    Box::new(ToolPicker::new(76, 296, Tool::Select,      Keycode::S,
-                             canvas.new_sprite(&tool_icons[3]))),
-    // Text box:
-    Box::new(FilePathTextBox::new(152, 296, font.clone())),
+    Box::new(ColorPalette::new(4, 136)),
+    Box::new(Toolbox::new(10, 10, tool_icons)),
+    Box::new(FilePathTextBox::new(4, 296, font.clone())),
     // Image canvases:
-    Box::new(ImageCanvas::new(48, 32, 256)),
-    Box::new(ImageCanvas::new(320, 32, 64)),
+    Box::new(ImageCanvas::new(48, 16, 256)),
+    Box::new(ImageCanvas::new(320, 16, 64)),
     // Images scrollbar:
     Box::new(NextPrevImage::new(414, 8, -1, Keycode::Up)),
     Box::new(ImagePicker::new(412, 32, -2)),

@@ -64,8 +64,8 @@ pub struct EditorState {
     pub current_image: usize,
     pub selection: Option<(Image, i32, i32)>,
     pub clipboard: Option<(Image, i32, i32)>,
-    pub tool: Tool,
-    pub prev_tool: Tool,
+    tool: Tool,
+    prev_tool: Tool,
     undo_stack: Vec<Undo>,
     redo_stack: Vec<Redo>,
     unsaved: bool,
@@ -93,6 +93,26 @@ impl EditorState {
 
     pub fn is_unsaved(&self) -> bool {
         self.unsaved
+    }
+
+    pub fn tool(&self) -> Tool {
+        self.tool
+    }
+
+    pub fn set_tool(&mut self, tool: Tool) {
+        if self.tool != tool {
+            self.unselect();
+            self.prev_tool = self.tool;
+            self.tool = tool;
+        }
+    }
+
+    pub fn eyedrop_at(&mut self, position: (u32, u32)) {
+        self.color = self.image()[position];
+        if self.tool == Tool::Eyedropper {
+            self.tool = self.prev_tool;
+        }
+
     }
 
     pub fn image_size(&self) -> (u32, u32) {
