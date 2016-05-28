@@ -24,9 +24,6 @@
 extern crate ahi;
 extern crate sdl2;
 
-mod canvas;
-use self::canvas::{Canvas, Sprite};
-
 use ahi::Image;
 use sdl2::event::Event;
 use sdl2::keyboard::{self, Keycode};
@@ -36,12 +33,11 @@ use std::fs::File;
 use std::io;
 use std::rc::Rc;
 
-// ========================================================================= //
+mod canvas;
+use self::canvas::{Canvas, Sprite};
 
-trait GuiElement<S> {
-    fn draw(&self, state: &S, canvas: &mut Canvas);
-    fn handle_event(&mut self, event: &Event, state: &mut S) -> bool;
-}
+mod element;
+use self::element::{AggregateElement, GuiElement, SubrectElement};
 
 // ========================================================================= //
 
@@ -375,44 +371,87 @@ impl EditorState {
 
 // ========================================================================= //
 
+struct ColorPalette {
+    element: SubrectElement<AggregateElement<ahi::Color>>,
+}
+
+impl ColorPalette {
+    fn new(left: i32, top: i32) -> ColorPalette {
+        let elements: Vec<Box<GuiElement<ahi::Color>>> = vec![
+ ColorPalette::picker(0, 0, ahi::Color::Transparent, Keycode::Num0),
+ ColorPalette::picker(18, 0, ahi::Color::Black, Keycode::Num1),
+ ColorPalette::picker(0, 18, ahi::Color::DarkRed, Keycode::Num2),
+ ColorPalette::picker(18, 18, ahi::Color::Red, Keycode::Num3),
+ ColorPalette::picker(0, 36, ahi::Color::DarkGreen, Keycode::Num4),
+ ColorPalette::picker(18, 36, ahi::Color::Green, Keycode::Num5),
+ ColorPalette::picker(0, 54, ahi::Color::DarkYellow, Keycode::Num6),
+ ColorPalette::picker(18, 54, ahi::Color::Yellow, Keycode::Num7),
+ ColorPalette::picker(0, 72, ahi::Color::DarkBlue, Keycode::Num8),
+ ColorPalette::picker(18, 72, ahi::Color::Blue, Keycode::Num9),
+ ColorPalette::picker(0, 90, ahi::Color::DarkMagenta, Keycode::A),
+ ColorPalette::picker(18, 90, ahi::Color::Magenta, Keycode::B),
+ ColorPalette::picker(0, 108, ahi::Color::DarkCyan, Keycode::C),
+ ColorPalette::picker(18, 108, ahi::Color::Cyan, Keycode::D),
+ ColorPalette::picker(0, 126, ahi::Color::Gray, Keycode::E),
+ ColorPalette::picker(18, 126, ahi::Color::White, Keycode::F),
+                                                          ];
+        ColorPalette {
+            element: SubrectElement::new(AggregateElement::new(elements),
+                                         Rect::new(left, top, 36, 144)),
+        }
+    }
+
+    fn picker(x: i32,
+              y: i32,
+              color: ahi::Color,
+              key: Keycode)
+              -> Box<GuiElement<ahi::Color>> {
+        Box::new(SubrectElement::new(ColorPicker::new(color, key),
+                                     Rect::new(x, y, 18, 18)))
+    }
+}
+
+impl GuiElement<EditorState> for ColorPalette {
+    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+        canvas.fill_rect((95, 95, 95, 255), self.element.rect());
+        self.element.draw(&state.color, canvas);
+    }
+
+    fn handle_event(&mut self,
+                    event: &Event,
+                    state: &mut EditorState)
+                    -> bool {
+        let mut new_color = state.color;
+        let result = self.element.handle_event(event, &mut new_color);
+        if new_color != state.color {
+            state.unselect();
+            state.color = new_color;
+            if state.tool == Tool::Select {
+                state.tool = Tool::Pencil;
+            }
+        }
+        result
+    }
+}
+
 struct ColorPicker {
-    key: Keycode,
-    left: i32,
-    top: i32,
     color: ahi::Color,
+    key: Keycode,
 }
 
 impl ColorPicker {
-    fn new(left: i32,
-           top: i32,
-           color: ahi::Color,
-           key: Keycode)
-           -> ColorPicker {
+    fn new(color: ahi::Color, key: Keycode) -> ColorPicker {
         ColorPicker {
-            left: left,
-            top: top,
             color: color,
             key: key,
         }
     }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 16, 16)
-    }
-
-    fn pick_color(&self, state: &mut EditorState) -> bool {
-        state.unselect();
-        state.color = self.color;
-        if state.tool == Tool::Select {
-            state.tool = Tool::Pencil;
-        }
-        true
-    }
 }
 
-impl GuiElement<EditorState> for ColorPicker {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let inner = expand(self.rect(), -2);
+impl GuiElement<ahi::Color> for ColorPicker {
+    fn draw(&self, state: &ahi::Color, canvas: &mut Canvas) {
+        let rect = canvas.rect();
+        let inner = expand(rect, -2);
         if self.color == ahi::Color::Transparent {
             canvas.draw_rect((0, 0, 0, 255), inner);
             canvas.draw_rect((0, 0, 0, 255), expand(inner, -2));
@@ -420,24 +459,21 @@ impl GuiElement<EditorState> for ColorPicker {
         } else {
             canvas.fill_rect(self.color.rgba(), inner);
         }
-        if state.color == self.color {
-            canvas.draw_rect((255, 255, 255, 255), self.rect());
+        if *state == self.color {
+            canvas.draw_rect((255, 255, 255, 255), rect);
         }
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
-                    -> bool {
+    fn handle_event(&mut self, event: &Event, state: &mut ahi::Color) -> bool {
         match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
-                if self.rect().contains((x, y)) {
-                    return self.pick_color(state);
-                }
+            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
+                *state = self.color;
+                return true;
             }
             &Event::KeyDown { keycode: Some(key), .. } => {
                 if key == self.key {
-                    return self.pick_color(state);
+                    *state = self.color;
+                    return true;
                 }
             }
             _ => {}
@@ -1118,23 +1154,7 @@ fn main() {
     let mut state = EditorState::new(filepath, images);
     let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(UnsavedIndicator::new(462, 2)),
-    // Color palette:
-    Box::new(ColorPicker::new(  2, 2, ahi::Color::Transparent, Keycode::Num0)),
-    Box::new(ColorPicker::new( 20, 2, ahi::Color::Black, Keycode::Num1)),
-    Box::new(ColorPicker::new( 38, 2, ahi::Color::DarkRed, Keycode::Num2)),
-    Box::new(ColorPicker::new( 56, 2, ahi::Color::Red, Keycode::Num3)),
-    Box::new(ColorPicker::new( 74, 2, ahi::Color::DarkGreen, Keycode::Num4)),
-    Box::new(ColorPicker::new( 92, 2, ahi::Color::Green, Keycode::Num5)),
-    Box::new(ColorPicker::new(110, 2, ahi::Color::DarkYellow, Keycode::Num6)),
-    Box::new(ColorPicker::new(128, 2, ahi::Color::Yellow, Keycode::Num7)),
-    Box::new(ColorPicker::new(146, 2, ahi::Color::DarkBlue, Keycode::Num8)),
-    Box::new(ColorPicker::new(164, 2, ahi::Color::Blue, Keycode::Num9)),
-    Box::new(ColorPicker::new(182, 2, ahi::Color::DarkMagenta, Keycode::A)),
-    Box::new(ColorPicker::new(200, 2, ahi::Color::Magenta, Keycode::B)),
-    Box::new(ColorPicker::new(218, 2, ahi::Color::DarkCyan, Keycode::C)),
-    Box::new(ColorPicker::new(236, 2, ahi::Color::Cyan, Keycode::D)),
-    Box::new(ColorPicker::new(254, 2, ahi::Color::Gray, Keycode::E)),
-    Box::new(ColorPicker::new(272, 2, ahi::Color::White, Keycode::F)),
+    Box::new(ColorPalette::new(4, 4)),
     // Toolbox:
     Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
                              canvas.new_sprite(&tool_icons[0]))),
@@ -1147,16 +1167,16 @@ fn main() {
     // Text box:
     Box::new(FilePathTextBox::new(152, 296, font.clone())),
     // Image canvases:
-    Box::new(ImageCanvas::new(8, 32, 256)),
-    Box::new(ImageCanvas::new(300, 32, 64)),
+    Box::new(ImageCanvas::new(48, 32, 256)),
+    Box::new(ImageCanvas::new(320, 32, 64)),
     // Images scrollbar:
-    Box::new(NextPrevImage::new(374, 8, -1, Keycode::Up)),
-    Box::new(ImagePicker::new(372, 32, -2)),
-    Box::new(ImagePicker::new(372, 70, -1)),
-    Box::new(ImagePicker::new(372, 108, 0)),
-    Box::new(ImagePicker::new(372, 146, 1)),
-    Box::new(ImagePicker::new(372, 184, 2)),
-    Box::new(NextPrevImage::new(374, 222, 1, Keycode::Down)),
+    Box::new(NextPrevImage::new(414, 8, -1, Keycode::Up)),
+    Box::new(ImagePicker::new(412, 32, -2)),
+    Box::new(ImagePicker::new(412, 70, -1)),
+    Box::new(ImagePicker::new(412, 108, 0)),
+    Box::new(ImagePicker::new(412, 146, 1)),
+    Box::new(ImagePicker::new(412, 184, 2)),
+    Box::new(NextPrevImage::new(414, 222, 1, Keycode::Down)),
   ];
 
     render_screen(&mut canvas, &state, &elements);

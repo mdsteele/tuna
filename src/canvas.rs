@@ -40,6 +40,19 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    pub fn size(&self) -> (u32, u32) {
+        if let Some(rect) = self.clip_rect {
+            (rect.width(), rect.height())
+        } else {
+            self.renderer.logical_size()
+        }
+    }
+
+    pub fn rect(&self) -> Rect {
+        let (width, height) = self.size();
+        Rect::new(0, 0, width, height)
+    }
+
     pub fn new_sprite(&self, image: &Image) -> Sprite {
         let width = image.width();
         let height = image.height();
