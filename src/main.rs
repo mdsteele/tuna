@@ -45,6 +45,9 @@ use self::palette::ColorPalette;
 mod state;
 use self::state::{EditorState, Tool};
 
+mod unsaved;
+use self::unsaved::UnsavedIndicator;
+
 // ========================================================================= //
 
 struct ToolPicker {
@@ -247,38 +250,6 @@ impl GuiElement<EditorState> for NextPrevImage {
             }
             _ => {}
         }
-        false
-    }
-}
-
-// ========================================================================= //
-
-struct UnsavedIndicator {
-    left: i32,
-    top: i32,
-}
-
-impl UnsavedIndicator {
-    fn new(left: i32, top: i32) -> UnsavedIndicator {
-        UnsavedIndicator {
-            left: left,
-            top: top,
-        }
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 16, 16)
-    }
-}
-
-impl GuiElement<EditorState> for UnsavedIndicator {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        if state.is_unsaved() {
-            canvas.fill_rect((255, 127, 0, 255), self.rect());
-        }
-    }
-
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
         false
     }
 }
@@ -705,6 +676,10 @@ fn main() {
 
     let tool_icons = load_from_file(&"data/tool_icons.ahi".to_string())
                          .unwrap();
+    let unsaved_sprite = {
+        let images = load_from_file(&"data/unsaved.ahi".to_string()).unwrap();
+        canvas.new_sprite(&images[0])
+    };
     let font: Rc<Vec<Sprite>> = Rc::new(load_from_file(&"data/font.ahi"
                                                             .to_string())
                                             .unwrap()
@@ -716,7 +691,7 @@ fn main() {
 
     let mut state = EditorState::new(filepath, images);
     let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
-    Box::new(UnsavedIndicator::new(462, 2)),
+    Box::new(UnsavedIndicator::new(462, 2, unsaved_sprite)),
     Box::new(ColorPalette::new(4, 4)),
     // Toolbox:
     Box::new(ToolPicker::new( 4, 296, Tool::Pencil,      Keycode::P,
