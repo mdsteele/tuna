@@ -37,123 +37,13 @@ mod canvas;
 use self::canvas::{Canvas, Sprite};
 
 mod element;
-use self::element::{AggregateElement, GuiElement, SubrectElement};
+use self::element::GuiElement;
+
+mod palette;
+use self::palette::ColorPalette;
 
 mod state;
 use self::state::{EditorState, Tool};
-
-// ========================================================================= //
-
-struct ColorPalette {
-    element: SubrectElement<AggregateElement<ahi::Color>>,
-}
-
-impl ColorPalette {
-    fn new(left: i32, top: i32) -> ColorPalette {
-        let elements: Vec<Box<GuiElement<ahi::Color>>> = vec![
- ColorPalette::picker(0, 0, ahi::Color::Transparent, Keycode::Num0),
- ColorPalette::picker(18, 0, ahi::Color::Black, Keycode::Num1),
- ColorPalette::picker(0, 18, ahi::Color::DarkRed, Keycode::Num2),
- ColorPalette::picker(18, 18, ahi::Color::Red, Keycode::Num3),
- ColorPalette::picker(0, 36, ahi::Color::DarkGreen, Keycode::Num4),
- ColorPalette::picker(18, 36, ahi::Color::Green, Keycode::Num5),
- ColorPalette::picker(0, 54, ahi::Color::DarkYellow, Keycode::Num6),
- ColorPalette::picker(18, 54, ahi::Color::Yellow, Keycode::Num7),
- ColorPalette::picker(0, 72, ahi::Color::DarkBlue, Keycode::Num8),
- ColorPalette::picker(18, 72, ahi::Color::Blue, Keycode::Num9),
- ColorPalette::picker(0, 90, ahi::Color::DarkMagenta, Keycode::A),
- ColorPalette::picker(18, 90, ahi::Color::Magenta, Keycode::B),
- ColorPalette::picker(0, 108, ahi::Color::DarkCyan, Keycode::C),
- ColorPalette::picker(18, 108, ahi::Color::Cyan, Keycode::D),
- ColorPalette::picker(0, 126, ahi::Color::Gray, Keycode::E),
- ColorPalette::picker(18, 126, ahi::Color::White, Keycode::F),
-                                                          ];
-        ColorPalette {
-            element: SubrectElement::new(AggregateElement::new(elements),
-                                         Rect::new(left, top, 36, 144)),
-        }
-    }
-
-    fn picker(x: i32,
-              y: i32,
-              color: ahi::Color,
-              key: Keycode)
-              -> Box<GuiElement<ahi::Color>> {
-        Box::new(SubrectElement::new(ColorPicker::new(color, key),
-                                     Rect::new(x, y, 18, 18)))
-    }
-}
-
-impl GuiElement<EditorState> for ColorPalette {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(&state.color, canvas);
-    }
-
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
-                    -> bool {
-        let mut new_color = state.color;
-        let result = self.element.handle_event(event, &mut new_color);
-        if new_color != state.color {
-            state.unselect();
-            state.color = new_color;
-            if state.tool == Tool::Select {
-                state.tool = Tool::Pencil;
-            }
-        }
-        result
-    }
-}
-
-struct ColorPicker {
-    color: ahi::Color,
-    key: Keycode,
-}
-
-impl ColorPicker {
-    fn new(color: ahi::Color, key: Keycode) -> ColorPicker {
-        ColorPicker {
-            color: color,
-            key: key,
-        }
-    }
-}
-
-impl GuiElement<ahi::Color> for ColorPicker {
-    fn draw(&self, state: &ahi::Color, canvas: &mut Canvas) {
-        let rect = canvas.rect();
-        let inner = expand(rect, -2);
-        if self.color == ahi::Color::Transparent {
-            canvas.draw_rect((0, 0, 0, 255), inner);
-            canvas.draw_rect((0, 0, 0, 255), expand(inner, -2));
-            canvas.draw_rect((0, 0, 0, 255), expand(inner, -4));
-        } else {
-            canvas.fill_rect(self.color.rgba(), inner);
-        }
-        if *state == self.color {
-            canvas.draw_rect((255, 255, 255, 255), rect);
-        }
-    }
-
-    fn handle_event(&mut self, event: &Event, state: &mut ahi::Color) -> bool {
-        match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
-                *state = self.color;
-                return true;
-            }
-            &Event::KeyDown { keycode: Some(key), .. } => {
-                if key == self.key {
-                    *state = self.color;
-                    return true;
-                }
-            }
-            _ => {}
-        }
-        false
-    }
-}
 
 // ========================================================================= //
 
