@@ -37,10 +37,13 @@ mod canvas;
 use self::canvas::{Canvas, Sprite};
 
 mod element;
-use self::element::GuiElement;
+use self::element::{AggregateElement, GuiElement};
 
 mod palette;
 use self::palette::ColorPalette;
+
+mod scrollbar;
+use self::scrollbar::ImagesScrollbar;
 
 mod state;
 use self::state::{EditorState, Tool};
@@ -51,138 +54,7 @@ use self::toolbox::Toolbox;
 mod unsaved;
 use self::unsaved::UnsavedIndicator;
 
-// ========================================================================= //
-
-struct ImagePicker {
-    left: i32,
-    top: i32,
-    delta: i32,
-}
-
-impl ImagePicker {
-    fn new(left: i32, top: i32, delta: i32) -> ImagePicker {
-        ImagePicker {
-            left: left,
-            top: top,
-            delta: delta,
-        }
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 36, 36)
-    }
-
-    fn index(&self, state: &EditorState) -> Option<usize> {
-        let index = (state.current_image as i32) + self.delta;
-        if index >= 0 && index < (state.images.len() as i32) {
-            Some(index as usize)
-        } else {
-            None
-        }
-    }
-
-    fn pick(&self, state: &mut EditorState) -> bool {
-        if let Some(index) = self.index(state) {
-            state.current_image = index;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl GuiElement<EditorState> for ImagePicker {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let color = if let Some(index) = self.index(state) {
-            render_image(canvas,
-                         state.image_at(index),
-                         self.left + 2,
-                         self.top + 2,
-                         1);
-            if self.delta == 0 {
-                (255, 255, 127, 255)
-            } else {
-                (127, 127, 63, 255)
-            }
-        } else {
-            (0, 0, 0, 255)
-        };
-        canvas.draw_rect(color, self.rect());
-    }
-
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
-                    -> bool {
-        match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
-                if self.rect().contains((x, y)) {
-                    return self.pick(state);
-                }
-            }
-            _ => {}
-        }
-        false
-    }
-}
-
-// ========================================================================= //
-
-struct NextPrevImage {
-    left: i32,
-    top: i32,
-    delta: i32,
-    key: Keycode,
-}
-
-impl NextPrevImage {
-    fn new(left: i32, top: i32, delta: i32, key: Keycode) -> NextPrevImage {
-        NextPrevImage {
-            left: left,
-            top: top,
-            delta: delta,
-            key: key,
-        }
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 32, 16)
-    }
-
-    fn increment(&self, state: &mut EditorState) -> bool {
-        state.unselect();
-        state.current_image =
-            modulo((state.current_image as i32) + self.delta,
-                   state.images.len() as i32) as usize;
-        true
-    }
-}
-
-impl GuiElement<EditorState> for NextPrevImage {
-    fn draw(&self, _: &EditorState, canvas: &mut Canvas) {
-        canvas.fill_rect((63, 0, 127, 255), self.rect());
-    }
-
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
-                    -> bool {
-        match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
-                if self.rect().contains((x, y)) {
-                    return self.increment(state);
-                }
-            }
-            &Event::KeyDown { keycode: Some(key), .. } => {
-                if key == self.key {
-                    return self.increment(state);
-                }
-            }
-            _ => {}
-        }
-        false
-    }
-}
+mod util;
 
 // ========================================================================= //
 
@@ -373,11 +245,11 @@ impl GuiElement<EditorState> for ImageCanvas {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let scale = self.scale(state);
         canvas.draw_rect((255, 255, 255, 255), expand(self.rect(state), 2));
-        render_image(canvas, state.image(), self.left, self.top, scale);
+        util::render_image(canvas, state.image(), self.left, self.top, scale);
         if let Some((ref selected, x, y)) = state.selection {
             let left = self.left + x * (scale as i32);
             let top = self.top + y * (scale as i32);
-            render_image(canvas, selected, left, top, scale);
+            util::render_image(canvas, selected, left, top, scale);
             canvas.draw_rect((255, 191, 255, 255),
                              Rect::new(left,
                                        top,
@@ -501,44 +373,11 @@ impl GuiElement<EditorState> for ImageCanvas {
 
 // ========================================================================= //
 
-fn modulo(a: i32, b: i32) -> i32 {
-    if b == 0 {
-        panic!();
-    }
-    let remainder = a % b;
-    if remainder == 0 {
-        0
-    } else if (a < 0) ^ (b < 0) {
-        remainder + b
-    } else {
-        remainder
-    }
-}
-
 fn expand(rect: Rect, by: i32) -> Rect {
     Rect::new(rect.x() - by,
               rect.y() - by,
               ((rect.width() as i32) + 2 * by) as u32,
               ((rect.height() as i32) + 2 * by) as u32)
-}
-
-fn render_image(canvas: &mut Canvas,
-                image: &Image,
-                left: i32,
-                top: i32,
-                scale: u32) {
-    for row in 0..image.height() {
-        for col in 0..image.width() {
-            let pixel = image[(col, row)];
-            if pixel != ahi::Color::Transparent {
-                canvas.fill_rect(pixel.rgba(),
-                                 Rect::new(left + (scale * col) as i32,
-                                           top + (scale * row) as i32,
-                                           scale,
-                                           scale));
-            }
-        }
-    }
 }
 
 fn render_string(canvas: &mut Canvas,
@@ -559,31 +398,34 @@ fn render_string(canvas: &mut Canvas,
                     canvas.draw_sprite(&font[index], Point::new(x, y));
                 }
             }
-            x += 16;
+            x += 14;
         }
     }
 }
 
 fn render_screen(canvas: &mut Canvas,
                  state: &EditorState,
-                 elements: &Vec<Box<GuiElement<EditorState>>>) {
+                 gui: &AggregateElement<EditorState>) {
     canvas.clear((64, 64, 64, 255));
-    for element in elements {
-        element.draw(state, canvas);
-    }
+    gui.draw(state, canvas);
     canvas.present();
 }
 
-fn load_from_file(path: &String) -> io::Result<Vec<Image>> {
+fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
     let mut file = try!(File::open(path));
     Image::read_all(&mut file)
+}
+
+fn load_sprites(canvas: &Canvas, path: &str) -> Vec<Sprite> {
+    let images = load_ahi_from_file(&path.to_string()).unwrap();
+    images.iter().map(|image| canvas.new_sprite(image)).collect()
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (filepath, images) = if args.len() >= 2 {
         let filepath = &args[1];
-        (filepath.clone(), load_from_file(filepath).unwrap())
+        (filepath.clone(), load_ahi_from_file(filepath).unwrap())
     } else {
         ("out.ahi".to_string(), vec![])
     };
@@ -603,45 +445,29 @@ fn main() {
     renderer.set_logical_size(width, height).unwrap();
     let mut canvas = Canvas::from_renderer(&mut renderer);
 
-    let tool_icons: Vec<Sprite> = load_from_file(&"data/tool_icons.ahi"
-                                                      .to_string())
-                                      .unwrap()
-                                      .iter()
-                                      .map(|image| canvas.new_sprite(image))
-                                      .collect();
+    let tool_icons: Vec<Sprite> = load_sprites(&canvas, "data/tool_icons.ahi");
+    let arrows: Vec<Sprite> = load_sprites(&canvas, "data/arrows.ahi");
     let unsaved_sprite = {
-        let images = load_from_file(&"data/unsaved.ahi".to_string()).unwrap();
+        let images = load_ahi_from_file(&"data/unsaved.ahi".to_string())
+                         .unwrap();
         canvas.new_sprite(&images[0])
     };
-    let font: Rc<Vec<Sprite>> = Rc::new(load_from_file(&"data/font.ahi"
-                                                            .to_string())
-                                            .unwrap()
-                                            .iter()
-                                            .map(|image| {
-                                                canvas.new_sprite(image)
-                                            })
-                                            .collect());
+    let font: Rc<Vec<Sprite>> = Rc::new(load_sprites(&canvas,
+                                                     "data/font.ahi"));
 
     let mut state = EditorState::new(filepath, images);
-    let mut elements: Vec<Box<GuiElement<EditorState>>> = vec![
-    Box::new(UnsavedIndicator::new(462, 2, unsaved_sprite)),
+    let elements: Vec<Box<GuiElement<EditorState>>> = vec![
+    Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
     Box::new(ColorPalette::new(4, 136)),
     Box::new(Toolbox::new(10, 10, tool_icons)),
     Box::new(FilePathTextBox::new(4, 296, font.clone())),
-    // Image canvases:
+    Box::new(ImagesScrollbar::new(436, 11, arrows)),
     Box::new(ImageCanvas::new(48, 16, 256)),
-    Box::new(ImageCanvas::new(320, 16, 64)),
-    // Images scrollbar:
-    Box::new(NextPrevImage::new(414, 8, -1, Keycode::Up)),
-    Box::new(ImagePicker::new(412, 32, -2)),
-    Box::new(ImagePicker::new(412, 70, -1)),
-    Box::new(ImagePicker::new(412, 108, 0)),
-    Box::new(ImagePicker::new(412, 146, 1)),
-    Box::new(ImagePicker::new(412, 184, 2)),
-    Box::new(NextPrevImage::new(414, 222, 1, Keycode::Down)),
+    Box::new(ImageCanvas::new(314, 16, 64)),
   ];
+    let mut gui = AggregateElement::new(elements);
 
-    render_screen(&mut canvas, &state, &elements);
+    render_screen(&mut canvas, &state, &gui);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     loop {
@@ -706,15 +532,13 @@ fn main() {
                 }
             }
             event => {
-                for element in elements.iter_mut() {
-                    if element.handle_event(&event, &mut state) {
-                        needs_redraw = true;
-                    }
+                if gui.handle_event(&event, &mut state) {
+                    needs_redraw = true;
                 }
             }
         }
         if needs_redraw {
-            render_screen(&mut canvas, &state, &elements);
+            render_screen(&mut canvas, &state, &gui);
         }
     }
 }

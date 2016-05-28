@@ -135,12 +135,12 @@ impl EditorState {
 
     pub fn flip_image_horz(&mut self) {
         self.push_change();
-        self.image_mut().flip_horz();
+        *self.image_mut() = self.image().flip_horz();
     }
 
     pub fn flip_image_vert(&mut self) {
         self.push_change();
-        self.image_mut().flip_vert();
+        *self.image_mut() = self.image().flip_vert();
     }
 
     pub fn add_new_image(&mut self) {
