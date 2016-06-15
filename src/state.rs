@@ -28,6 +28,7 @@ use std::mem;
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Tool {
     Eyedropper,
+    Line,
     PaintBucket,
     Pencil,
     Select,

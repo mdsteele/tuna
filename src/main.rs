@@ -58,6 +58,52 @@ mod util;
 
 // ========================================================================= //
 
+fn bresenham_points(x1: u32, y1: u32, x2: u32, y2: u32) -> Vec<(u32, u32)> {
+    let (x1, y1, x2, y2) = (x1 as i32, y1 as i32, x2 as i32, y2 as i32);
+    let dx = (x2 - x1).abs();
+    let dy = (y2 - y1).abs();
+    let steep = dy > dx;
+    let (dx, dy, x1, y1, x2, y2) = if steep {
+        (dy, dx, y1, x1, y2, x2)
+    } else {
+        (dx, dy, x1, y1, x2, y2)
+    };
+    let reversed = x1 > x2;
+    let (x1, y1, x2, y2) = if reversed {
+        (x2, y2, x1, y1)
+    } else {
+        (x1, y1, x2, y2)
+    };
+    let y_step = if y1 < y2 {
+        1
+    } else {
+        -1
+    };
+    let mut x = x1;
+    let mut y = y1;
+    let mut err = dx / 2;
+    let mut output = vec![];
+    while x <= x2 {
+        output.push(if steep {
+            (y as u32, x as u32)
+        } else {
+            (x as u32, y as u32)
+        });
+        x += 1;
+        err -= dy;
+        if err < 0 {
+            y += y_step;
+            err += dx;
+        }
+    }
+    if reversed {
+        output.reverse();
+    }
+    output
+}
+
+// ========================================================================= //
+
 struct FilePathTextBox {
     left: i32,
     top: i32,
@@ -130,16 +176,23 @@ impl ImageCanvas {
         Rect::new(self.left, self.top, width * scale, height * scale)
     }
 
-    fn dragged_rect(&self, state: &EditorState) -> Option<Rect> {
+    fn dragged_points(&self,
+                      state: &EditorState)
+                      -> Option<((u32, u32), (u32, u32))> {
         if let Some(ref drag) = self.drag_from_to {
             let (fpx, fpy) = drag.from_pixel;
             let (tpx, tpy) = drag.to_pixel;
-            let (from_col, from_row) = self.clamp_mouse_to_row_col(fpx,
-                                                                   fpy,
-                                                                   state);
-            let (to_col, to_row) = self.clamp_mouse_to_row_col(tpx,
-                                                               tpy,
-                                                               state);
+            let from_point = self.clamp_mouse_to_row_col(fpx, fpy, state);
+            let to_point = self.clamp_mouse_to_row_col(tpx, tpy, state);
+            Some((from_point, to_point))
+        } else {
+            None
+        }
+    }
+
+    fn dragged_rect(&self, state: &EditorState) -> Option<Rect> {
+        if let Some(((from_col, from_row), (to_col, to_row))) =
+               self.dragged_points(state) {
             let x = std::cmp::min(from_col, to_col) as i32;
             let y = std::cmp::min(from_row, to_row) as i32;
             let w = ((from_col as i32 - to_col as i32).abs() + 1) as u32;
@@ -179,8 +232,8 @@ impl ImageCanvas {
         let col = (x - self.left) / scale;
         let row = (y - self.top) / scale;
         let (width, height) = state.image_size();
-        (std::cmp::max(0, std::cmp::min(col, width as i32)) as u32,
-         std::cmp::max(0, std::cmp::min(row, height as i32)) as u32)
+        (std::cmp::max(0, std::cmp::min(col, width as i32 - 1)) as u32,
+         std::cmp::max(0, std::cmp::min(row, height as i32 - 1)) as u32)
     }
 
     fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
@@ -199,6 +252,19 @@ impl ImageCanvas {
         } else {
             false
         }
+    }
+
+    fn try_draw_line(&mut self, state: &mut EditorState) -> bool {
+        if let Some(((col1, row1), (col2, row2))) =
+               self.dragged_points(state) {
+            state.push_change();
+            for coords in bresenham_points(col1, row1, col2, row2) {
+                state.image_mut()[coords] = state.color;
+            }
+            self.drag_from_to = None;
+            return true;
+        }
+        false
     }
 
     fn try_flood_fill(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
@@ -255,6 +321,18 @@ impl GuiElement<EditorState> for ImageCanvas {
                                        top,
                                        selected.width() * scale,
                                        selected.height() * scale));
+        } else if state.tool() == Tool::Line {
+            if let Some(((col1, row1), (col2, row2))) =
+                   self.dragged_points(state) {
+                for (x, y) in bresenham_points(col1, row1, col2, row2) {
+                    canvas.draw_rect((191, 191, 191, 255),
+                                     Rect::new(self.left +
+                                               (x * scale) as i32,
+                                               self.top + (y * scale) as i32,
+                                               scale,
+                                               scale));
+                }
+            }
         } else if let Some(rect) = self.dragged_rect(state) {
             canvas.draw_rect((255, 255, 191, 255),
                              Rect::new(self.left + rect.x() * (scale as i32),
@@ -277,6 +355,14 @@ impl GuiElement<EditorState> for ImageCanvas {
                     match state.tool() {
                         Tool::Eyedropper => {
                             return self.try_eyedrop(x, y, state);
+                        }
+                        Tool::Line => {
+                            self.drag_from_to = Some(ImageCanvasDrag {
+                                from_selection: (0, 0),
+                                from_pixel: (x, y),
+                                to_pixel: (x, y),
+                            });
+                            return true;
                         }
                         Tool::PaintBucket => {
                             state.push_change();
@@ -328,6 +414,9 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseButtonUp { mouse_btn: Mouse::Left, .. } => {
                 match state.tool() {
+                    Tool::Line => {
+                        return self.try_draw_line(state);
+                    }
                     Tool::Select => {
                         if state.selection.is_none() {
                             if let Some(rect) = self.dragged_rect(state) {
@@ -344,6 +433,12 @@ impl GuiElement<EditorState> for ImageCanvas {
             &Event::MouseMotion { x, y, mousestate, .. } => {
                 if mousestate.left() {
                     match state.tool() {
+                        Tool::Line => {
+                            if let Some(ref mut drag) = self.drag_from_to {
+                                drag.to_pixel = (x, y);
+                                return true;
+                            }
+                        }
                         Tool::Pencil => {
                             return self.try_paint(x, y, state);
                         }
@@ -458,7 +553,7 @@ fn main() {
     let mut state = EditorState::new(filepath, images);
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
     Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
-    Box::new(ColorPalette::new(4, 136)),
+    Box::new(ColorPalette::new(4, 138)),
     Box::new(Toolbox::new(10, 10, tool_icons)),
     Box::new(FilePathTextBox::new(4, 296, font.clone())),
     Box::new(ImagesScrollbar::new(436, 11, arrows)),
