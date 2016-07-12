@@ -27,7 +27,6 @@ extern crate sdl2;
 use ahi::Image;
 use sdl2::event::Event;
 use sdl2::keyboard::{self, Keycode};
-use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
 use std::rc::Rc;
@@ -50,6 +49,9 @@ use self::scrollbar::ImagesScrollbar;
 mod state;
 use self::state::EditorState;
 
+mod textbox;
+use self::textbox::FilePathTextBox;
+
 mod toolbox;
 use self::toolbox::Toolbox;
 
@@ -60,70 +62,9 @@ mod util;
 
 // ========================================================================= //
 
-struct FilePathTextBox {
-    left: i32,
-    top: i32,
-    font: Rc<Vec<Sprite>>,
-}
-
-impl FilePathTextBox {
-    fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> FilePathTextBox {
-        FilePathTextBox {
-            left: left,
-            top: top,
-            font: font,
-        }
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top, 472, 20)
-    }
-}
-
-impl GuiElement<EditorState> for FilePathTextBox {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let rect = self.rect();
-        render_string(canvas,
-                      &self.font,
-                      rect.x() + 2,
-                      rect.y() + 2,
-                      &state.filepath);
-        canvas.draw_rect((255, 255, 255, 255), rect);
-    }
-
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
-        false
-    }
-}
-
-// ========================================================================= //
-
-fn render_string(canvas: &mut Canvas,
-                 font: &Vec<Sprite>,
-                 left: i32,
-                 top: i32,
-                 string: &str) {
-    let mut x = left;
-    let mut y = top;
-    for ch in string.chars() {
-        if ch == '\n' {
-            x = left;
-            y += 24;
-        } else {
-            if ch >= '!' {
-                let index = ch as usize - '!' as usize;
-                if index < font.len() {
-                    canvas.draw_sprite(&font[index], Point::new(x, y));
-                }
-            }
-            x += 14;
-        }
-    }
-}
-
-fn render_screen(canvas: &mut Canvas,
-                 state: &EditorState,
-                 gui: &AggregateElement<EditorState>) {
+fn render_screen<E: GuiElement<EditorState>>(canvas: &mut Canvas,
+                                             state: &EditorState,
+                                             gui: &E) {
     canvas.clear((64, 64, 64, 255));
     gui.draw(state, canvas);
     canvas.present();
