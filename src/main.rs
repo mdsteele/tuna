@@ -27,6 +27,7 @@ extern crate sdl2;
 use ahi::Image;
 use sdl2::event::Event;
 use sdl2::keyboard::{self, Keycode};
+use sdl2::rect::Rect;
 use std::fs::File;
 use std::io;
 use std::rc::Rc;
@@ -35,7 +36,7 @@ mod canvas;
 use self::canvas::{Canvas, Sprite};
 
 mod element;
-use self::element::{AggregateElement, GuiElement};
+use self::element::{AggregateElement, GuiElement, SubrectElement};
 
 mod paint;
 use self::paint::ImageCanvas;
@@ -66,6 +67,8 @@ fn render_screen<E: GuiElement<EditorState>>(canvas: &mut Canvas,
                                              state: &EditorState,
                                              gui: &E) {
     canvas.clear((64, 64, 64, 255));
+    let rect = canvas.rect();
+    canvas.draw_rect((127, 127, 127, 127), rect);
     gui.draw(state, canvas);
     canvas.present();
 }
@@ -80,6 +83,32 @@ fn load_sprites(canvas: &Canvas, path: &str) -> Vec<Sprite> {
     images.iter().map(|image| canvas.new_sprite(image)).collect()
 }
 
+fn window_size(ideal_width: u32,
+               ideal_height: u32,
+               aspect_ratio: f64)
+               -> ((u32, u32), Rect) {
+    let ideal_ratio = (ideal_width as f64) / (ideal_height as f64);
+    if aspect_ratio > ideal_ratio {
+        let actual_width = (aspect_ratio *
+                            (ideal_height as f64))
+                               .round() as u32;
+        ((actual_width, ideal_height),
+         Rect::new(((actual_width - ideal_width) / 2) as i32,
+                   0,
+                   ideal_width,
+                   ideal_height))
+    } else {
+        let actual_height = ((ideal_width as f64) /
+                             aspect_ratio)
+                                .round() as u32;
+        ((ideal_width, actual_height),
+         Rect::new(0,
+                   ((actual_height - ideal_height) / 2) as i32,
+                   ideal_width,
+                   ideal_height))
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (filepath, images) = if args.len() >= 2 {
@@ -92,16 +121,21 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let width: u32 = 32 * 15;
-    let height: u32 = 32 * 10;
-
-    let window = video_subsystem.window("AHI Editor", width, height)
-      .position_centered()
-      //.fullscreen_desktop()
-      .build().unwrap();
-
+    let ideal_width = 480;
+    let ideal_height = 320;
+    let window = video_subsystem.window("AHI Editor",
+                                        ideal_width,
+                                        ideal_height)
+                                .position_centered()
+                                .fullscreen_desktop()
+                                .build()
+                                .unwrap();
+    let (native_width, native_height) = window.size();
+    let aspect_ratio: f64 = (native_width as f64) / (native_height as f64);
+    let ((actual_width, actual_height), gui_subrect) =
+        window_size(ideal_width, ideal_height, aspect_ratio);
     let mut renderer = window.renderer().build().unwrap();
-    renderer.set_logical_size(width, height).unwrap();
+    renderer.set_logical_size(actual_width, actual_height).unwrap();
     let mut canvas = Canvas::from_renderer(&mut renderer);
 
     let tool_icons: Vec<Sprite> = load_sprites(&canvas, "data/tool_icons.ahi");
@@ -124,7 +158,8 @@ fn main() {
     Box::new(ImageCanvas::new(48, 16, 256)),
     Box::new(ImageCanvas::new(314, 16, 64)),
   ];
-    let mut gui = AggregateElement::new(elements);
+    let mut gui = SubrectElement::new(AggregateElement::new(elements),
+                                      gui_subrect);
 
     render_screen(&mut canvas, &state, &gui);
 
