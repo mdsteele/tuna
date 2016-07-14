@@ -18,7 +18,6 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Image resizing
 // - Open-file/Save-as
 
 extern crate ahi;
@@ -51,7 +50,7 @@ mod state;
 use self::state::EditorState;
 
 mod textbox;
-use self::textbox::FilePathTextBox;
+use self::textbox::ModalTextBox;
 
 mod toolbox;
 use self::toolbox::Toolbox;
@@ -153,7 +152,7 @@ fn main() {
     Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
     Box::new(ColorPalette::new(4, 138)),
     Box::new(Toolbox::new(10, 10, tool_icons)),
-    Box::new(FilePathTextBox::new(4, 296, font.clone())),
+    Box::new(ModalTextBox::new(4, 296, font.clone())),
     Box::new(ImagesScrollbar::new(436, 11, arrows)),
     Box::new(ImageCanvas::new(48, 16, 256)),
     Box::new(ImageCanvas::new(314, 16, 64)),
@@ -193,6 +192,10 @@ fn main() {
                     }
                     Keycode::N => {
                         state.add_new_image();
+                        needs_redraw = true;
+                    }
+                    Keycode::R => {
+                        state.begin_resize();
                         needs_redraw = true;
                     }
                     Keycode::S => {

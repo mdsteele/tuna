@@ -18,11 +18,12 @@
 // +--------------------------------------------------------------------------+
 
 use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use sdl2::rect::{Point, Rect};
 use std::rc::Rc;
 use super::canvas::{Canvas, Sprite};
 use super::element::{GuiElement, SubrectElement};
-use super::state::EditorState;
+use super::state::{EditorState, Mode};
 
 // ========================================================================= //
 
@@ -43,33 +44,63 @@ impl GuiElement<String> for TextBox {
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut String) -> bool {
-        false
+    fn handle_event(&mut self, event: &Event, text: &mut String) -> bool {
+        match event {
+            &Event::KeyDown { keycode: Some(Keycode::Backspace), .. } => {
+                text.pop().is_some()
+            }
+            &Event::TextInput { text: ref input, .. } => {
+                text.push_str(input);
+                true
+            }
+            _ => false,
+        }
     }
 }
 
 // ========================================================================= //
 
-pub struct FilePathTextBox {
+pub struct ModalTextBox {
     element: SubrectElement<TextBox>,
 }
 
-impl FilePathTextBox {
-    pub fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> FilePathTextBox {
-        FilePathTextBox {
+impl ModalTextBox {
+    pub fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> ModalTextBox {
+        ModalTextBox {
             element: SubrectElement::new(TextBox::new(font),
                                          Rect::new(left, top, 472, 20)),
         }
     }
 }
 
-impl GuiElement<EditorState> for FilePathTextBox {
+impl GuiElement<EditorState> for ModalTextBox {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        self.element.draw(&state.filepath, canvas);
+        match state.mode {
+            Mode::Edit => self.element.draw(&state.filepath, canvas),
+            Mode::Resize(ref text) => self.element.draw(text, canvas),
+        }
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
-        false
+    fn handle_event(&mut self,
+                    event: &Event,
+                    state: &mut EditorState)
+                    -> bool {
+        match event {
+            &Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                state.mode_cancel()
+            }
+            &Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
+                state.mode_perform()
+            }
+            _ => {
+                match state.mode {
+                    Mode::Edit => false,
+                    Mode::Resize(ref mut text) => {
+                        self.element.handle_event(event, text)
+                    }
+                }
+            }
+        }
     }
 }
 

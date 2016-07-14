@@ -34,6 +34,12 @@ pub enum Tool {
     Select,
 }
 
+#[derive(Clone, Eq, PartialEq)]
+pub enum Mode {
+    Edit,
+    Resize(String),
+}
+
 const MAX_UNDOS: usize = 100;
 
 enum Undo {
@@ -59,6 +65,7 @@ enum Redo {
 }
 
 pub struct EditorState {
+    pub mode: Mode,
     pub color: Color,
     pub filepath: String,
     pub images: Vec<Image>,
@@ -78,6 +85,7 @@ impl EditorState {
             images.push(Image::new(32, 32));
         }
         EditorState {
+            mode: Mode::Edit,
             color: Color::Black,
             filepath: filepath,
             images: images,
@@ -375,6 +383,61 @@ impl EditorState {
         try!(Image::write_all(&mut file, &self.images));
         self.unsaved = false;
         Ok(())
+    }
+
+    pub fn begin_resize(&mut self) {
+        if self.mode == Mode::Edit {
+            self.mode = Mode::Resize(format!("{}x{}",
+                                             self.image().width(),
+                                             self.image().height()));
+        }
+    }
+
+    pub fn mode_cancel(&mut self) -> bool {
+        match self.mode {
+            Mode::Edit => false,
+            _ => {
+                self.mode = Mode::Edit;
+                true
+            }
+        }
+    }
+
+    pub fn mode_perform(&mut self) -> bool {
+        match self.mode {
+            Mode::Edit => {
+                return false;
+            }
+            Mode::Resize(ref text) => {
+                let pieces: Vec<&str> = text.split('x').collect();
+                if pieces.len() != 2 {
+                    return false;
+                }
+                let new_width = match pieces[0].parse::<u32>() {
+                    Ok(width) => width,
+                    Err(_) => {
+                        return false;
+                    }
+                };
+                let new_height = match pieces[1].parse::<u32>() {
+                    Ok(height) => height,
+                    Err(_) => {
+                        return false;
+                    }
+                };
+                self.images = self.images
+                                  .iter()
+                                  .map(|old_image| {
+                                      let mut new_image =
+                                          Image::new(new_width, new_height);
+                                      new_image.draw(old_image, 0, 0);
+                                      new_image
+                                  })
+                                  .collect();
+            }
+        }
+        self.mode = Mode::Edit;
+        true
     }
 }
 
