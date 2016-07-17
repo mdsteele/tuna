@@ -52,6 +52,9 @@ use self::state::EditorState;
 mod textbox;
 use self::textbox::ModalTextBox;
 
+mod tiles;
+use self::tiles::TileView;
+
 mod toolbox;
 use self::toolbox::Toolbox;
 
@@ -156,6 +159,7 @@ fn main() {
     Box::new(ImagesScrollbar::new(436, 11, arrows)),
     Box::new(ImageCanvas::new(48, 16, 256)),
     Box::new(ImageCanvas::new(314, 16, 64)),
+    Box::new(TileView::new(314, 96, 96, 96)),
   ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),
                                       gui_subrect);
