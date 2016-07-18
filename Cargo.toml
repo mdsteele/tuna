@@ -6,4 +6,4 @@ license = "GPL-3.0+"
 
 [dependencies]
 ahi = { git = "https://github.com/mdsteele/ahi" }
-sdl2 = { version = "0.19.0", features = ["use_mac_framework"] }
+sdl2 = { version = "0.21.0", features = ["use_mac_framework"] }
