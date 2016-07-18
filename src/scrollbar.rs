@@ -17,12 +17,10 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::mouse::Mouse;
 use sdl2::rect::{Point, Rect};
 use super::canvas::{Canvas, Sprite};
 use super::element::{AggregateElement, GuiElement, SubrectElement};
+use super::event::{Event, Keycode};
 use super::state::EditorState;
 use super::util;
 
@@ -137,7 +135,7 @@ impl GuiElement<EditorState> for ImagePicker {
                     state: &mut EditorState)
                     -> bool {
         match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
+            &Event::MouseDown(_) => {
                 return self.pick(state);
             }
             _ => {}
@@ -182,10 +180,10 @@ impl GuiElement<EditorState> for NextPrevImage {
                     state: &mut EditorState)
                     -> bool {
         match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
+            &Event::MouseDown(_) => {
                 return self.increment(state);
             }
-            &Event::KeyDown { keycode: Some(key), .. } => {
+            &Event::KeyDown(key, _) => {
                 if key == self.key {
                     return self.increment(state);
                 }

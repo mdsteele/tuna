@@ -17,12 +17,10 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::mouse::Mouse;
 use sdl2::rect::{Point, Rect};
 use super::canvas::{Canvas, Sprite};
 use super::element::{AggregateElement, GuiElement, SubrectElement};
+use super::event::{Event, Keycode, NONE};
 use super::state::{EditorState, Tool};
 
 // ========================================================================= //
@@ -113,12 +111,12 @@ impl GuiElement<Tool> for ToolPicker {
 
     fn handle_event(&mut self, event: &Event, tool: &mut Tool) -> bool {
         match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
+            &Event::MouseDown(_) => {
                 *tool = self.tool;
                 return true;
             }
-            &Event::KeyDown { keycode: Some(key), .. } => {
-                if key == self.key {
+            &Event::KeyDown(key, kmod) => {
+                if key == self.key && kmod == NONE {
                     *tool = self.tool;
                     return true;
                 }

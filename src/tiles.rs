@@ -18,10 +18,10 @@
 // +--------------------------------------------------------------------------+
 
 use ahi::Image;
-use sdl2::event::Event;
 use sdl2::rect::Rect;
 use super::canvas::Canvas;
 use super::element::{GuiElement, SubrectElement};
+use super::event::Event;
 use super::state::EditorState;
 use super::util;
 

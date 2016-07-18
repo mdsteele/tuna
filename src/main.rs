@@ -24,8 +24,6 @@ extern crate ahi;
 extern crate sdl2;
 
 use ahi::Image;
-use sdl2::event::Event;
-use sdl2::keyboard::{self, Keycode};
 use sdl2::rect::Rect;
 use std::fs::File;
 use std::io;
@@ -36,6 +34,9 @@ use self::canvas::{Canvas, Sprite};
 
 mod element;
 use self::element::{AggregateElement, GuiElement, SubrectElement};
+
+mod event;
+use self::event::{COMMAND, Event, Keycode, SHIFT};
 
 mod paint;
 use self::paint::ImageCanvas;
@@ -168,68 +169,63 @@ fn main() {
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     loop {
+        let event = match Event::from_sdl2(&event_pump.wait_event()) {
+            Some(event) => event,
+            None => {
+                continue;
+            }
+        };
         let mut needs_redraw = false;
-        match event_pump.wait_event() {
-            Event::Quit { .. } => return,
-            Event::KeyDown { keycode: Some(key), keymod: kmod, .. }
-                if kmod.intersects(keyboard::LGUIMOD |
-                                   keyboard::RGUIMOD) => {
-                match key {
-                    Keycode::Backspace => {
-                        if state.try_delete_image() {
-                            needs_redraw = true;
-                        }
-                    }
-                    Keycode::A => {
-                        state.select_all_with_undo();
-                        needs_redraw = true;
-                    }
-                    Keycode::C => {
-                        state.copy_selection();
-                    }
-                    Keycode::H => {
-                        if kmod.intersects(keyboard::LSHIFTMOD |
-                                           keyboard::RSHIFTMOD) {
-                            state.flip_image_horz();
-                            needs_redraw = true;
-                        }
-                    }
-                    Keycode::N => {
-                        state.add_new_image();
-                        needs_redraw = true;
-                    }
-                    Keycode::R => {
-                        state.begin_resize();
-                        needs_redraw = true;
-                    }
-                    Keycode::S => {
-                        state.save_to_file().unwrap();
-                        needs_redraw = true;
-                    }
-                    Keycode::V => {
-                        if kmod.intersects(keyboard::LSHIFTMOD |
-                                           keyboard::RSHIFTMOD) {
-                            state.flip_image_vert();
-                        } else {
-                            state.paste_selection();
-                        }
-                        needs_redraw = true;
-                    }
-                    Keycode::X => {
-                        state.cut_selection();
-                        needs_redraw = true;
-                    }
-                    Keycode::Z => {
-                        if kmod.intersects(keyboard::LSHIFTMOD |
-                                           keyboard::RSHIFTMOD) {
-                            if state.redo() {
-                                needs_redraw = true;
-                            }
-                        } else if state.undo() {
-                            needs_redraw = true;
-                        }
-                    }
-                    _ => {}
+        match event {
+            Event::Quit => return,
+            Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
+                if state.try_delete_image() {
+                    needs_redraw = true;
+                }
+            }
+            Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
+                state.select_all_with_undo();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
+                state.copy_selection();
+            }
+            Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
+                state.flip_image_horz();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
+                state.add_new_image();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
+                state.begin_resize();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
+                state.save_to_file().unwrap();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
+                state.paste_selection();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
+                state.flip_image_vert();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
+                state.cut_selection();
+                needs_redraw = true;
+            }
+            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {
+                if state.undo() {
+                    needs_redraw = true;
+                }
+            }
+            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
+                if state.redo() {
+                    needs_redraw = true;
                 }
             }
             event => {

@@ -17,9 +17,9 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::event::Event;
 use sdl2::rect::Rect;
 use super::canvas::Canvas;
+use super::event::Event;
 
 // ========================================================================= //
 
@@ -55,11 +55,17 @@ impl<E, S> GuiElement<S> for SubrectElement<E>
         let mut subcanvas = canvas.subcanvas(self.subrect);
         self.element.draw(state, &mut subcanvas);
     }
+
     fn handle_event(&mut self, event: &Event, state: &mut S) -> bool {
-        if event_outside_rect(event, self.subrect) {
-            return false;
+        match event {
+            &Event::MouseDown(pt) => {
+                if !self.subrect.contains(pt) {
+                    return false;
+                }
+            }
+            _ => {}
         }
-        let event = translate_event(event, self.subrect.x(), self.subrect.y());
+        let event = event.translate(-self.subrect.x(), -self.subrect.y());
         self.element.handle_event(&event, state)
     }
 }
@@ -90,44 +96,6 @@ impl<S> GuiElement<S> for AggregateElement<S> {
         }
         result
     }
-}
-
-// ========================================================================= //
-
-fn event_outside_rect(event: &Event, rect: Rect) -> bool {
-    let maybe_pt = match *event {
-        Event::MouseButtonDown { x, y, .. } => Some((x, y)),
-        _ => None,
-    };
-    if let Some(pt) = maybe_pt {
-        !rect.contains(pt)
-    } else {
-        false
-    }
-}
-
-fn translate_event(event: &Event, x_offset: i32, y_offset: i32) -> Event {
-    let mut event = event.clone();
-    match event {
-        Event::MouseButtonDown { ref mut x, ref mut y, .. } => {
-            *x -= x_offset;
-            *y -= y_offset;
-        }
-        Event::MouseButtonUp { ref mut x, ref mut y, .. } => {
-            *x -= x_offset;
-            *y -= y_offset;
-        }
-        Event::MouseMotion { ref mut x, ref mut y, .. } => {
-            *x -= x_offset;
-            *y -= y_offset;
-        }
-        Event::MouseWheel { ref mut x, ref mut y, .. } => {
-            *x -= x_offset;
-            *y -= y_offset;
-        }
-        _ => {}
-    }
-    event
 }
 
 // ========================================================================= //

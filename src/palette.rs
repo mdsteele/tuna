@@ -18,13 +18,11 @@
 // +--------------------------------------------------------------------------+
 
 use ahi::Color;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::mouse::Mouse;
 use sdl2::rect::Rect;
 use std::cmp;
 use super::canvas::Canvas;
 use super::element::{AggregateElement, GuiElement, SubrectElement};
+use super::event::{Event, Keycode, NONE};
 use super::state::{EditorState, Tool};
 
 // ========================================================================= //
@@ -126,12 +124,12 @@ impl GuiElement<Color> for ColorPicker {
 
     fn handle_event(&mut self, event: &Event, state: &mut Color) -> bool {
         match event {
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, .. } => {
+            &Event::MouseDown(_) => {
                 *state = self.color;
                 return true;
             }
-            &Event::KeyDown { keycode: Some(key), .. } => {
-                if key == self.key {
+            &Event::KeyDown(key, kmod) => {
+                if key == self.key && kmod == NONE {
                     *state = self.color;
                     return true;
                 }

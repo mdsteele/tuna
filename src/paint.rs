@@ -17,13 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::mouse::Mouse;
 use sdl2::rect::Rect;
 use std::cmp;
 use super::canvas::Canvas;
 use super::element::GuiElement;
+use super::event::{Event, Keycode};
 use super::state::{EditorState, Tool};
 use super::util;
 
@@ -234,11 +232,12 @@ impl GuiElement<EditorState> for ImageCanvas {
                     state: &mut EditorState)
                     -> bool {
         match event {
-            &Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+            &Event::KeyDown(Keycode::Escape, _) => {
                 return state.try_unselect_with_undo();
             }
-            &Event::MouseButtonDown { mouse_btn: Mouse::Left, x, y, .. } => {
-                if self.rect(state).contains((x, y)) {
+            &Event::MouseDown(pt) => {
+                if self.rect(state).contains(pt) {
+                    let (x, y) = (pt.x(), pt.y());
                     match state.tool() {
                         Tool::Eyedropper => {
                             return self.try_eyedrop(x, y, state);
@@ -299,7 +298,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                     self.drag_from_to = None;
                 }
             }
-            &Event::MouseButtonUp { mouse_btn: Mouse::Left, .. } => {
+            &Event::MouseUp => {
                 match state.tool() {
                     Tool::Line => {
                         return self.try_draw_line(state);
@@ -317,34 +316,33 @@ impl GuiElement<EditorState> for ImageCanvas {
                 }
                 self.drag_from_to = None;
             }
-            &Event::MouseMotion { x, y, mousestate, .. } => {
-                if mousestate.left() {
-                    match state.tool() {
-                        Tool::Line => {
-                            if let Some(ref mut drag) = self.drag_from_to {
-                                drag.to_pixel = (x, y);
-                                return true;
-                            }
+            &Event::MouseDrag(pt) => {
+                let (x, y) = (pt.x(), pt.y());
+                match state.tool() {
+                    Tool::Line => {
+                        if let Some(ref mut drag) = self.drag_from_to {
+                            drag.to_pixel = (x, y);
+                            return true;
                         }
-                        Tool::Pencil => {
-                            return self.try_paint(x, y, state);
-                        }
-                        Tool::Select => {
-                            let scale = self.scale(state) as i32;
-                            if let Some(ref mut drag) = self.drag_from_to {
-                                drag.to_pixel = (x, y);
-                                if let Some((_, ref mut sx, ref mut sy)) =
-                                       state.selection {
-                                    let (fsx, fsy) = drag.from_selection;
-                                    let (fpx, fpy) = drag.from_pixel;
-                                    *sx = fsx + (x - fpx) / scale;
-                                    *sy = fsy + (y - fpy) / scale;
-                                }
-                                return true;
-                            }
-                        }
-                        _ => {}
                     }
+                    Tool::Pencil => {
+                        return self.try_paint(x, y, state);
+                    }
+                    Tool::Select => {
+                        let scale = self.scale(state) as i32;
+                        if let Some(ref mut drag) = self.drag_from_to {
+                            drag.to_pixel = (x, y);
+                            if let Some((_, ref mut sx, ref mut sy)) =
+                                   state.selection {
+                                let (fsx, fsy) = drag.from_selection;
+                                let (fpx, fpy) = drag.from_pixel;
+                                *sx = fsx + (x - fpx) / scale;
+                                *sy = fsy + (y - fpy) / scale;
+                            }
+                            return true;
+                        }
+                    }
+                    _ => {}
                 }
             }
             _ => {}

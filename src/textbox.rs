@@ -17,12 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
 use sdl2::rect::{Point, Rect};
 use std::rc::Rc;
 use super::canvas::{Canvas, Sprite};
 use super::element::{GuiElement, SubrectElement};
+use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode};
 
 // ========================================================================= //
@@ -46,10 +45,8 @@ impl GuiElement<String> for TextBox {
 
     fn handle_event(&mut self, event: &Event, text: &mut String) -> bool {
         match event {
-            &Event::KeyDown { keycode: Some(Keycode::Backspace), .. } => {
-                text.pop().is_some()
-            }
-            &Event::TextInput { text: ref input, .. } => {
+            &Event::KeyDown(Keycode::Backspace, _) => text.pop().is_some(),
+            &Event::TextInput(ref input) => {
                 text.push_str(input);
                 true
             }
@@ -86,12 +83,8 @@ impl GuiElement<EditorState> for ModalTextBox {
                     state: &mut EditorState)
                     -> bool {
         match event {
-            &Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                state.mode_cancel()
-            }
-            &Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
-                state.mode_perform()
-            }
+            &Event::KeyDown(Keycode::Escape, _) => state.mode_cancel(),
+            &Event::KeyDown(Keycode::Return, _) => state.mode_perform(),
             _ => {
                 match state.mode {
                     Mode::Edit => false,
