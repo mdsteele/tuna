@@ -22,6 +22,7 @@ use sdl2::rect::Rect;
 use std::fs::File;
 use std::io;
 use std::mem;
+use super::util;
 
 // ========================================================================= //
 
@@ -37,6 +38,7 @@ pub enum Tool {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Mode {
     Edit,
+    LoadFile(String),
     Resize(String),
 }
 
@@ -385,11 +387,23 @@ impl EditorState {
         Ok(())
     }
 
-    pub fn begin_resize(&mut self) {
+    pub fn begin_load_file(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            self.mode = Mode::LoadFile(self.filepath.clone());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn begin_resize(&mut self) -> bool {
         if self.mode == Mode::Edit {
             self.mode = Mode::Resize(format!("{}x{}",
                                              self.image().width(),
                                              self.image().height()));
+            true
+        } else {
+            false
         }
     }
 
@@ -407,6 +421,20 @@ impl EditorState {
         match self.mode {
             Mode::Edit => {
                 return false;
+            }
+            Mode::LoadFile(ref path) => {
+                match util::load_ahi_from_file(path) {
+                    Ok(images) => {
+                        self.images = images;
+                        self.filepath = path.clone();
+                        self.current_image = 0;
+                        self.selection = None;
+                        self.undo_stack.clear();
+                        self.redo_stack.clear();
+                        self.unsaved = false;
+                    }
+                    Err(_) => return false,
+                }
             }
             Mode::Resize(ref text) => {
                 let pieces: Vec<&str> = text.split('x').collect();

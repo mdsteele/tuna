@@ -18,15 +18,12 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Open-file/Save-as
+// - Save-as
 
 extern crate ahi;
 extern crate sdl2;
 
-use ahi::Image;
 use sdl2::rect::Rect;
-use std::fs::File;
-use std::io;
 use std::rc::Rc;
 
 mod canvas;
@@ -76,13 +73,8 @@ fn render_screen<E: GuiElement<EditorState>>(canvas: &mut Canvas,
     canvas.present();
 }
 
-fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
-    let mut file = try!(File::open(path));
-    Image::read_all(&mut file)
-}
-
 fn load_sprites(canvas: &Canvas, path: &str) -> Vec<Sprite> {
-    let images = load_ahi_from_file(&path.to_string()).unwrap();
+    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
     images.iter().map(|image| canvas.new_sprite(image)).collect()
 }
 
@@ -113,12 +105,15 @@ fn window_size(ideal_width: u32,
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let (filepath, images) = if args.len() >= 2 {
-        let filepath = &args[1];
-        (filepath.clone(), load_ahi_from_file(filepath).unwrap())
-    } else {
-        ("out.ahi".to_string(), vec![])
+    let mut state = {
+        let args: Vec<String> = std::env::args().collect();
+        let (filepath, images) = if args.len() >= 2 {
+            let filepath = &args[1];
+            (filepath.clone(), util::load_ahi_from_file(filepath).unwrap())
+        } else {
+            ("out.ahi".to_string(), vec![])
+        };
+        EditorState::new(filepath, images)
     };
 
     let sdl_context = sdl2::init().unwrap();
@@ -144,24 +139,23 @@ fn main() {
     let tool_icons: Vec<Sprite> = load_sprites(&canvas, "data/tool_icons.ahi");
     let arrows: Vec<Sprite> = load_sprites(&canvas, "data/arrows.ahi");
     let unsaved_sprite = {
-        let images = load_ahi_from_file(&"data/unsaved.ahi".to_string())
+        let images = util::load_ahi_from_file(&"data/unsaved.ahi".to_string())
                          .unwrap();
         canvas.new_sprite(&images[0])
     };
     let font: Rc<Vec<Sprite>> = Rc::new(load_sprites(&canvas,
                                                      "data/font.ahi"));
 
-    let mut state = EditorState::new(filepath, images);
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
-    Box::new(ModalTextBox::new(4, 296, font.clone())),
-    Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
-    Box::new(ColorPalette::new(4, 138)),
-    Box::new(Toolbox::new(10, 10, tool_icons)),
-    Box::new(ImagesScrollbar::new(436, 11, arrows)),
-    Box::new(ImageCanvas::new(48, 16, 256)),
-    Box::new(ImageCanvas::new(314, 16, 64)),
-    Box::new(TileView::new(314, 96, 96, 96)),
-  ];
+        Box::new(ModalTextBox::new(2, 296, font.clone())),
+        Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
+        Box::new(ColorPalette::new(4, 138)),
+        Box::new(Toolbox::new(10, 10, tool_icons)),
+        Box::new(ImagesScrollbar::new(436, 11, arrows)),
+        Box::new(ImageCanvas::new(48, 16, 256)),
+        Box::new(ImageCanvas::new(314, 16, 64)),
+        Box::new(TileView::new(314, 96, 96, 96)),
+    ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),
                                       gui_subrect);
 
@@ -194,9 +188,11 @@ fn main() {
                 state.add_new_image();
                 Action::redraw().and_stop()
             }
+            Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
+                Action::redraw_if(state.begin_load_file()).and_stop()
+            }
             Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
-                state.begin_resize();
-                Action::redraw().and_stop()
+                Action::redraw_if(state.begin_resize()).and_stop()
             }
             Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();

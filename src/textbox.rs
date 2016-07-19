@@ -61,24 +61,41 @@ impl GuiElement<String> for TextBox {
 // ========================================================================= //
 
 pub struct ModalTextBox {
+    left: i32,
+    top: i32,
+    font: Rc<Vec<Sprite>>,
     element: SubrectElement<TextBox>,
 }
 
 impl ModalTextBox {
     pub fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> ModalTextBox {
         ModalTextBox {
+            left: left,
+            top: top,
+            font: font.clone(),
             element: SubrectElement::new(TextBox::new(font),
-                                         Rect::new(left, top, 472, 20)),
+                                         Rect::new(left + 70, top, 404, 20)),
         }
     }
 }
 
 impl GuiElement<EditorState> for ModalTextBox {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        match state.mode {
-            Mode::Edit => self.element.draw(&state.filepath, canvas),
-            Mode::Resize(ref text) => self.element.draw(text, canvas),
-        }
+        let label = match state.mode {
+            Mode::Edit => {
+                self.element.draw(&state.filepath, canvas);
+                "Path:"
+            }
+            Mode::LoadFile(ref text) => {
+                self.element.draw(text, canvas);
+                "Load:"
+            }
+            Mode::Resize(ref text) => {
+                self.element.draw(text, canvas);
+                "Size:"
+            }
+        };
+        render_string(canvas, &self.font, self.left, self.top + 2, label);
     }
 
     fn handle_event(&mut self,
@@ -103,6 +120,9 @@ impl GuiElement<EditorState> for ModalTextBox {
             _ => {
                 match state.mode {
                     Mode::Edit => Action::ignore().and_continue(),
+                    Mode::LoadFile(ref mut text) => {
+                        self.element.handle_event(event, text)
+                    }
                     Mode::Resize(ref mut text) => {
                         self.element.handle_event(event, text)
                     }

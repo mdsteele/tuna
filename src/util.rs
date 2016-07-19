@@ -18,10 +18,17 @@
 // +--------------------------------------------------------------------------+
 
 use ahi::{Color, Image};
-use super::canvas::Canvas;
 use sdl2::rect::Rect;
+use std::fs::File;
+use std::io;
+use super::canvas::Canvas;
 
 // ========================================================================= //
+
+pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
+    let mut file = try!(File::open(path));
+    Image::read_all(&mut file)
+}
 
 pub fn render_image(canvas: &mut Canvas,
                     image: &Image,
