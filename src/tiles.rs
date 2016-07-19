@@ -20,7 +20,7 @@
 use ahi::Image;
 use sdl2::rect::Rect;
 use super::canvas::Canvas;
-use super::element::{GuiElement, SubrectElement};
+use super::element::{Action, GuiElement, SubrectElement};
 use super::event::Event;
 use super::state::EditorState;
 use super::util;
@@ -45,8 +45,8 @@ impl GuiElement<EditorState> for TileView {
         self.element.draw(state.image(), canvas);
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
-        false
+    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
+        Action::ignore().and_continue()
     }
 }
 
@@ -77,8 +77,8 @@ impl GuiElement<Image> for InnerTileView {
         }
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut Image) -> bool {
-        false
+    fn handle_event(&mut self, _: &Event, _: &mut Image) -> Action {
+        Action::ignore().and_continue()
     }
 }
 

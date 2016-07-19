@@ -19,7 +19,7 @@
 
 use sdl2::rect::{Point, Rect};
 use super::canvas::{Canvas, Sprite};
-use super::element::{AggregateElement, GuiElement, SubrectElement};
+use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use super::event::{Event, Keycode, NONE};
 use super::state::{EditorState, Tool};
 
@@ -71,13 +71,13 @@ impl GuiElement<EditorState> for Toolbox {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         let mut new_tool = state.tool();
-        let result = self.element.handle_event(event, &mut new_tool);
+        let action = self.element.handle_event(event, &mut new_tool);
         if new_tool != state.tool() {
             state.set_tool(new_tool);
         }
-        result
+        action
     }
 }
 
@@ -109,21 +109,21 @@ impl GuiElement<Tool> for ToolPicker {
         canvas.draw_sprite(&self.icon, Point::new(2, 2));
     }
 
-    fn handle_event(&mut self, event: &Event, tool: &mut Tool) -> bool {
+    fn handle_event(&mut self, event: &Event, tool: &mut Tool) -> Action {
         match event {
             &Event::MouseDown(_) => {
                 *tool = self.tool;
-                return true;
+                return Action::redraw().and_stop();
             }
             &Event::KeyDown(key, kmod) => {
                 if key == self.key && kmod == NONE {
                     *tool = self.tool;
-                    return true;
+                    return Action::redraw().and_stop();
                 }
             }
             _ => {}
         }
-        false
+        Action::ignore().and_continue()
     }
 }
 

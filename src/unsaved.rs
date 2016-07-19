@@ -19,7 +19,7 @@
 
 use sdl2::rect::Point;
 use super::canvas::{Canvas, Sprite};
-use super::element::GuiElement;
+use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
 
@@ -46,8 +46,8 @@ impl GuiElement<EditorState> for UnsavedIndicator {
         }
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> bool {
-        false
+    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
+        Action::ignore().and_continue()
     }
 }
 

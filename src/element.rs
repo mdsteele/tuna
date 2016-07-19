@@ -23,9 +23,65 @@ use super::event::Event;
 
 // ========================================================================= //
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct Action {
+    redraw: bool,
+    stop: bool,
+}
+
+impl Action {
+    pub fn ignore() -> ActionBuilder {
+        ActionBuilder { redraw: false }
+    }
+
+    pub fn redraw() -> ActionBuilder {
+        ActionBuilder { redraw: true }
+    }
+
+    pub fn redraw_if(should_redraw: bool) -> ActionBuilder {
+        ActionBuilder { redraw: should_redraw }
+    }
+
+    pub fn should_redraw(&self) -> bool {
+        self.redraw
+    }
+
+    pub fn should_stop(&self) -> bool {
+        self.stop
+    }
+
+    fn merge(&mut self, action: Action) {
+        self.redraw |= action.redraw;
+        self.stop |= action.stop;
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct ActionBuilder {
+    redraw: bool,
+}
+
+impl ActionBuilder {
+    pub fn and_continue(&self) -> Action {
+        Action {
+            redraw: self.redraw,
+            stop: false,
+        }
+    }
+
+    pub fn and_stop(&self) -> Action {
+        Action {
+            redraw: self.redraw,
+            stop: true,
+        }
+    }
+}
+
+// ========================================================================= //
+
 pub trait GuiElement<S> {
     fn draw(&self, state: &S, canvas: &mut Canvas);
-    fn handle_event(&mut self, event: &Event, state: &mut S) -> bool;
+    fn handle_event(&mut self, event: &Event, state: &mut S) -> Action;
 }
 
 // ========================================================================= //
@@ -56,16 +112,18 @@ impl<E, S> GuiElement<S> for SubrectElement<E>
         self.element.draw(state, &mut subcanvas);
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut S) -> bool {
+    fn handle_event(&mut self, event: &Event, state: &mut S) -> Action {
         match event {
             &Event::MouseDown(pt) => {
                 if !self.subrect.contains(pt) {
-                    return false;
+                    return Action::ignore().and_continue();
                 }
             }
             _ => {}
         }
-        let event = event.translate(-self.subrect.x(), -self.subrect.y());
+        let dx = self.subrect.x();
+        let dy = self.subrect.y();
+        let event = event.translate(-dx, -dy);
         self.element.handle_event(&event, state)
     }
 }
@@ -89,12 +147,15 @@ impl<S> GuiElement<S> for AggregateElement<S> {
         }
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut S) -> bool {
-        let mut result = false;
+    fn handle_event(&mut self, event: &Event, state: &mut S) -> Action {
+        let mut action = Action::ignore().and_continue();
         for element in self.elements.iter_mut() {
-            result |= element.handle_event(event, state);
+            action.merge(element.handle_event(event, state));
+            if action.should_stop() {
+                break;
+            }
         }
-        result
+        action
     }
 }
 

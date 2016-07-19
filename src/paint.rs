@@ -20,7 +20,7 @@
 use sdl2::rect::Rect;
 use std::cmp;
 use super::canvas::Canvas;
-use super::element::GuiElement;
+use super::element::{Action, GuiElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Tool};
 use super::util;
@@ -230,17 +230,22 @@ impl GuiElement<EditorState> for ImageCanvas {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         match event {
             &Event::KeyDown(Keycode::Escape, _) => {
-                return state.try_unselect_with_undo();
+                if state.try_unselect_with_undo() {
+                    return Action::redraw().and_stop();
+                } else {
+                    return Action::ignore().and_continue();
+                }
             }
             &Event::MouseDown(pt) => {
                 if self.rect(state).contains(pt) {
                     let (x, y) = (pt.x(), pt.y());
                     match state.tool() {
                         Tool::Eyedropper => {
-                            return self.try_eyedrop(x, y, state);
+                            let changed = self.try_eyedrop(x, y, state);
+                            return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Line => {
                             self.drag_from_to = Some(ImageCanvasDrag {
@@ -248,15 +253,17 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 from_pixel: (x, y),
                                 to_pixel: (x, y),
                             });
-                            return true;
+                            return Action::redraw().and_stop();
                         }
                         Tool::PaintBucket => {
                             state.push_change();
-                            return self.try_flood_fill(x, y, state);
+                            let changed = self.try_flood_fill(x, y, state);
+                            return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Pencil => {
                             state.push_change();
-                            return self.try_paint(x, y, state);
+                            let changed = self.try_paint(x, y, state);
+                            return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
                             let rect = if let Some((ref selected, x, y)) =
@@ -291,7 +298,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 from_pixel: (x, y),
                                 to_pixel: (x, y),
                             });
-                            return true;
+                            return Action::redraw().and_stop();
                         }
                     }
                 } else {
@@ -301,14 +308,15 @@ impl GuiElement<EditorState> for ImageCanvas {
             &Event::MouseUp => {
                 match state.tool() {
                     Tool::Line => {
-                        return self.try_draw_line(state);
+                        let changed = self.try_draw_line(state);
+                        return Action::redraw_if(changed).and_continue();
                     }
                     Tool::Select => {
                         if state.selection.is_none() {
                             if let Some(rect) = self.dragged_rect(state) {
                                 state.select_with_undo(&rect);
                                 self.drag_from_to = None;
-                                return true;
+                                return Action::redraw().and_continue();
                             }
                         }
                     }
@@ -322,11 +330,12 @@ impl GuiElement<EditorState> for ImageCanvas {
                     Tool::Line => {
                         if let Some(ref mut drag) = self.drag_from_to {
                             drag.to_pixel = (x, y);
-                            return true;
+                            return Action::redraw().and_continue();
                         }
                     }
                     Tool::Pencil => {
-                        return self.try_paint(x, y, state);
+                        let changed = self.try_paint(x, y, state);
+                        return Action::redraw_if(changed).and_continue();
                     }
                     Tool::Select => {
                         let scale = self.scale(state) as i32;
@@ -339,7 +348,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 *sx = fsx + (x - fpx) / scale;
                                 *sy = fsy + (y - fpy) / scale;
                             }
-                            return true;
+                            return Action::redraw().and_continue();
                         }
                     }
                     _ => {}
@@ -347,7 +356,7 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             _ => {}
         }
-        return false;
+        return Action::ignore().and_continue();
     }
 }
 

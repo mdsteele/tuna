@@ -33,7 +33,7 @@ mod canvas;
 use self::canvas::{Canvas, Sprite};
 
 mod element;
-use self::element::{AggregateElement, GuiElement, SubrectElement};
+use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
 
 mod event;
 use self::event::{COMMAND, Event, Keycode, SHIFT};
@@ -153,10 +153,10 @@ fn main() {
 
     let mut state = EditorState::new(filepath, images);
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
+    Box::new(ModalTextBox::new(4, 296, font.clone())),
     Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
     Box::new(ColorPalette::new(4, 138)),
     Box::new(Toolbox::new(10, 10, tool_icons)),
-    Box::new(ModalTextBox::new(4, 296, font.clone())),
     Box::new(ImagesScrollbar::new(436, 11, arrows)),
     Box::new(ImageCanvas::new(48, 16, 256)),
     Box::new(ImageCanvas::new(314, 16, 64)),
@@ -171,70 +171,58 @@ fn main() {
     loop {
         let event = match Event::from_sdl2(&event_pump.wait_event()) {
             Some(event) => event,
-            None => {
-                continue;
-            }
+            None => continue,
         };
-        let mut needs_redraw = false;
-        match event {
+        let action = match event {
             Event::Quit => return,
             Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
-                if state.try_delete_image() {
-                    needs_redraw = true;
-                }
+                Action::redraw_if(state.try_delete_image()).and_stop()
             }
             Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
                 state.select_all_with_undo();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
                 state.copy_selection();
+                Action::ignore().and_stop()
             }
             Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
                 state.flip_image_horz();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
                 state.add_new_image();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
                 state.begin_resize();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
                 state.paste_selection();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
                 state.flip_image_vert();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
                 state.cut_selection();
-                needs_redraw = true;
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {
-                if state.undo() {
-                    needs_redraw = true;
-                }
+                Action::redraw_if(state.undo()).and_stop()
             }
             Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
-                if state.redo() {
-                    needs_redraw = true;
-                }
+                Action::redraw_if(state.redo()).and_stop()
             }
-            event => {
-                if gui.handle_event(&event, &mut state) {
-                    needs_redraw = true;
-                }
-            }
-        }
-        if needs_redraw {
+            event => gui.handle_event(&event, &mut state),
+        };
+        if action.should_redraw() {
             render_screen(&mut canvas, &state, &gui);
         }
     }

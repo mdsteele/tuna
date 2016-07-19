@@ -20,7 +20,7 @@
 use sdl2::rect::{Point, Rect};
 use std::rc::Rc;
 use super::canvas::{Canvas, Sprite};
-use super::element::{GuiElement, SubrectElement};
+use super::element::{Action, GuiElement, SubrectElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode};
 
@@ -43,14 +43,17 @@ impl GuiElement<String> for TextBox {
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
-    fn handle_event(&mut self, event: &Event, text: &mut String) -> bool {
+    fn handle_event(&mut self, event: &Event, text: &mut String) -> Action {
         match event {
-            &Event::KeyDown(Keycode::Backspace, _) => text.pop().is_some(),
+            &Event::KeyDown(Keycode::Backspace, _) => {
+                Action::redraw_if(text.pop().is_some()).and_stop()
+            }
+            &Event::KeyDown(_, _) => Action::ignore().and_stop(),
             &Event::TextInput(ref input) => {
                 text.push_str(input);
-                true
+                Action::redraw().and_stop()
             }
-            _ => false,
+            _ => Action::ignore().and_continue(),
         }
     }
 }
@@ -81,13 +84,25 @@ impl GuiElement<EditorState> for ModalTextBox {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         match event {
-            &Event::KeyDown(Keycode::Escape, _) => state.mode_cancel(),
-            &Event::KeyDown(Keycode::Return, _) => state.mode_perform(),
+            &Event::KeyDown(Keycode::Escape, _) => {
+                if state.mode_cancel() {
+                    Action::redraw().and_stop()
+                } else {
+                    Action::ignore().and_continue()
+                }
+            }
+            &Event::KeyDown(Keycode::Return, _) => {
+                if state.mode_perform() {
+                    Action::redraw().and_stop()
+                } else {
+                    Action::ignore().and_continue()
+                }
+            }
             _ => {
                 match state.mode {
-                    Mode::Edit => false,
+                    Mode::Edit => Action::ignore().and_continue(),
                     Mode::Resize(ref mut text) => {
                         self.element.handle_event(event, text)
                     }

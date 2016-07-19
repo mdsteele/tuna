@@ -21,7 +21,7 @@ use ahi::Color;
 use sdl2::rect::Rect;
 use std::cmp;
 use super::canvas::Canvas;
-use super::element::{AggregateElement, GuiElement, SubrectElement};
+use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use super::event::{Event, Keycode, NONE};
 use super::state::{EditorState, Tool};
 
@@ -76,7 +76,7 @@ impl GuiElement<EditorState> for ColorPalette {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         let mut new_color = state.color;
         let result = self.element.handle_event(event, &mut new_color);
         if new_color != state.color {
@@ -122,21 +122,21 @@ impl GuiElement<Color> for ColorPicker {
         }
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut Color) -> bool {
+    fn handle_event(&mut self, event: &Event, state: &mut Color) -> Action {
         match event {
             &Event::MouseDown(_) => {
                 *state = self.color;
-                return true;
+                return Action::redraw().and_stop();
             }
             &Event::KeyDown(key, kmod) => {
                 if key == self.key && kmod == NONE {
                     *state = self.color;
-                    return true;
+                    return Action::redraw().and_stop();
                 }
             }
             _ => {}
         }
-        false
+        Action::ignore().and_continue()
     }
 }
 

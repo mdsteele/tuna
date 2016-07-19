@@ -19,8 +19,8 @@
 
 use sdl2::rect::{Point, Rect};
 use super::canvas::{Canvas, Sprite};
-use super::element::{AggregateElement, GuiElement, SubrectElement};
-use super::event::{Event, Keycode};
+use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
+use super::event::{Event, Keycode, NONE};
 use super::state::EditorState;
 use super::util;
 
@@ -79,7 +79,7 @@ impl GuiElement<EditorState> for ImagesScrollbar {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         self.element.handle_event(event, state)
     }
 }
@@ -103,15 +103,6 @@ impl ImagePicker {
             None
         }
     }
-
-    fn pick(&self, state: &mut EditorState) -> bool {
-        if let Some(index) = self.index(state) {
-            state.current_image = index;
-            true
-        } else {
-            false
-        }
-    }
 }
 
 impl GuiElement<EditorState> for ImagePicker {
@@ -133,14 +124,18 @@ impl GuiElement<EditorState> for ImagePicker {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         match event {
             &Event::MouseDown(_) => {
-                return self.pick(state);
+                if let Some(index) = self.index(state) {
+                    state.current_image = index;
+                    Action::redraw().and_stop()
+                } else {
+                    Action::ignore().and_stop()
+                }
             }
-            _ => {}
+            _ => Action::ignore().and_continue(),
         }
-        false
     }
 }
 
@@ -161,12 +156,12 @@ impl NextPrevImage {
         }
     }
 
-    fn increment(&self, state: &mut EditorState) -> bool {
+    fn increment(&self, state: &mut EditorState) -> Action {
         state.unselect();
         state.current_image =
             modulo((state.current_image as i32) + self.delta,
                    state.images.len() as i32) as usize;
-        true
+        Action::redraw().and_stop()
     }
 }
 
@@ -178,19 +173,19 @@ impl GuiElement<EditorState> for NextPrevImage {
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
-                    -> bool {
+                    -> Action {
         match event {
             &Event::MouseDown(_) => {
                 return self.increment(state);
             }
-            &Event::KeyDown(key, _) => {
-                if key == self.key {
+            &Event::KeyDown(key, kmod) => {
+                if key == self.key && kmod == NONE {
                     return self.increment(state);
                 }
             }
             _ => {}
         }
-        false
+        Action::ignore().and_continue()
     }
 }
 
