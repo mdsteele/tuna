@@ -17,9 +17,6 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-// TODO:
-// - Save-as
-
 extern crate ahi;
 extern crate sdl2;
 
@@ -197,6 +194,9 @@ fn main() {
             Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();
                 Action::redraw().and_stop()
+            }
+            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
+                Action::redraw_if(state.begin_save_as()).and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
                 state.paste_selection();

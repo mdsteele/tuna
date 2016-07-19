@@ -40,6 +40,7 @@ pub enum Mode {
     Edit,
     LoadFile(String),
     Resize(String),
+    SaveAs(String),
 }
 
 const MAX_UNDOS: usize = 100;
@@ -407,6 +408,15 @@ impl EditorState {
         }
     }
 
+    pub fn begin_save_as(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            self.mode = Mode::SaveAs(self.filepath.clone());
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn mode_cancel(&mut self) -> bool {
         match self.mode {
             Mode::Edit => false,
@@ -418,25 +428,25 @@ impl EditorState {
     }
 
     pub fn mode_perform(&mut self) -> bool {
-        match self.mode {
-            Mode::Edit => {
-                return false;
-            }
-            Mode::LoadFile(ref path) => {
-                match util::load_ahi_from_file(path) {
+        match self.mode.clone() {
+            Mode::Edit => false,
+            Mode::LoadFile(path) => {
+                match util::load_ahi_from_file(&path) {
                     Ok(images) => {
+                        self.mode = Mode::Edit;
+                        self.filepath = path;
                         self.images = images;
-                        self.filepath = path.clone();
                         self.current_image = 0;
                         self.selection = None;
                         self.undo_stack.clear();
                         self.redo_stack.clear();
                         self.unsaved = false;
+                        true
                     }
-                    Err(_) => return false,
+                    Err(_) => false,
                 }
             }
-            Mode::Resize(ref text) => {
+            Mode::Resize(text) => {
                 let pieces: Vec<&str> = text.split('x').collect();
                 if pieces.len() != 2 {
                     return false;
@@ -462,10 +472,23 @@ impl EditorState {
                                       new_image
                                   })
                                   .collect();
+                self.mode = Mode::Edit;
+                true
+            }
+            Mode::SaveAs(mut path) => {
+                mem::swap(&mut path, &mut self.filepath);
+                match self.save_to_file() {
+                    Ok(()) => {
+                        self.mode = Mode::Edit;
+                        true
+                    }
+                    Err(_) => {
+                        mem::swap(&mut path, &mut self.filepath);
+                        false
+                    }
+                }
             }
         }
-        self.mode = Mode::Edit;
-        true
     }
 }
 
