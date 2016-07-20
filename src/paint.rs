@@ -195,12 +195,14 @@ impl ImageCanvas {
 impl GuiElement<EditorState> for ImageCanvas {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let scale = self.scale(state);
-        canvas.draw_rect((255, 255, 255, 255), expand(self.rect(state), 2));
-        util::render_image(canvas, state.image(), self.left, self.top, scale);
+        let canvas_rect = self.rect(state);
+        canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
+        let mut canvas = canvas.subcanvas(canvas_rect);
+        util::render_image(&mut canvas, state.image(), 0, 0, scale);
         if let Some((ref selected, x, y)) = state.selection {
-            let left = self.left + x * (scale as i32);
-            let top = self.top + y * (scale as i32);
-            util::render_image(canvas, selected, left, top, scale);
+            let left = x * (scale as i32);
+            let top = y * (scale as i32);
+            util::render_image(&mut canvas, selected, left, top, scale);
             canvas.draw_rect((255, 191, 255, 255),
                              Rect::new(left,
                                        top,
@@ -211,17 +213,16 @@ impl GuiElement<EditorState> for ImageCanvas {
                    self.dragged_points(state) {
                 for (x, y) in bresenham_points(col1, row1, col2, row2) {
                     canvas.draw_rect((191, 191, 191, 255),
-                                     Rect::new(self.left +
-                                               (x * scale) as i32,
-                                               self.top + (y * scale) as i32,
+                                     Rect::new((x * scale) as i32,
+                                               (y * scale) as i32,
                                                scale,
                                                scale));
                 }
             }
         } else if let Some(rect) = self.dragged_rect(state) {
             canvas.draw_rect((255, 255, 191, 255),
-                             Rect::new(self.left + rect.x() * (scale as i32),
-                                       self.top + rect.y() * (scale as i32),
+                             Rect::new(rect.x() * (scale as i32),
+                                       rect.y() * (scale as i32),
                                        rect.width() * scale,
                                        rect.height() * scale));
         }

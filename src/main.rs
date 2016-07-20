@@ -17,6 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+// TODO:
+// - Fix undo/redo system
+// - Limited region redraws
+// - Clock tick events (animated selection outline?)
+
 extern crate ahi;
 extern crate sdl2;
 
