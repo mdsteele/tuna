@@ -199,9 +199,9 @@ impl GuiElement<EditorState> for ImageCanvas {
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
         let mut canvas = canvas.subcanvas(canvas_rect);
         util::render_image(&mut canvas, state.image(), 0, 0, scale);
-        if let &Some((ref selected, x, y)) = state.selection() {
-            let left = x * (scale as i32);
-            let top = y * (scale as i32);
+        if let Some((ref selected, topleft)) = state.selection() {
+            let left = topleft.x() * (scale as i32);
+            let top = topleft.y() * (scale as i32);
             util::render_image(&mut canvas, selected, left, top, scale);
             canvas.draw_rect((255, 191, 255, 255),
                              Rect::new(left,
@@ -267,10 +267,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = if let &Some((ref selected, x, y)) =
+                            let rect = if let Some((ref selected, topleft)) =
                                               state.selection() {
-                                Some(Rect::new(x,
-                                               y,
+                                Some(Rect::new(topleft.x(),
+                                               topleft.y(),
                                                selected.width(),
                                                selected.height()))
                             } else {
@@ -287,7 +287,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                                         .contains((x, y)) {
                                     state.try_unselect_with_undo();
                                 } else {
-                                    state.push_selection_move();
+                                    state.push_change();
                                 }
                             }
                             self.drag_from_to = Some(ImageCanvasDrag {

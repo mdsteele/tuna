@@ -18,7 +18,6 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Fix undo/redo system
 // - Limited region redraws
 // - Clock tick events (animated selection outline?)
 
