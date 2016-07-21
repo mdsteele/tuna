@@ -171,22 +171,22 @@ fn main() {
         let action = match event {
             Event::Quit => return,
             Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.try_delete_image()).and_stop()
+                Action::redraw_if(state.mutation().delete_image()).and_stop()
             }
             Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
-                state.select_all_with_undo();
+                state.mutation().select_all();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
-                state.copy_selection();
+                state.mutation().copy_selection();
                 Action::ignore().and_stop()
             }
             Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
-                state.flip_image_horz();
+                state.mutation().flip_image_horz();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
-                state.add_new_image();
+                state.mutation().add_new_image();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
@@ -203,15 +203,15 @@ fn main() {
                 Action::redraw_if(state.begin_save_as()).and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
-                state.paste_selection();
+                state.mutation().paste_selection();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
-                state.flip_image_vert();
+                state.mutation().flip_image_vert();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
-                state.cut_selection();
+                state.mutation().cut_selection();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {

@@ -22,7 +22,7 @@ use std::cmp;
 use super::canvas::Canvas;
 use super::element::{Action, GuiElement};
 use super::event::{Event, Keycode};
-use super::state::{EditorState, Tool};
+use super::state::{EditorState, Mode, Tool};
 use super::util;
 
 // ========================================================================= //
@@ -123,7 +123,8 @@ impl ImageCanvas {
 
     fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
         if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
-            state.image_mut()[(col, row)] = state.color();
+            let color = state.color();
+            state.persistent_mutation().image()[(col, row)] = color;
             true
         } else {
             false
@@ -142,9 +143,11 @@ impl ImageCanvas {
     fn try_draw_line(&mut self, state: &mut EditorState) -> bool {
         if let Some(((col1, row1), (col2, row2))) =
                self.dragged_points(state) {
-            state.push_change();
+            let color = state.color();
+            let mut mutation = state.mutation();
+            let image = mutation.image();
             for coords in bresenham_points(col1, row1, col2, row2) {
-                state.image_mut()[coords] = state.color();
+                image[coords] = color;
             }
             self.drag_from_to = None;
             return true;
@@ -155,13 +158,14 @@ impl ImageCanvas {
     fn try_flood_fill(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
         if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
             let to_color = state.color();
-            let image = state.image_mut();
-            let width = image.width();
-            let height = image.height();
-            let from_color = image[(col, row)];
+            let from_color = state.image()[(col, row)];
             if from_color == to_color {
                 return false;
             }
+            let mut mutation = state.mutation();
+            let image = mutation.image();
+            let width = image.width();
+            let height = image.height();
             image[(col, row)] = to_color;
             let mut stack: Vec<(u32, u32)> = vec![(col, row)];
             while let Some((col, row)) = stack.pop() {
@@ -232,9 +236,13 @@ impl GuiElement<EditorState> for ImageCanvas {
                     event: &Event,
                     state: &mut EditorState)
                     -> Action {
+        if state.mode() != &Mode::Edit {
+            return Action::ignore().and_continue();
+        }
         match event {
             &Event::KeyDown(Keycode::Escape, _) => {
-                if state.try_unselect_with_undo() {
+                if state.selection().is_some() {
+                    state.mutation().unselect();
                     return Action::redraw().and_stop();
                 } else {
                     return Action::ignore().and_continue();
@@ -257,12 +265,11 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw().and_stop();
                         }
                         Tool::PaintBucket => {
-                            state.push_change();
                             let changed = self.try_flood_fill(x, y, state);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Pencil => {
-                            state.push_change();
+                            state.reset_persistent_mutation();
                             let changed = self.try_paint(x, y, state);
                             return Action::redraw_if(changed).and_stop();
                         }
@@ -285,9 +292,9 @@ impl GuiElement<EditorState> for ImageCanvas {
                                               rect.width() * scale,
                                               rect.height() * scale)
                                         .contains((x, y)) {
-                                    state.try_unselect_with_undo();
+                                    state.mutation().unselect();
                                 } else {
-                                    state.push_change();
+                                    state.reset_persistent_mutation();
                                 }
                             }
                             self.drag_from_to = Some(ImageCanvasDrag {
@@ -315,7 +322,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                     Tool::Select => {
                         if state.selection().is_none() {
                             if let Some(rect) = self.dragged_rect(state) {
-                                state.select_with_undo(&rect);
+                                state.mutation().select(&rect);
                                 self.drag_from_to = None;
                                 return Action::redraw().and_continue();
                             }
@@ -345,7 +352,8 @@ impl GuiElement<EditorState> for ImageCanvas {
                             if state.selection().is_some() {
                                 let (fsx, fsy) = drag.from_selection;
                                 let (fpx, fpy) = drag.from_pixel;
-                                state.reposition_selection(fsx +
+                                state.persistent_mutation()
+                                     .reposition_selection(fsx +
                                                            (x - fpx) / scale,
                                                            fsy +
                                                            (y - fpy) / scale);

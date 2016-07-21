@@ -157,7 +157,6 @@ impl NextPrevImage {
     }
 
     fn increment(&self, state: &mut EditorState) -> Action {
-        state.unselect();
         let new_index = modulo((state.image_index() as i32) + self.delta,
                                state.num_images() as i32);
         state.set_image_index(new_index as usize);

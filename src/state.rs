@@ -69,6 +69,7 @@ pub struct EditorState {
     clipboard: Option<(Rc<Image>, i32, i32)>,
     tool: Tool,
     prev_tool: Tool,
+    persistent_mutation_active: bool,
 }
 
 impl EditorState {
@@ -91,6 +92,7 @@ impl EditorState {
             clipboard: None,
             tool: Tool::Pencil,
             prev_tool: Tool::Pencil,
+            persistent_mutation_active: false,
         }
     }
 
@@ -124,7 +126,7 @@ impl EditorState {
 
     pub fn set_tool(&mut self, tool: Tool) {
         if self.tool != tool {
-            self.unselect();
+            self.unselect_if_necessary();
             self.prev_tool = self.tool;
             self.tool = tool;
         }
@@ -147,6 +149,7 @@ impl EditorState {
     }
 
     pub fn set_image_index(&mut self, index: usize) {
+        self.unselect_if_necessary();
         self.current.image_index = index % self.current.images.len();
     }
 
@@ -157,11 +160,6 @@ impl EditorState {
 
     pub fn image(&self) -> &Image {
         &self.current.images[self.current.image_index]
-    }
-
-    pub fn image_mut(&mut self) -> &mut Image {
-        self.current.unsaved = true;
-        Rc::make_mut(&mut self.current.images[self.current.image_index])
     }
 
     pub fn image_at(&self, index: usize) -> &Image {
@@ -175,118 +173,34 @@ impl EditorState {
         }
     }
 
-    pub fn reposition_selection(&mut self, new_x: i32, new_y: i32) {
-        if let Some((_, ref mut x, ref mut y)) = self.current.selection {
-            *x = new_x;
-            *y = new_y;
+    fn unselect_if_necessary(&mut self) {
+        self.reset_persistent_mutation();
+        if self.selection().is_some() {
+            self.mutation().unselect();
         }
     }
 
-    pub fn flip_image_horz(&mut self) {
+    pub fn mutation(&mut self) -> Mutation {
         self.push_change();
-        *self.image_mut() = self.image().flip_horz();
-    }
-
-    pub fn flip_image_vert(&mut self) {
-        self.push_change();
-        *self.image_mut() = self.image().flip_vert();
-    }
-
-    pub fn add_new_image(&mut self) {
-        self.push_change();
-        self.unselect();
-        let (width, height) = self.image_size();
-        self.current.image_index += 1;
-        self.current
-            .images
-            .insert(self.current.image_index,
-                    Rc::new(Image::new(width, height)));
         self.current.unsaved = true;
+        Mutation { state: self }
     }
 
-    pub fn try_delete_image(&mut self) -> bool {
-        if self.current.images.len() > 1 {
+    pub fn persistent_mutation(&mut self) -> Mutation {
+        if !self.persistent_mutation_active {
             self.push_change();
-            self.unselect();
-            self.current.images.remove(self.current.image_index);
-            if self.current.image_index == self.current.images.len() {
-                self.current.image_index -= 1;
-            }
-            self.current.unsaved = true;
-            true
-        } else {
-            false
+            self.persistent_mutation_active = true;
         }
+        self.current.unsaved = true;
+        Mutation { state: self }
     }
 
-    pub fn select_with_undo(&mut self, rect: &Rect) {
-        self.push_change();
-        self.select(rect);
-        self.tool = Tool::Select;
+    pub fn reset_persistent_mutation(&mut self) {
+        self.persistent_mutation_active = false;
     }
 
-    pub fn select_all_with_undo(&mut self) {
-        let (width, height) = self.image_size();
-        self.select_with_undo(&Rect::new(0, 0, width, height));
-    }
-
-    pub fn try_unselect_with_undo(&mut self) -> bool {
-        if self.current.selection.is_some() {
-            self.push_change();
-            self.unselect();
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn select(&mut self, rect: &Rect) {
-        self.unselect();
-        let mut selected = Image::new(rect.width(), rect.height());
-        selected.draw(self.image(), -rect.x(), -rect.y());
-        self.current.selection = Some((Rc::new(selected), rect.x(), rect.y()));
-        self.image_mut().fill_rect(rect.x(),
-                                   rect.y(),
-                                   rect.width(),
-                                   rect.height(),
-                                   Color::Transparent);
-    }
-
-    pub fn unselect(&mut self) -> Option<Rect> {
-        if let Some((selected, x, y)) = self.current.selection.take() {
-            self.image_mut().draw(&selected, x, y);
-            Some(Rect::new(x, y, selected.width(), selected.height()))
-        } else {
-            None
-        }
-    }
-
-    pub fn cut_selection(&mut self) {
-        if self.current.selection.is_some() {
-            self.push_change();
-            self.clipboard = self.current.selection.take();
-        }
-    }
-
-    pub fn copy_selection(&mut self) {
-        if self.current.selection.is_some() {
-            self.clipboard = self.current.selection.clone();
-        } else {
-            let rc = self.current.images[self.current.image_index].clone();
-            self.clipboard = Some((rc, 0, 0));
-        }
-    }
-
-    pub fn paste_selection(&mut self) {
-        if self.clipboard.is_some() {
-            self.push_change();
-            self.unselect();
-            self.current.selection = self.clipboard.clone();
-            self.tool = Tool::Select;
-        }
-    }
-
-    pub fn push_change(&mut self) {
+    fn push_change(&mut self) {
+        self.reset_persistent_mutation();
         self.redo_stack.clear();
         self.undo_stack.push(self.current.clone());
         if self.undo_stack.len() > MAX_UNDOS {
@@ -315,7 +229,7 @@ impl EditorState {
     }
 
     pub fn save_to_file(&mut self) -> io::Result<()> {
-        self.unselect();
+        self.unselect_if_necessary();
         let mut file = try!(File::create(&self.filepath));
         let images: Vec<Image> = self.current
                                      .images
@@ -335,6 +249,7 @@ impl EditorState {
 
     pub fn begin_load_file(&mut self) -> bool {
         if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
             self.mode = Mode::LoadFile(self.filepath.clone());
             true
         } else {
@@ -344,6 +259,7 @@ impl EditorState {
 
     pub fn begin_resize(&mut self) -> bool {
         if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
             self.mode = Mode::Resize(format!("{}x{}",
                                              self.image().width(),
                                              self.image().height()));
@@ -355,6 +271,7 @@ impl EditorState {
 
     pub fn begin_save_as(&mut self) -> bool {
         if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
             self.mode = Mode::SaveAs(self.filepath.clone());
             true
         } else {
@@ -388,6 +305,7 @@ impl EditorState {
                         };
                         self.undo_stack.clear();
                         self.redo_stack.clear();
+                        self.persistent_mutation_active = false;
                         true
                     }
                     Err(_) => false,
@@ -406,19 +324,7 @@ impl EditorState {
                     Ok(height) => height,
                     Err(_) => return false,
                 };
-                self.push_change();
-                self.unselect();
-                self.current.images = self.current
-                                          .images
-                                          .iter()
-                                          .map(|old_image| {
-                                              let mut new_image =
-                                                  Image::new(new_width,
-                                                             new_height);
-                                              new_image.draw(&old_image, 0, 0);
-                                              Rc::new(new_image)
-                                          })
-                                          .collect();
+                self.mutation().resize_images(new_width, new_height);
                 self.mode = Mode::Edit;
                 true
             }
@@ -435,6 +341,128 @@ impl EditorState {
                     }
                 }
             }
+        }
+    }
+}
+
+// ========================================================================= //
+
+pub struct Mutation<'a> {
+    state: &'a mut EditorState,
+}
+
+impl<'a> Mutation<'a> {
+    fn image_rc(&self) -> Rc<Image> {
+        self.state.current.images[self.state.current.image_index].clone()
+    }
+
+    pub fn image(&mut self) -> &mut Image {
+        Rc::make_mut(&mut self.state.current.images[self.state
+                                                        .current
+                                                        .image_index])
+    }
+
+    pub fn add_new_image(&mut self) {
+        self.unselect();
+        let (width, height) = self.state.image_size();
+        self.state.current.image_index += 1;
+        let rc = Rc::new(Image::new(width, height));
+        self.state.current.images.insert(self.state.current.image_index, rc);
+    }
+
+    pub fn delete_image(&mut self) -> bool {
+        if self.state.current.images.len() > 1 {
+            self.unselect();
+            let index = self.state.current.image_index;
+            self.state.current.images.remove(index);
+            if index == self.state.num_images() {
+                self.state.current.image_index -= 1;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn flip_image_horz(&mut self) {
+        *self.image() = self.state.image().flip_horz();
+    }
+
+    pub fn flip_image_vert(&mut self) {
+        *self.image() = self.state.image().flip_vert();
+    }
+
+    pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
+        self.unselect();
+        self.state.current.images = self.state
+                                        .current
+                                        .images
+                                        .iter()
+                                        .map(|old_image| {
+                                            let mut new_image =
+                                                Image::new(new_width,
+                                                           new_height);
+                                            new_image.draw(&old_image, 0, 0);
+                                            Rc::new(new_image)
+                                        })
+                                        .collect();
+    }
+
+    pub fn select(&mut self, rect: &Rect) {
+        self.unselect();
+        let mut selected = Image::new(rect.width(), rect.height());
+        selected.draw(self.image(), -rect.x(), -rect.y());
+        self.state.current.selection = Some((Rc::new(selected),
+                                             rect.x(),
+                                             rect.y()));
+        self.image().fill_rect(rect.x(),
+                               rect.y(),
+                               rect.width(),
+                               rect.height(),
+                               Color::Transparent);
+        self.state.tool = Tool::Select;
+    }
+
+    pub fn select_all(&mut self) {
+        let (width, height) = self.state.image_size();
+        self.select(&Rect::new(0, 0, width, height));
+    }
+
+    pub fn unselect(&mut self) {
+        if let Some((selected, x, y)) = self.state.current.selection.take() {
+            self.image().draw(&selected, x, y);
+        }
+    }
+
+    pub fn cut_selection(&mut self) {
+        if self.state.current.selection.is_some() {
+            self.state.clipboard = self.state.current.selection.take();
+        } else {
+            self.state.clipboard = Some((self.image_rc(), 0, 0));
+            self.image().clear();
+        }
+    }
+
+    pub fn copy_selection(&mut self) {
+        if self.state.current.selection.is_some() {
+            self.state.clipboard = self.state.current.selection.clone();
+        } else {
+            self.state.clipboard = Some((self.image_rc(), 0, 0));
+        }
+    }
+
+    pub fn paste_selection(&mut self) {
+        if self.state.clipboard.is_some() {
+            self.unselect();
+            self.state.current.selection = self.state.clipboard.clone();
+            self.state.tool = Tool::Select;
+        }
+    }
+
+    pub fn reposition_selection(&mut self, new_x: i32, new_y: i32) {
+        if let Some((_, ref mut x, ref mut y)) = self.state.current.selection {
+            *x = new_x;
+            *y = new_y;
         }
     }
 }

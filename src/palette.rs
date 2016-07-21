@@ -80,7 +80,6 @@ impl GuiElement<EditorState> for ColorPalette {
         let mut new_color = state.color();
         let result = self.element.handle_event(event, &mut new_color);
         if new_color != state.color() {
-            state.unselect();
             state.set_color(new_color);
             if state.tool() == Tool::Select {
                 state.set_tool(Tool::Pencil);
