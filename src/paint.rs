@@ -123,7 +123,7 @@ impl ImageCanvas {
 
     fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
         if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
-            state.image_mut()[(col, row)] = state.color;
+            state.image_mut()[(col, row)] = state.color();
             true
         } else {
             false
@@ -144,7 +144,7 @@ impl ImageCanvas {
                self.dragged_points(state) {
             state.push_change();
             for coords in bresenham_points(col1, row1, col2, row2) {
-                state.image_mut()[coords] = state.color;
+                state.image_mut()[coords] = state.color();
             }
             self.drag_from_to = None;
             return true;
@@ -154,7 +154,7 @@ impl ImageCanvas {
 
     fn try_flood_fill(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
         if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
-            let to_color = state.color;
+            let to_color = state.color();
             let image = state.image_mut();
             let width = image.width();
             let height = image.height();
@@ -199,7 +199,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
         let mut canvas = canvas.subcanvas(canvas_rect);
         util::render_image(&mut canvas, state.image(), 0, 0, scale);
-        if let Some((ref selected, x, y)) = state.selection {
+        if let &Some((ref selected, x, y)) = state.selection() {
             let left = x * (scale as i32);
             let top = y * (scale as i32);
             util::render_image(&mut canvas, selected, left, top, scale);
@@ -267,8 +267,8 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = if let Some((ref selected, x, y)) =
-                                              state.selection {
+                            let rect = if let &Some((ref selected, x, y)) =
+                                              state.selection() {
                                 Some(Rect::new(x,
                                                y,
                                                selected.width(),
@@ -313,7 +313,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                         return Action::redraw_if(changed).and_continue();
                     }
                     Tool::Select => {
-                        if state.selection.is_none() {
+                        if state.selection().is_none() {
                             if let Some(rect) = self.dragged_rect(state) {
                                 state.select_with_undo(&rect);
                                 self.drag_from_to = None;
@@ -342,12 +342,13 @@ impl GuiElement<EditorState> for ImageCanvas {
                         let scale = self.scale(state) as i32;
                         if let Some(ref mut drag) = self.drag_from_to {
                             drag.to_pixel = (x, y);
-                            if let Some((_, ref mut sx, ref mut sy)) =
-                                   state.selection {
+                            if state.selection().is_some() {
                                 let (fsx, fsy) = drag.from_selection;
                                 let (fpx, fpy) = drag.from_pixel;
-                                *sx = fsx + (x - fpx) / scale;
-                                *sy = fsy + (y - fpy) / scale;
+                                state.reposition_selection(fsx +
+                                                           (x - fpx) / scale,
+                                                           fsy +
+                                                           (y - fpy) / scale);
                             }
                             return Action::redraw().and_continue();
                         }

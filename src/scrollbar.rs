@@ -96,8 +96,8 @@ impl ImagePicker {
     }
 
     fn index(&self, state: &EditorState) -> Option<usize> {
-        let index = (state.current_image as i32) + self.delta;
-        if index >= 0 && index < (state.images.len() as i32) {
+        let index = (state.image_index() as i32) + self.delta;
+        if index >= 0 && index < (state.num_images() as i32) {
             Some(index as usize)
         } else {
             None
@@ -128,7 +128,7 @@ impl GuiElement<EditorState> for ImagePicker {
         match event {
             &Event::MouseDown(_) => {
                 if let Some(index) = self.index(state) {
-                    state.current_image = index;
+                    state.set_image_index(index);
                     Action::redraw().and_stop()
                 } else {
                     Action::ignore().and_stop()
@@ -158,9 +158,9 @@ impl NextPrevImage {
 
     fn increment(&self, state: &mut EditorState) -> Action {
         state.unselect();
-        state.current_image =
-            modulo((state.current_image as i32) + self.delta,
-                   state.images.len() as i32) as usize;
+        let new_index = modulo((state.image_index() as i32) + self.delta,
+                               state.num_images() as i32);
+        state.set_image_index(new_index as usize);
         Action::redraw().and_stop()
     }
 }

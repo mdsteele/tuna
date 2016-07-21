@@ -70,18 +70,18 @@ impl ColorPalette {
 impl GuiElement<EditorState> for ColorPalette {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(&state.color, canvas);
+        self.element.draw(&state.color(), canvas);
     }
 
     fn handle_event(&mut self,
                     event: &Event,
                     state: &mut EditorState)
                     -> Action {
-        let mut new_color = state.color;
+        let mut new_color = state.color();
         let result = self.element.handle_event(event, &mut new_color);
-        if new_color != state.color {
+        if new_color != state.color() {
             state.unselect();
-            state.color = new_color;
+            state.set_color(new_color);
             if state.tool() == Tool::Select {
                 state.set_tool(Tool::Pencil);
             }

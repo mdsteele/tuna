@@ -68,13 +68,13 @@ enum Redo {
 }
 
 pub struct EditorState {
-    pub mode: Mode,
-    pub color: Color,
-    pub filepath: String,
-    pub images: Vec<Image>,
-    pub current_image: usize,
-    pub selection: Option<(Image, i32, i32)>,
-    pub clipboard: Option<(Image, i32, i32)>,
+    mode: Mode,
+    color: Color,
+    filepath: String,
+    images: Vec<Image>,
+    current_image: usize,
+    selection: Option<(Image, i32, i32)>,
+    clipboard: Option<(Image, i32, i32)>,
     tool: Tool,
     prev_tool: Tool,
     undo_stack: Vec<Undo>,
@@ -107,6 +107,26 @@ impl EditorState {
         self.unsaved
     }
 
+    pub fn filepath(&self) -> &String {
+        &self.filepath
+    }
+
+    pub fn mode(&self) -> &Mode {
+        &self.mode
+    }
+
+    pub fn mode_mut(&mut self) -> &mut Mode {
+        &mut self.mode
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
+
     pub fn tool(&self) -> Tool {
         self.tool
     }
@@ -127,6 +147,18 @@ impl EditorState {
 
     }
 
+    pub fn num_images(&self) -> usize {
+        self.images.len()
+    }
+
+    pub fn image_index(&self) -> usize {
+        self.current_image
+    }
+
+    pub fn set_image_index(&mut self, index: usize) {
+        self.current_image = index % self.images.len();
+    }
+
     pub fn image_size(&self) -> (u32, u32) {
         let image = self.image();
         (image.width(), image.height())
@@ -143,6 +175,17 @@ impl EditorState {
 
     pub fn image_at(&self, index: usize) -> &Image {
         &self.images[index]
+    }
+
+    pub fn selection(&self) -> &Option<(Image, i32, i32)> {
+        &self.selection
+    }
+
+    pub fn reposition_selection(&mut self, new_x: i32, new_y: i32) {
+        if let Some((_, ref mut x, ref mut y)) = self.selection {
+            *x = new_x;
+            *y = new_y;
+        }
     }
 
     pub fn flip_image_horz(&mut self) {

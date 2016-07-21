@@ -81,9 +81,9 @@ impl ModalTextBox {
 
 impl GuiElement<EditorState> for ModalTextBox {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let label = match state.mode {
+        let label = match *state.mode() {
             Mode::Edit => {
-                self.element.draw(&state.filepath, canvas);
+                self.element.draw(state.filepath(), canvas);
                 "Path:"
             }
             Mode::LoadFile(ref text) => {
@@ -122,7 +122,7 @@ impl GuiElement<EditorState> for ModalTextBox {
                 }
             }
             _ => {
-                match state.mode {
+                match *state.mode_mut() {
                     Mode::Edit => Action::ignore().and_continue(),
                     Mode::LoadFile(ref mut text) |
                     Mode::Resize(ref mut text) |
