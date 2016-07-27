@@ -26,9 +26,12 @@ pub use sdl2::keyboard::Keycode;
 
 // ========================================================================= //
 
+struct ClockTick;
+
 #[derive(Clone, Eq, PartialEq)]
 pub enum Event {
     Quit,
+    ClockTick,
     MouseDrag(Point),
     MouseDown(Point),
     MouseUp,
@@ -37,6 +40,14 @@ pub enum Event {
 }
 
 impl Event {
+    pub fn register_clock_ticks(subsystem: &sdl2::EventSubsystem) {
+        subsystem.register_custom_event::<ClockTick>().unwrap();
+    }
+
+    pub fn push_clock_tick(subsystem: &sdl2::EventSubsystem) {
+        subsystem.push_custom_event(ClockTick).unwrap();
+    }
+
     pub fn from_sdl2(event: &sdl2::event::Event) -> Option<Event> {
         match event {
             &sdl2::event::Event::Quit { .. } => Some(Event::Quit),
@@ -63,6 +74,9 @@ impl Event {
             &sdl2::event::Event::TextInput { ref text, .. } => {
                 Some(Event::TextInput(text.clone()))
             }
+            &sdl2::event::Event::User { .. }
+                if event.as_user_event_type::<ClockTick>()
+                        .is_some() => Some(Event::ClockTick),
             _ => None,
         }
     }

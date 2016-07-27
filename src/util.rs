@@ -25,6 +25,22 @@ use super::canvas::Canvas;
 
 // ========================================================================= //
 
+pub fn modulo(a: i32, b: i32) -> i32 {
+    if b == 0 {
+        panic!();
+    }
+    let remainder = a % b;
+    if remainder == 0 {
+        0
+    } else if (a < 0) ^ (b < 0) {
+        remainder + b
+    } else {
+        remainder
+    }
+}
+
+// ========================================================================= //
+
 pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
     let mut file = try!(File::open(path));
     Image::read_all(&mut file)

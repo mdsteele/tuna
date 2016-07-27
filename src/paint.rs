@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::Rect;
+use sdl2::rect::{Point, Rect};
 use std::cmp;
 use super::canvas::Canvas;
 use super::element::{Action, GuiElement};
@@ -38,6 +38,7 @@ pub struct ImageCanvas {
     top: i32,
     max_size: u32,
     drag_from_to: Option<ImageCanvasDrag>,
+    selection_animation_counter: i32,
 }
 
 impl ImageCanvas {
@@ -47,6 +48,7 @@ impl ImageCanvas {
             top: top,
             max_size: max_size,
             drag_from_to: None,
+            selection_animation_counter: 0,
         }
     }
 
@@ -207,11 +209,13 @@ impl GuiElement<EditorState> for ImageCanvas {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
             util::render_image(&mut canvas, selected, left, top, scale);
-            canvas.draw_rect((255, 191, 255, 255),
-                             Rect::new(left,
-                                       top,
-                                       selected.width() * scale,
-                                       selected.height() * scale));
+            let marquee_rect = Rect::new(left,
+                                         top,
+                                         selected.width() * scale,
+                                         selected.height() * scale);
+            draw_marquee(&mut canvas,
+                         marquee_rect,
+                         self.selection_animation_counter);
         } else if state.tool() == Tool::Line {
             if let Some(((col1, row1), (col2, row2))) =
                    self.dragged_points(state) {
@@ -224,11 +228,11 @@ impl GuiElement<EditorState> for ImageCanvas {
                 }
             }
         } else if let Some(rect) = self.dragged_rect(state) {
-            canvas.draw_rect((255, 255, 191, 255),
-                             Rect::new(rect.x() * (scale as i32),
-                                       rect.y() * (scale as i32),
-                                       rect.width() * scale,
-                                       rect.height() * scale));
+            let marquee_rect = Rect::new(rect.x() * (scale as i32),
+                                         rect.y() * (scale as i32),
+                                         rect.width() * scale,
+                                         rect.height() * scale);
+            draw_marquee(&mut canvas, marquee_rect, 0);
         }
     }
 
@@ -240,6 +244,16 @@ impl GuiElement<EditorState> for ImageCanvas {
             return Action::ignore().and_continue();
         }
         match event {
+            &Event::ClockTick => {
+                if state.selection().is_some() {
+                    self.selection_animation_counter =
+                        util::modulo(self.selection_animation_counter + 1,
+                                     MARQUEE_ANIMATION_MODULUS);
+                    return Action::redraw().and_continue();
+                } else {
+                    return Action::ignore().and_continue();
+                }
+            }
             &Event::KeyDown(Keycode::Escape, _) => {
                 if state.selection().is_some() {
                     state.mutation().unselect();
@@ -324,6 +338,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                             if let Some(rect) = self.dragged_rect(state) {
                                 state.mutation().select(&rect);
                                 self.drag_from_to = None;
+                                self.selection_animation_counter = 0;
                                 return Action::redraw().and_continue();
                             }
                         }
@@ -421,6 +436,31 @@ fn expand(rect: Rect, by: i32) -> Rect {
               rect.y() - by,
               ((rect.width() as i32) + 2 * by) as u32,
               ((rect.height() as i32) + 2 * by) as u32)
+}
+
+const MARQUEE_ANIMATION_MODULUS: i32 = 8;
+
+fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
+    canvas.draw_rect((255, 255, 255, 255), rect);
+    let color = (0, 0, 0, 255);
+    for x in 0..(rect.width() as i32) {
+        if util::modulo(x - anim, MARQUEE_ANIMATION_MODULUS) < 4 {
+            canvas.draw_pixel(color, Point::new(rect.left() + x, rect.top()));
+        }
+        if util::modulo(x + anim, MARQUEE_ANIMATION_MODULUS) < 4 {
+            canvas.draw_pixel(color,
+                              Point::new(rect.left() + x, rect.bottom() - 1));
+        }
+    }
+    for y in 0..(rect.height() as i32) {
+        if util::modulo(y + anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
+            canvas.draw_pixel(color, Point::new(rect.left(), rect.top() + y));
+        }
+        if util::modulo(y - anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
+            canvas.draw_pixel(color,
+                              Point::new(rect.right() - 1, rect.top() + y));
+        }
+    }
 }
 
 // ========================================================================= //

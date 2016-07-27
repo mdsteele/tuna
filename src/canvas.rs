@@ -104,6 +104,10 @@ impl<'a> Canvas<'a> {
         self.renderer.present();
     }
 
+    pub fn draw_pixel(&mut self, color: (u8, u8, u8, u8), point: Point) {
+        self.fill_rect(color, Rect::new(point.x(), point.y(), 1, 1));
+    }
+
     pub fn draw_rect(&mut self, color: (u8, u8, u8, u8), rect: Rect) {
         let (r, g, b, a) = color;
         self.renderer.set_draw_color(Color::RGBA(r, g, b, a));

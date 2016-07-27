@@ -19,7 +19,6 @@
 
 // TODO:
 // - Limited region redraws
-// - Clock tick events (animated selection outline?)
 
 extern crate ahi;
 extern crate sdl2;
@@ -63,6 +62,8 @@ use self::unsaved::UnsavedIndicator;
 mod util;
 
 // ========================================================================= //
+
+const FRAME_DELAY_MILLIS: u32 = 100;
 
 fn render_screen<E: GuiElement<EditorState>>(canvas: &mut Canvas,
                                              state: &EditorState,
@@ -118,6 +119,8 @@ fn main() {
     };
 
     let sdl_context = sdl2::init().unwrap();
+    let event_subsystem = sdl_context.event().unwrap();
+    let timer_subsystem = sdl_context.timer().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let ideal_width = 480;
@@ -161,6 +164,14 @@ fn main() {
                                       gui_subrect);
 
     render_screen(&mut canvas, &state, &gui);
+
+    Event::register_clock_ticks(&event_subsystem);
+    let _timer =
+        timer_subsystem.add_timer(FRAME_DELAY_MILLIS,
+                                  Box::new(|| {
+                                      Event::push_clock_tick(&event_subsystem);
+                                      FRAME_DELAY_MILLIS
+                                  }));
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     loop {

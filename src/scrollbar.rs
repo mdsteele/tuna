@@ -157,8 +157,9 @@ impl NextPrevImage {
     }
 
     fn increment(&self, state: &mut EditorState) -> Action {
-        let new_index = modulo((state.image_index() as i32) + self.delta,
-                               state.num_images() as i32);
+        let new_index = util::modulo((state.image_index() as i32) +
+                                     self.delta,
+                                     state.num_images() as i32);
         state.set_image_index(new_index as usize);
         Action::redraw().and_stop()
     }
@@ -185,22 +186,6 @@ impl GuiElement<EditorState> for NextPrevImage {
             _ => {}
         }
         Action::ignore().and_continue()
-    }
-}
-
-// ========================================================================= //
-
-fn modulo(a: i32, b: i32) -> i32 {
-    if b == 0 {
-        panic!();
-    }
-    let remainder = a % b;
-    if remainder == 0 {
-        0
-    } else if (a < 0) ^ (b < 0) {
-        remainder + b
-    } else {
-        remainder
     }
 }
 
