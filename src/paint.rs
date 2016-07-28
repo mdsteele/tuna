@@ -28,14 +28,13 @@ use super::util;
 // ========================================================================= //
 
 struct ImageCanvasDrag {
-    from_selection: (i32, i32),
-    from_pixel: (i32, i32),
-    to_pixel: (i32, i32),
+    from_selection: Point,
+    from_pixel: Point,
+    to_pixel: Point,
 }
 
 pub struct ImageCanvas {
-    left: i32,
-    top: i32,
+    top_left: Point,
     max_size: u32,
     drag_from_to: Option<ImageCanvasDrag>,
     selection_animation_counter: i32,
@@ -44,8 +43,7 @@ pub struct ImageCanvas {
 impl ImageCanvas {
     pub fn new(left: i32, top: i32, max_size: u32) -> ImageCanvas {
         ImageCanvas {
-            left: left,
-            top: top,
+            top_left: Point::new(left, top),
             max_size: max_size,
             drag_from_to: None,
             selection_animation_counter: 0,
@@ -60,17 +58,19 @@ impl ImageCanvas {
     fn rect(&self, state: &EditorState) -> Rect {
         let scale = self.scale(state);
         let (width, height) = state.image_size();
-        Rect::new(self.left, self.top, width * scale, height * scale)
+        Rect::new(self.top_left.x(),
+                  self.top_left.y(),
+                  width * scale,
+                  height * scale)
     }
 
     fn dragged_points(&self,
                       state: &EditorState)
                       -> Option<((u32, u32), (u32, u32))> {
         if let Some(ref drag) = self.drag_from_to {
-            let (fpx, fpy) = drag.from_pixel;
-            let (tpx, tpy) = drag.to_pixel;
-            let from_point = self.clamp_mouse_to_row_col(fpx, fpy, state);
-            let to_point = self.clamp_mouse_to_row_col(tpx, tpy, state);
+            let from_point = self.clamp_mouse_to_row_col(drag.from_pixel,
+                                                         state);
+            let to_point = self.clamp_mouse_to_row_col(drag.to_pixel, state);
             Some((from_point, to_point))
         } else {
             None
@@ -91,50 +91,44 @@ impl ImageCanvas {
     }
 
     fn mouse_to_row_col(&self,
-                        x: i32,
-                        y: i32,
+                        mouse: Point,
                         state: &EditorState)
                         -> Option<(u32, u32)> {
-        if x < self.left || y < self.top {
+        if mouse.x() < self.top_left.x() || mouse.y() < self.top_left.y() {
             return None;
         }
-        let scale = self.scale(state) as i32;
-        let col = (x - self.left) / scale;
-        let row = (y - self.top) / scale;
+        let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
-        if col < 0 || col >= (width as i32) || row < 0 ||
-           row >= (height as i32) {
+        if scaled.x() < 0 || scaled.x() >= (width as i32) ||
+           scaled.y() < 0 || scaled.y() >= (height as i32) {
             None
         } else {
-            Some((col as u32, row as u32))
+            Some((scaled.x() as u32, scaled.y() as u32))
         }
     }
 
     fn clamp_mouse_to_row_col(&self,
-                              x: i32,
-                              y: i32,
+                              mouse: Point,
                               state: &EditorState)
                               -> (u32, u32) {
-        let scale = self.scale(state) as i32;
-        let col = (x - self.left) / scale;
-        let row = (y - self.top) / scale;
+        let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
-        (cmp::max(0, cmp::min(col, width as i32 - 1)) as u32,
-         cmp::max(0, cmp::min(row, height as i32 - 1)) as u32)
+        (cmp::max(0, cmp::min(scaled.x(), width as i32 - 1)) as u32,
+         cmp::max(0, cmp::min(scaled.y(), height as i32 - 1)) as u32)
     }
 
-    fn try_paint(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
-        if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
+    fn try_paint(&self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(position) = self.mouse_to_row_col(mouse, state) {
             let color = state.color();
-            state.persistent_mutation().image()[(col, row)] = color;
+            state.persistent_mutation().image()[position] = color;
             true
         } else {
             false
         }
     }
 
-    fn try_eyedrop(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
-        if let Some(position) = self.mouse_to_row_col(x, y, state) {
+    fn try_eyedrop(&self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(position) = self.mouse_to_row_col(mouse, state) {
             state.eyedrop_at(position);
             true
         } else {
@@ -157,10 +151,10 @@ impl ImageCanvas {
         false
     }
 
-    fn try_flood_fill(&self, x: i32, y: i32, state: &mut EditorState) -> bool {
-        if let Some((col, row)) = self.mouse_to_row_col(x, y, state) {
+    fn try_flood_fill(&self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(start) = self.mouse_to_row_col(mouse, state) {
             let to_color = state.color();
-            let from_color = state.image()[(col, row)];
+            let from_color = state.image()[start];
             if from_color == to_color {
                 return false;
             }
@@ -168,8 +162,8 @@ impl ImageCanvas {
             let image = mutation.image();
             let width = image.width();
             let height = image.height();
-            image[(col, row)] = to_color;
-            let mut stack: Vec<(u32, u32)> = vec![(col, row)];
+            image[start] = to_color;
+            let mut stack: Vec<(u32, u32)> = vec![start];
             while let Some((col, row)) = stack.pop() {
                 let mut next: Vec<(u32, u32)> = vec![];
                 if col > 0 {
@@ -264,27 +258,26 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseDown(pt) => {
                 if self.rect(state).contains(pt) {
-                    let (x, y) = (pt.x(), pt.y());
                     match state.tool() {
                         Tool::Eyedropper => {
-                            let changed = self.try_eyedrop(x, y, state);
+                            let changed = self.try_eyedrop(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Line => {
                             self.drag_from_to = Some(ImageCanvasDrag {
-                                from_selection: (0, 0),
-                                from_pixel: (x, y),
-                                to_pixel: (x, y),
+                                from_selection: Point::new(0, 0),
+                                from_pixel: pt,
+                                to_pixel: pt,
                             });
                             return Action::redraw().and_stop();
                         }
                         Tool::PaintBucket => {
-                            let changed = self.try_flood_fill(x, y, state);
+                            let changed = self.try_flood_fill(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Pencil => {
                             state.reset_persistent_mutation();
-                            let changed = self.try_paint(x, y, state);
+                            let changed = self.try_paint(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
@@ -298,14 +291,15 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 None
                             };
                             if let Some(rect) = rect {
+                                let screen_topleft = self.top_left +
+                                                     rect.top_left() *
+                                                     self.scale(state) as i32;
                                 let scale = self.scale(state);
-                                if !Rect::new(self.left +
-                                              rect.x() * (scale as i32),
-                                              self.top +
-                                              rect.y() * (scale as i32),
+                                if !Rect::new(screen_topleft.x(),
+                                              screen_topleft.y(),
                                               rect.width() * scale,
                                               rect.height() * scale)
-                                        .contains((x, y)) {
+                                        .contains(pt) {
                                     state.mutation().unselect();
                                 } else {
                                     state.reset_persistent_mutation();
@@ -313,12 +307,12 @@ impl GuiElement<EditorState> for ImageCanvas {
                             }
                             self.drag_from_to = Some(ImageCanvasDrag {
                                 from_selection: if let Some(r) = rect {
-                                    (r.x(), r.y())
+                                    r.top_left()
                                 } else {
-                                    (0, 0)
+                                    Point::new(0, 0)
                                 },
-                                from_pixel: (x, y),
-                                to_pixel: (x, y),
+                                from_pixel: pt,
+                                to_pixel: pt,
                             });
                             return Action::redraw().and_stop();
                         }
@@ -348,30 +342,26 @@ impl GuiElement<EditorState> for ImageCanvas {
                 self.drag_from_to = None;
             }
             &Event::MouseDrag(pt) => {
-                let (x, y) = (pt.x(), pt.y());
                 match state.tool() {
                     Tool::Line => {
                         if let Some(ref mut drag) = self.drag_from_to {
-                            drag.to_pixel = (x, y);
+                            drag.to_pixel = pt;
                             return Action::redraw().and_continue();
                         }
                     }
                     Tool::Pencil => {
-                        let changed = self.try_paint(x, y, state);
+                        let changed = self.try_paint(pt, state);
                         return Action::redraw_if(changed).and_continue();
                     }
                     Tool::Select => {
                         let scale = self.scale(state) as i32;
                         if let Some(ref mut drag) = self.drag_from_to {
-                            drag.to_pixel = (x, y);
+                            drag.to_pixel = pt;
                             if state.selection().is_some() {
-                                let (fsx, fsy) = drag.from_selection;
-                                let (fpx, fpy) = drag.from_pixel;
+                                let position = drag.from_selection +
+                                               (pt - drag.from_pixel) / scale;
                                 state.persistent_mutation()
-                                     .reposition_selection(fsx +
-                                                           (x - fpx) / scale,
-                                                           fsy +
-                                                           (y - fpy) / scale);
+                                     .reposition_selection(position);
                             }
                             return Action::redraw().and_continue();
                         }

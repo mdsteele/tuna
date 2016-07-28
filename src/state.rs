@@ -53,7 +53,7 @@ const MAX_UNDOS: usize = 100;
 struct Snapshot {
     image_index: usize,
     images: Vec<Rc<Image>>,
-    selection: Option<(Rc<Image>, i32, i32)>,
+    selection: Option<(Rc<Image>, Point)>,
     unsaved: bool,
 }
 
@@ -66,7 +66,7 @@ pub struct EditorState {
     current: Snapshot,
     undo_stack: Vec<Snapshot>,
     redo_stack: Vec<Snapshot>,
-    clipboard: Option<(Rc<Image>, i32, i32)>,
+    clipboard: Option<(Rc<Image>, Point)>,
     tool: Tool,
     prev_tool: Tool,
     persistent_mutation_active: bool,
@@ -168,7 +168,7 @@ impl EditorState {
 
     pub fn selection(&self) -> Option<(&Image, Point)> {
         match self.current.selection {
-            Some((ref image, x, y)) => Some((&image, Point::new(x, y))),
+            Some((ref image, position)) => Some((&image, position)),
             None => None,
         }
     }
@@ -413,8 +413,7 @@ impl<'a> Mutation<'a> {
         let mut selected = Image::new(rect.width(), rect.height());
         selected.draw(self.image(), -rect.x(), -rect.y());
         self.state.current.selection = Some((Rc::new(selected),
-                                             rect.x(),
-                                             rect.y()));
+                                             rect.top_left()));
         self.image().fill_rect(rect.x(),
                                rect.y(),
                                rect.width(),
@@ -429,8 +428,8 @@ impl<'a> Mutation<'a> {
     }
 
     pub fn unselect(&mut self) {
-        if let Some((selected, x, y)) = self.state.current.selection.take() {
-            self.image().draw(&selected, x, y);
+        if let Some((image, position)) = self.state.current.selection.take() {
+            self.image().draw(&image, position.x(), position.y());
         }
     }
 
@@ -438,7 +437,7 @@ impl<'a> Mutation<'a> {
         if self.state.current.selection.is_some() {
             self.state.clipboard = self.state.current.selection.take();
         } else {
-            self.state.clipboard = Some((self.image_rc(), 0, 0));
+            self.state.clipboard = Some((self.image_rc(), Point::new(0, 0)));
             self.image().clear();
         }
     }
@@ -447,7 +446,7 @@ impl<'a> Mutation<'a> {
         if self.state.current.selection.is_some() {
             self.state.clipboard = self.state.current.selection.clone();
         } else {
-            self.state.clipboard = Some((self.image_rc(), 0, 0));
+            self.state.clipboard = Some((self.image_rc(), Point::new(0, 0)));
         }
     }
 
@@ -459,10 +458,9 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    pub fn reposition_selection(&mut self, new_x: i32, new_y: i32) {
-        if let Some((_, ref mut x, ref mut y)) = self.state.current.selection {
-            *x = new_x;
-            *y = new_y;
+    pub fn reposition_selection(&mut self, new_position: Point) {
+        if let Some((_, ref mut position)) = self.state.current.selection {
+            *position = new_position;
         }
     }
 }
