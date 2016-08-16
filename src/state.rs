@@ -384,14 +384,6 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    pub fn flip_image_horz(&mut self) {
-        *self.image() = self.state.image().flip_horz();
-    }
-
-    pub fn flip_image_vert(&mut self) {
-        *self.image() = self.state.image().flip_vert();
-    }
-
     pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
         self.unselect();
         self.state.current.images = self.state
@@ -430,6 +422,42 @@ impl<'a> Mutation<'a> {
     pub fn unselect(&mut self) {
         if let Some((image, position)) = self.state.current.selection.take() {
             self.image().draw(&image, position.x(), position.y());
+        }
+    }
+
+    pub fn flip_selection_horz(&mut self) {
+        if let Some((ref mut image, _)) = self.state.current.selection {
+            *image = Rc::new(image.flip_horz());
+        } else {
+            *self.image() = self.state.image().flip_horz();
+        }
+    }
+
+    pub fn flip_selection_vert(&mut self) {
+        if let Some((ref mut image, _)) = self.state.current.selection {
+            *image = Rc::new(image.flip_vert());
+        } else {
+            *self.image() = self.state.image().flip_vert();
+        }
+    }
+
+    pub fn rotate_selection_clockwise(&mut self) {
+        if let Some((ref mut image, _)) = self.state.current.selection {
+            *image = Rc::new(image.rotate_cw());
+        } else {
+            let rotated = self.image().rotate_cw();
+            self.image().clear();
+            self.image().draw(&rotated, 0, 0);
+        }
+    }
+
+    pub fn rotate_selection_counterclockwise(&mut self) {
+        if let Some((ref mut image, _)) = self.state.current.selection {
+            *image = Rc::new(image.rotate_ccw());
+        } else {
+            let rotated = self.image().rotate_ccw();
+            self.image().clear();
+            self.image().draw(&rotated, 0, 0);
         }
     }
 

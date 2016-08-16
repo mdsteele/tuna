@@ -193,7 +193,11 @@ fn main() {
                 Action::ignore().and_stop()
             }
             Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_image_horz();
+                state.mutation().flip_selection_horz();
+                Action::redraw().and_stop()
+            }
+            Event::KeyDown(Keycode::L, kmod) if kmod == COMMAND | SHIFT => {
+                state.mutation().rotate_selection_counterclockwise();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
@@ -205,6 +209,10 @@ fn main() {
             }
             Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
                 Action::redraw_if(state.begin_resize()).and_stop()
+            }
+            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND | SHIFT => {
+                state.mutation().rotate_selection_clockwise();
+                Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();
@@ -218,7 +226,7 @@ fn main() {
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_image_vert();
+                state.mutation().flip_selection_vert();
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
