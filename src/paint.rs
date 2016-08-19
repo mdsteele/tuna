@@ -151,6 +151,46 @@ impl ImageCanvas {
         false
     }
 
+    fn try_checker_fill(&self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(start) = self.mouse_to_row_col(mouse, state) {
+            let to_color = state.color();
+            let from_color = state.image()[start];
+            if from_color == to_color {
+                return false;
+            }
+            let mut mutation = state.mutation();
+            let image = mutation.image();
+            let width = image.width();
+            let height = image.height();
+            image[start] = to_color;
+            let mut stack: Vec<(u32, u32)> = vec![start];
+            while let Some((col, row)) = stack.pop() {
+                let mut next: Vec<(u32, u32)> = vec![];
+                if col > 0 && row > 0 {
+                    next.push((col - 1, row - 1));
+                }
+                if col < width - 1 && row < height - 1 {
+                    next.push((col + 1, row + 1));
+                }
+                if col < width - 1 && row > 0 {
+                    next.push((col + 1, row - 1));
+                }
+                if col > 0 && row < height - 1 {
+                    next.push((col - 1, row + 1));
+                }
+                for coords in next {
+                    if image[coords] == from_color {
+                        image[coords] = to_color;
+                        stack.push(coords);
+                    }
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     fn try_flood_fill(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(start) = self.mouse_to_row_col(mouse, state) {
             let to_color = state.color();
@@ -267,6 +307,10 @@ impl GuiElement<EditorState> for ImageCanvas {
             &Event::MouseDown(pt) => {
                 if self.rect(state).contains(pt) {
                     match state.tool() {
+                        Tool::Checkerboard => {
+                            let changed = self.try_checker_fill(pt, state);
+                            return Action::redraw_if(changed).and_stop();
+                        }
                         Tool::Eyedropper => {
                             let changed = self.try_eyedrop(pt, state);
                             return Action::redraw_if(changed).and_stop();

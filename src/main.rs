@@ -152,13 +152,13 @@ fn main() {
 
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
         Box::new(ModalTextBox::new(2, 296, font.clone())),
-        Box::new(UnsavedIndicator::new(312, 256, unsaved_sprite)),
-        Box::new(ColorPalette::new(4, 138)),
-        Box::new(Toolbox::new(10, 10, tool_icons)),
+        Box::new(ColorPalette::new(10, 128)),
+        Box::new(Toolbox::new(4, 16, tool_icons)),
         Box::new(ImagesScrollbar::new(436, 11, arrows)),
-        Box::new(ImageCanvas::new(48, 16, 256)),
-        Box::new(ImageCanvas::new(314, 16, 64)),
-        Box::new(TileView::new(314, 96, 96, 96)),
+        Box::new(ImageCanvas::new(60, 16, 256)),
+        Box::new(ImageCanvas::new(326, 16, 64)),
+        Box::new(TileView::new(326, 96, 96, 96)),
+        Box::new(UnsavedIndicator::new(326, 256, unsaved_sprite)),
     ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),
                                       gui_subrect);

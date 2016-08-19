@@ -30,6 +30,7 @@ use super::util;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Tool {
+    Checkerboard,
     Eyedropper,
     Line,
     PaintBucket,

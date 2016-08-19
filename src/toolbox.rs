@@ -31,8 +31,9 @@ pub struct Toolbox {
 
 impl Toolbox {
     pub fn new(left: i32, top: i32, mut icons: Vec<Sprite>) -> Toolbox {
-        icons.truncate(5);
-        assert_eq!(icons.len(), 5);
+        icons.truncate(6);
+        assert_eq!(icons.len(), 6);
+        let checker_icon = icons.pop().unwrap();
         let line_icon = icons.pop().unwrap();
         let select_icon = icons.pop().unwrap();
         let eyedrop_icon = icons.pop().unwrap();
@@ -40,14 +41,16 @@ impl Toolbox {
         let pencil_icon = icons.pop().unwrap();
         let elements: Vec<Box<GuiElement<Tool>>> = vec![
             Toolbox::picker(2, 2, Tool::Pencil, Keycode::P, pencil_icon),
+            Toolbox::picker(26, 2, Tool::Line, Keycode::L, line_icon),
             Toolbox::picker(2, 26, Tool::PaintBucket, Keycode::K, bucket_icon),
+            Toolbox::picker(26, 26, Tool::Checkerboard, Keycode::H,
+                            checker_icon),
             Toolbox::picker(2, 50, Tool::Eyedropper, Keycode::Y, eyedrop_icon),
-            Toolbox::picker(2, 74, Tool::Select, Keycode::S, select_icon),
-            Toolbox::picker(2, 98, Tool::Line, Keycode::L, line_icon),
+            Toolbox::picker(26, 50, Tool::Select, Keycode::S, select_icon),
         ];
         Toolbox {
             element: SubrectElement::new(AggregateElement::new(elements),
-                                         Rect::new(left, top, 24, 120)),
+                                         Rect::new(left, top, 48, 72)),
         }
     }
 
