@@ -248,6 +248,14 @@ impl GuiElement<EditorState> for ImageCanvas {
                     return Action::ignore().and_continue();
                 }
             }
+            &Event::KeyDown(Keycode::Backspace, _) => {
+                if state.selection().is_some() {
+                    state.mutation().delete_selection();
+                    return Action::redraw().and_stop();
+                } else {
+                    return Action::ignore().and_continue();
+                }
+            }
             &Event::KeyDown(Keycode::Escape, _) => {
                 if state.selection().is_some() {
                     state.mutation().unselect();

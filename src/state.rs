@@ -135,9 +135,12 @@ impl EditorState {
     pub fn eyedrop_at(&mut self, position: (u32, u32)) {
         self.color = self.image()[position];
         if self.tool == Tool::Eyedropper {
-            self.tool = self.prev_tool;
+            self.tool = if self.prev_tool == Tool::Select {
+                Tool::Pencil
+            } else {
+                self.prev_tool
+            };
         }
-
     }
 
     pub fn num_images(&self) -> usize {
@@ -459,6 +462,10 @@ impl<'a> Mutation<'a> {
             self.image().clear();
             self.image().draw(&rotated, 0, 0);
         }
+    }
+
+    pub fn delete_selection(&mut self) {
+        self.state.current.selection = None;
     }
 
     pub fn cut_selection(&mut self) {
