@@ -27,6 +27,23 @@ use super::util;
 
 // ========================================================================= //
 
+enum Shape {
+    Line,
+    Oval,
+    Rect,
+}
+
+impl Shape {
+    fn from_tool(tool: Tool) -> Option<Shape> {
+        match tool {
+            Tool::Line => Some(Shape::Line),
+            Tool::Oval => Some(Shape::Oval),
+            Tool::Rectangle => Some(Shape::Rect),
+            _ => None,
+        }
+    }
+}
+
 struct ImageCanvasDrag {
     from_selection: Point,
     from_pixel: Point,
@@ -66,12 +83,11 @@ impl ImageCanvas {
 
     fn dragged_points(&self,
                       state: &EditorState)
-                      -> Option<((u32, u32), (u32, u32))> {
+                      -> Option<((i32, i32), (i32, i32))> {
         if let Some(ref drag) = self.drag_from_to {
-            let from_point = self.clamp_mouse_to_row_col(drag.from_pixel,
-                                                         state);
-            let to_point = self.clamp_mouse_to_row_col(drag.to_pixel, state);
-            Some((from_point, to_point))
+            let (x0, y0) = self.clamp_mouse_to_row_col(drag.from_pixel, state);
+            let (x1, y1) = self.clamp_mouse_to_row_col(drag.to_pixel, state);
+            Some(((x0 as i32, y0 as i32), (x1 as i32, y1 as i32)))
         } else {
             None
         }
@@ -80,10 +96,10 @@ impl ImageCanvas {
     fn dragged_rect(&self, state: &EditorState) -> Option<Rect> {
         if let Some(((from_col, from_row), (to_col, to_row))) =
                self.dragged_points(state) {
-            let x = cmp::min(from_col, to_col) as i32;
-            let y = cmp::min(from_row, to_row) as i32;
-            let w = ((from_col as i32 - to_col as i32).abs() + 1) as u32;
-            let h = ((from_row as i32 - to_row as i32).abs() + 1) as u32;
+            let x = cmp::min(from_col, to_col);
+            let y = cmp::min(from_row, to_row);
+            let w = ((from_col - to_col).abs() + 1) as u32;
+            let h = ((from_row - to_row).abs() + 1) as u32;
             Some(Rect::new(x, y, w, h))
         } else {
             None
@@ -136,14 +152,23 @@ impl ImageCanvas {
         }
     }
 
-    fn try_draw_line(&mut self, state: &mut EditorState) -> bool {
+    fn try_draw_shape(&mut self,
+                      shape: Shape,
+                      state: &mut EditorState)
+                      -> bool {
         if let Some(((col1, row1), (col2, row2))) =
                self.dragged_points(state) {
             let color = state.color();
             let mut mutation = state.mutation();
             let image = mutation.image();
-            for coords in bresenham_points(col1, row1, col2, row2) {
-                image[coords] = color;
+            for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
+                if x >= 0 && y >= 0 {
+                    let x = x as u32;
+                    let y = y as u32;
+                    if x < image.width() && y < image.height() {
+                        image[(x, y)] = color;
+                    }
+                }
             }
             self.drag_from_to = None;
             return true;
@@ -250,13 +275,13 @@ impl GuiElement<EditorState> for ImageCanvas {
             draw_marquee(&mut canvas,
                          marquee_rect,
                          self.selection_animation_counter);
-        } else if state.tool() == Tool::Line {
+        } else if let Some(shape) = Shape::from_tool(state.tool()) {
             if let Some(((col1, row1), (col2, row2))) =
                    self.dragged_points(state) {
-                for (x, y) in bresenham_points(col1, row1, col2, row2) {
+                for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
                     canvas.draw_rect((191, 191, 191, 255),
-                                     Rect::new((x * scale) as i32,
-                                               (y * scale) as i32,
+                                     Rect::new(x * scale as i32,
+                                               y * scale as i32,
                                                scale,
                                                scale));
                 }
@@ -315,7 +340,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                             let changed = self.try_eyedrop(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
-                        Tool::Line => {
+                        Tool::Line | Tool::Oval | Tool::Rectangle => {
                             self.drag_from_to = Some(ImageCanvasDrag {
                                 from_selection: Point::new(0, 0),
                                 from_pixel: pt,
@@ -376,7 +401,15 @@ impl GuiElement<EditorState> for ImageCanvas {
             &Event::MouseUp => {
                 match state.tool() {
                     Tool::Line => {
-                        let changed = self.try_draw_line(state);
+                        let changed = self.try_draw_shape(Shape::Line, state);
+                        return Action::redraw_if(changed).and_continue();
+                    }
+                    Tool::Oval => {
+                        let changed = self.try_draw_shape(Shape::Oval, state);
+                        return Action::redraw_if(changed).and_continue();
+                    }
+                    Tool::Rectangle => {
+                        let changed = self.try_draw_shape(Shape::Rect, state);
                         return Action::redraw_if(changed).and_continue();
                     }
                     Tool::Select => {
@@ -395,7 +428,7 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseDrag(pt) => {
                 match state.tool() {
-                    Tool::Line => {
+                    Tool::Line | Tool::Oval | Tool::Rectangle => {
                         if let Some(ref mut drag) = self.drag_from_to {
                             drag.to_pixel = pt;
                             return Action::redraw().and_continue();
@@ -429,46 +462,101 @@ impl GuiElement<EditorState> for ImageCanvas {
 
 // ========================================================================= //
 
-fn bresenham_points(x1: u32, y1: u32, x2: u32, y2: u32) -> Vec<(u32, u32)> {
-    let (x1, y1, x2, y2) = (x1 as i32, y1 as i32, x2 as i32, y2 as i32);
-    let dx = (x2 - x1).abs();
-    let dy = (y2 - y1).abs();
-    let steep = dy > dx;
-    let (dx, dy, x1, y1, x2, y2) = if steep {
-        (dy, dx, y1, x1, y2, x2)
-    } else {
-        (dx, dy, x1, y1, x2, y2)
-    };
-    let reversed = x1 > x2;
-    let (x1, y1, x2, y2) = if reversed {
-        (x2, y2, x1, y1)
-    } else {
-        (x1, y1, x2, y2)
-    };
-    let y_step = if y1 < y2 {
-        1
-    } else {
-        -1
-    };
-    let mut x = x1;
-    let mut y = y1;
-    let mut err = dx / 2;
-    let mut output = vec![];
-    while x <= x2 {
-        output.push(if steep {
-            (y as u32, x as u32)
-        } else {
-            (x as u32, y as u32)
-        });
-        x += 1;
-        err -= dy;
-        if err < 0 {
+fn bresenham_shape(shape: Shape,
+                   x1: i32,
+                   y1: i32,
+                   x2: i32,
+                   y2: i32)
+                   -> Vec<(i32, i32)> {
+    match shape {
+        Shape::Line => bresenham_line(x1, y1, x2, y2),
+        Shape::Oval => bresenham_oval(x1, y1, x2, y2),
+        Shape::Rect => bresenham_rect(x1, y1, x2, y2),
+    }
+}
+
+fn bresenham_line(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    // This function was adapted from the plotLine function in
+    // http://members.chello.at/easyfilter/bresenham.js by Zingl Alois.
+    let dx = (x1 - x0).abs();
+    let dy = -(y1 - y0).abs();
+    let x_step = (x1 - x0).signum();
+    let y_step = (y1 - y0).signum();
+    let mut err = dx + dy;
+    let (mut x, mut y) = (x0, y0);
+    let mut output = vec![(x, y)];
+    while x != x1 || y != y1 {
+        let err2 = 2 * err;
+        if err2 >= dy {
+            err += dy;
+            x += x_step;
+        }
+        if err2 <= dx {
+            err += dx;
             y += y_step;
+        }
+        output.push((x, y));
+    }
+    output
+}
+
+fn bresenham_oval(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    // This function was adapted from the plotEllipseRect function in
+    // http://members.chello.at/easyfilter/bresenham.js by Zingl Alois.
+    let (mut x0, mut x1) = (cmp::min(x0, x1), cmp::max(x0, x1));
+    let (mut y0, mut y1) = (cmp::min(y0, y1), cmp::max(y0, y1));
+    let width = x1 - x0;
+    let height = y1 - y0;
+    let h_parity = height & 1;
+    y0 += (height + 1) / 2;
+    y1 = y0 - h_parity;
+    let mut dx = 4 * (1 - width) * height * height;
+    let mut dy = 4 * (h_parity + 1) * width * width;
+    let dx_step = 8 * height * height;
+    let dy_step = 8 * width * width;
+    let mut err = dx + dy + h_parity * width * width;
+    let mut output = Vec::new();
+    while x0 <= x1 {
+        output.push((x0, y0));
+        output.push((x0, y1));
+        output.push((x1, y0));
+        output.push((x1, y1));
+        let err2 = 2 * err;
+        if err2 <= dy {
+            y0 += 1;
+            y1 -= 1;
+            dy += dy_step;
+            err += dy;
+        }
+        if err2 >= dx || 2 * err > dy {
+            x0 += 1;
+            x1 -= 1;
+            dx += dx_step;
             err += dx;
         }
     }
-    if reversed {
-        output.reverse();
+    while y0 - y1 <= height {
+        output.push((x0 - 1, y0));
+        output.push((x0 - 1, y1));
+        output.push((x1 + 1, y0));
+        output.push((x1 + 1, y1));
+        y0 += 1;
+        y1 -= 1;
+    }
+    output
+}
+
+fn bresenham_rect(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    let (x0, x1) = (cmp::min(x0, x1), cmp::max(x0, x1));
+    let (y0, y1) = (cmp::min(y0, y1), cmp::max(y0, y1));
+    let mut output = Vec::new();
+    for x in x0..x1 {
+        output.push((x, y0));
+        output.push((x + 1, y1));
+    }
+    for y in y0..y1 {
+        output.push((x0, y + 1));
+        output.push((x1, y));
     }
     output
 }

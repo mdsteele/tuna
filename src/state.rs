@@ -33,8 +33,10 @@ pub enum Tool {
     Checkerboard,
     Eyedropper,
     Line,
+    Oval,
     PaintBucket,
     Pencil,
+    Rectangle,
     Select,
 }
 
