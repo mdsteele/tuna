@@ -17,13 +17,14 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::{Point, Rect};
+use sdl2::rect::Rect;
 use std::cmp;
 use std::rc::Rc;
 use super::canvas::{Canvas, Sprite};
 use super::element::{Action, GuiElement, SubrectElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode};
+use super::util;
 
 // ========================================================================= //
 
@@ -41,9 +42,9 @@ impl GuiElement<String> for TextBox {
     fn draw(&self, text: &String, canvas: &mut Canvas) {
         let rect = canvas.rect();
         let rect_width = rect.width() as i32;
-        let text_width = CHAR_PIXEL_WIDTH * text.len() as i32;
+        let text_width = util::CHAR_PIXEL_WIDTH * text.len() as i32;
         let text_left = cmp::min(2, rect_width - 3 - text_width);
-        render_string(canvas, &self.font, text_left, 2, text);
+        util::render_string(canvas, &self.font, text_left, 2, text);
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
@@ -107,7 +108,11 @@ impl GuiElement<EditorState> for ModalTextBox {
                 "Save:"
             }
         };
-        render_string(canvas, &self.font, self.left, self.top + 2, label);
+        util::render_string(canvas,
+                            &self.font,
+                            self.left,
+                            self.top + 2,
+                            label);
     }
 
     fn handle_event(&mut self,
@@ -140,33 +145,6 @@ impl GuiElement<EditorState> for ModalTextBox {
                     }
                 }
             }
-        }
-    }
-}
-
-// ========================================================================= //
-
-const CHAR_PIXEL_WIDTH: i32 = 14;
-
-fn render_string(canvas: &mut Canvas,
-                 font: &Vec<Sprite>,
-                 left: i32,
-                 top: i32,
-                 string: &str) {
-    let mut x = left;
-    let mut y = top;
-    for ch in string.chars() {
-        if ch == '\n' {
-            x = left;
-            y += 24;
-        } else {
-            if ch >= '!' {
-                let index = ch as usize - '!' as usize;
-                if index < font.len() {
-                    canvas.draw_sprite(&font[index], Point::new(x, y));
-                }
-            }
-            x += CHAR_PIXEL_WIDTH;
         }
     }
 }

@@ -23,43 +23,34 @@
 extern crate ahi;
 extern crate sdl2;
 
-use sdl2::rect::Rect;
-use std::rc::Rc;
-
 mod canvas;
-use self::canvas::{Canvas, Sprite};
-
 mod element;
-use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
-
 mod event;
-use self::event::{COMMAND, Event, Keycode, SHIFT};
-
+mod namebox;
 mod paint;
-use self::paint::ImageCanvas;
-
 mod palette;
-use self::palette::ColorPalette;
-
 mod scrollbar;
-use self::scrollbar::ImagesScrollbar;
-
 mod state;
-use self::state::EditorState;
-
 mod textbox;
-use self::textbox::ModalTextBox;
-
 mod tiles;
-use self::tiles::TileView;
-
 mod toolbox;
-use self::toolbox::Toolbox;
-
 mod unsaved;
-use self::unsaved::UnsavedIndicator;
-
 mod util;
+
+use sdl2::rect::Rect;
+use self::canvas::{Canvas, Sprite};
+use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
+use self::event::{COMMAND, Event, Keycode, SHIFT};
+use self::namebox::ImageNameBox;
+use self::paint::ImageCanvas;
+use self::palette::ColorPalette;
+use self::scrollbar::ImagesScrollbar;
+use self::state::EditorState;
+use self::textbox::ModalTextBox;
+use self::tiles::TileView;
+use self::toolbox::Toolbox;
+use self::unsaved::UnsavedIndicator;
+use std::rc::Rc;
 
 // ========================================================================= //
 
@@ -158,6 +149,7 @@ fn main() {
         Box::new(ImageCanvas::new(60, 16, 256)),
         Box::new(ImageCanvas::new(326, 16, 64)),
         Box::new(TileView::new(326, 96, 96, 96)),
+        Box::new(ImageNameBox::new(326, 230, font.clone())),
         Box::new(UnsavedIndicator::new(326, 256, unsaved_sprite)),
     ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),

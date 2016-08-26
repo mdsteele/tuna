@@ -18,10 +18,10 @@
 // +--------------------------------------------------------------------------+
 
 use ahi::{Color, Font, Image};
-use sdl2::rect::Rect;
+use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
-use super::canvas::Canvas;
+use super::canvas::{Canvas, Sprite};
 
 // ========================================================================= //
 
@@ -66,6 +66,33 @@ pub fn render_image(canvas: &mut Canvas,
                                            scale,
                                            scale));
             }
+        }
+    }
+}
+
+// ========================================================================= //
+
+pub const CHAR_PIXEL_WIDTH: i32 = 14;
+
+pub fn render_string(canvas: &mut Canvas,
+                     font: &Vec<Sprite>,
+                     left: i32,
+                     top: i32,
+                     string: &str) {
+    let mut x = left;
+    let mut y = top;
+    for ch in string.chars() {
+        if ch == '\n' {
+            x = left;
+            y += 24;
+        } else {
+            if ch >= '!' {
+                let index = ch as usize - '!' as usize;
+                if index < font.len() {
+                    canvas.draw_sprite(&font[index], Point::new(x, y));
+                }
+            }
+            x += CHAR_PIXEL_WIDTH;
         }
     }
 }

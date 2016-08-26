@@ -206,6 +206,24 @@ impl EditorState {
         }
     }
 
+    pub fn image_name(&self) -> String {
+        match self.current.data {
+            Data::AHI(ref ahi) => format!("{}", ahi.image_index),
+            Data::AHF(ref ahf) => {
+                if let Some(current) = ahf.current_char {
+                    let mut name = "'".to_string();
+                    for chr in current.escape_default() {
+                        name.push(chr);
+                    }
+                    name.push('\'');
+                    name
+                } else {
+                    "def".to_string()
+                }
+            }
+        }
+    }
+
     pub fn image_size(&self) -> (u32, u32) {
         let image = self.image();
         (image.width(), image.height())
