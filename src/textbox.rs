@@ -107,6 +107,10 @@ impl GuiElement<EditorState> for ModalTextBox {
                 self.element.draw(text, canvas);
                 "Save:"
             }
+            Mode::SetMetrics(ref text) => {
+                self.element.draw(text, canvas);
+                "BaSp:"
+            }
         };
         util::render_string(canvas,
                             &self.font,
@@ -140,7 +144,8 @@ impl GuiElement<EditorState> for ModalTextBox {
                     Mode::LoadFile(ref mut text) |
                     Mode::NewGlyph(ref mut text) |
                     Mode::Resize(ref mut text) |
-                    Mode::SaveAs(ref mut text) => {
+                    Mode::SaveAs(ref mut text) |
+                    Mode::SetMetrics(ref mut text) => {
                         self.element.handle_event(event, text)
                     }
                 }

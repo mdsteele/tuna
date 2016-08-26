@@ -47,6 +47,7 @@ pub enum Mode {
     NewGlyph(String),
     Resize(String),
     SaveAs(String),
+    SetMetrics(String),
 }
 
 // ========================================================================= //
@@ -224,6 +225,19 @@ impl EditorState {
         }
     }
 
+    pub fn image_metrics(&self) -> Option<(i32, i32)> {
+        match self.current.data {
+            Data::AHI(_) => None,
+            Data::AHF(ref ahf) => {
+                let glyph = match ahf.current_char {
+                    Some(chr) => &ahf.font[chr],
+                    None => ahf.font.default_glyph(),
+                };
+                Some((ahf.font.baseline(), glyph.spacing()))
+            }
+        }
+    }
+
     pub fn image_size(&self) -> (u32, u32) {
         let image = self.image();
         (image.width(), image.height())
@@ -389,6 +403,20 @@ impl EditorState {
         }
     }
 
+    pub fn begin_set_metrics(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            if let Some((bl, sp)) = self.image_metrics() {
+                self.unselect_if_necessary();
+                self.mode = Mode::SetMetrics(format!("{}/{}", bl, sp));
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn mode_cancel(&mut self) -> bool {
         match self.mode {
             Mode::Edit => false,
@@ -466,6 +494,23 @@ impl EditorState {
                         false
                     }
                 }
+            }
+            Mode::SetMetrics(text) => {
+                let pieces: Vec<&str> = text.split('/').collect();
+                if pieces.len() != 2 {
+                    return false;
+                }
+                let new_baseline = match pieces[0].parse::<i32>() {
+                    Ok(baseline) => baseline,
+                    Err(_) => return false,
+                };
+                let new_spacing = match pieces[1].parse::<i32>() {
+                    Ok(spacing) => spacing,
+                    Err(_) => return false,
+                };
+                self.mutation().set_metrics(new_baseline, new_spacing);
+                self.mode = Mode::Edit;
+                true
             }
         }
     }
@@ -628,6 +673,16 @@ impl<'a> Mutation<'a> {
                         ahf.font.set_default_glyph(new_glyph);
                     }
                 }
+            }
+        }
+    }
+
+    fn set_metrics(&mut self, new_baseline: i32, new_spacing: i32) {
+        if let Data::AHF(ref mut ahf) = self.state.current.data {
+            ahf.font.set_baseline(new_baseline);
+            match ahf.current_char {
+                Some(chr) => ahf.font[chr].set_spacing(new_spacing),
+                None => ahf.font.default_glyph_mut().set_spacing(new_spacing),
             }
         }
     }

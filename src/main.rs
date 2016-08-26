@@ -180,6 +180,9 @@ fn main() {
                 state.mutation().select_all();
                 Action::redraw().and_stop()
             }
+            Event::KeyDown(Keycode::B, kmod) if kmod == COMMAND | SHIFT => {
+                Action::redraw_if(state.begin_set_metrics()).and_stop()
+            }
             Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
                 state.mutation().copy_selection();
                 Action::ignore().and_stop()

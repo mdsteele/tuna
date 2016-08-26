@@ -262,8 +262,26 @@ impl GuiElement<EditorState> for ImageCanvas {
         let scale = self.scale(state);
         let canvas_rect = self.rect(state);
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
+        util::render_image(canvas,
+                           state.image(),
+                           canvas_rect.x(),
+                           canvas_rect.y(),
+                           scale);
+        if let Some((baseline, spacing)) = state.image_metrics() {
+            canvas.draw_rect((0, 127, 255, 255),
+                             Rect::new(canvas_rect.x(),
+                                       canvas_rect.y() +
+                                       baseline * scale as i32,
+                                       canvas_rect.width(),
+                                       1));
+            canvas.draw_rect((255, 0, 127, 255),
+                             Rect::new(canvas_rect.x() +
+                                       spacing * scale as i32,
+                                       canvas_rect.y(),
+                                       1,
+                                       canvas_rect.height()));
+        }
         let mut canvas = canvas.subcanvas(canvas_rect);
-        util::render_image(&mut canvas, state.image(), 0, 0, scale);
         if let Some((ref selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
