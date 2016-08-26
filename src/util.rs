@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use ahi::{Color, Image};
+use ahi::{Color, Font, Image};
 use sdl2::rect::Rect;
 use std::fs::File;
 use std::io;
@@ -40,6 +40,11 @@ pub fn modulo(a: i32, b: i32) -> i32 {
 }
 
 // ========================================================================= //
+
+pub fn load_ahf_from_file(path: &String) -> io::Result<Font> {
+    let mut file = try!(File::open(path));
+    Font::read(&mut file)
+}
 
 pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
     let mut file = try!(File::open(path));

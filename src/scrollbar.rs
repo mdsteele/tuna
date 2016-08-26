@@ -40,14 +40,14 @@ impl ImagesScrollbar {
         let down_icon = icons.pop().unwrap();
         let up_icon = icons.pop().unwrap();
         let elements: Vec<Box<GuiElement<EditorState>>> = vec![
- ImagesScrollbar::arrow_button(2, -1, Keycode::Up, up_icon),
- ImagesScrollbar::picker(20, -2),
- ImagesScrollbar::picker(58, -1),
- ImagesScrollbar::picker(96, 0),
- ImagesScrollbar::picker(134, 1),
- ImagesScrollbar::picker(172, 2),
- ImagesScrollbar::picker(210, 3),
- ImagesScrollbar::arrow_button(248, 1, Keycode::Down, down_icon),
+            ImagesScrollbar::arrow_button(2, -1, Keycode::Up, up_icon),
+            ImagesScrollbar::picker(20, -2),
+            ImagesScrollbar::picker(58, -1),
+            ImagesScrollbar::picker(96, 0),
+            ImagesScrollbar::picker(134, 1),
+            ImagesScrollbar::picker(172, 2),
+            ImagesScrollbar::picker(210, 3),
+            ImagesScrollbar::arrow_button(248, 1, Keycode::Down, down_icon),
         ];
         ImagesScrollbar {
             element: SubrectElement::new(AggregateElement::new(elements),

@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use ahi::{Color, Image};
+use ahi::{Color, Font, Glyph, Image};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
@@ -44,6 +44,7 @@ pub enum Tool {
 pub enum Mode {
     Edit,
     LoadFile(String),
+    NewGlyph(String),
     Resize(String),
     SaveAs(String),
 }
@@ -53,9 +54,26 @@ pub enum Mode {
 const MAX_UNDOS: usize = 100;
 
 #[derive(Clone)]
-struct Snapshot {
+struct AhiData {
     image_index: usize,
     images: Vec<Rc<Image>>,
+}
+
+#[derive(Clone)]
+struct AhfData {
+    current_char: Option<char>,
+    font: Font,
+}
+
+#[derive(Clone)]
+enum Data {
+    AHI(AhiData),
+    AHF(AhfData),
+}
+
+#[derive(Clone)]
+struct Snapshot {
+    data: Data,
     selection: Option<(Rc<Image>, Point)>,
     unsaved: bool,
 }
@@ -85,8 +103,10 @@ impl EditorState {
             color: Color::Black,
             filepath: filepath,
             current: Snapshot {
-                image_index: 0,
-                images: images.drain(..).map(Rc::new).collect(),
+                data: Data::AHI(AhiData {
+                    image_index: 0,
+                    images: images.drain(..).map(Rc::new).collect(),
+                }),
                 selection: None,
                 unsaved: false,
             },
@@ -147,16 +167,43 @@ impl EditorState {
     }
 
     pub fn num_images(&self) -> usize {
-        self.current.images.len()
+        match self.current.data {
+            Data::AHI(ref ahi) => ahi.images.len(),
+            Data::AHF(ref ahf) => 1 + ahf.font.chars().len(),
+        }
     }
 
     pub fn image_index(&self) -> usize {
-        self.current.image_index
+        match self.current.data {
+            Data::AHI(ref ahi) => ahi.image_index,
+            Data::AHF(ref ahf) => {
+                if let Some(current) = ahf.current_char {
+                    for (index, chr) in ahf.font.chars().enumerate() {
+                        if chr == current {
+                            return index + 1;
+                        }
+                    }
+                }
+                0
+            }
+        }
     }
 
     pub fn set_image_index(&mut self, index: usize) {
         self.unselect_if_necessary();
-        self.current.image_index = index % self.current.images.len();
+        match self.current.data {
+            Data::AHI(ref mut ahi) => {
+                ahi.image_index = index % ahi.images.len();
+            }
+            Data::AHF(ref mut ahf) => {
+                if index == 0 {
+                    ahf.current_char = None;
+                } else {
+                    let chr = ahf.font.chars().skip(index - 1).next().unwrap();
+                    ahf.current_char = Some(chr);
+                }
+            }
+        }
     }
 
     pub fn image_size(&self) -> (u32, u32) {
@@ -165,11 +212,29 @@ impl EditorState {
     }
 
     pub fn image(&self) -> &Image {
-        &self.current.images[self.current.image_index]
+        match self.current.data {
+            Data::AHI(ref ahi) => &ahi.images[ahi.image_index],
+            Data::AHF(ref ahf) => {
+                match ahf.current_char {
+                    Some(chr) => ahf.font[chr].image(),
+                    None => ahf.font.default_glyph().image(),
+                }
+            }
+        }
     }
 
     pub fn image_at(&self, index: usize) -> &Image {
-        &self.current.images[index]
+        match self.current.data {
+            Data::AHI(ref ahi) => &ahi.images[index],
+            Data::AHF(ref ahf) => {
+                if index == 0 {
+                    ahf.font.default_glyph().image()
+                } else {
+                    let chr = ahf.font.chars().skip(index - 1).next().unwrap();
+                    ahf.font[chr].image()
+                }
+            }
+        }
     }
 
     pub fn selection(&self) -> Option<(&Image, Point)> {
@@ -237,12 +302,18 @@ impl EditorState {
     pub fn save_to_file(&mut self) -> io::Result<()> {
         self.unselect_if_necessary();
         let mut file = try!(File::create(&self.filepath));
-        let images: Vec<Image> = self.current
-                                     .images
-                                     .iter()
-                                     .map(|rc| rc.deref().clone())
-                                     .collect();
-        try!(Image::write_all(&mut file, &images));
+        match self.current.data {
+            Data::AHI(ref ahi) => {
+                let images: Vec<Image> = ahi.images
+                                            .iter()
+                                            .map(|rc| rc.deref().clone())
+                                            .collect();
+                try!(Image::write_all(&mut file, &images));
+            }
+            Data::AHF(ref ahf) => {
+                try!(ahf.font.write(file));
+            }
+        }
         self.current.unsaved = false;
         for snapshot in self.undo_stack.iter_mut() {
             snapshot.unsaved = true;
@@ -251,6 +322,21 @@ impl EditorState {
             snapshot.unsaved = true;
         }
         Ok(())
+    }
+
+    pub fn begin_new_image(&mut self) -> bool {
+        match self.current.data {
+            Data::AHI(_) => self.mutation().add_new_image('_'),
+            Data::AHF(_) => {
+                if self.mode == Mode::Edit {
+                    self.unselect_if_necessary();
+                    self.mode = Mode::NewGlyph(String::new());
+                    true
+                } else {
+                    false
+                }
+            }
+        }
     }
 
     pub fn begin_load_file(&mut self) -> bool {
@@ -301,20 +387,36 @@ impl EditorState {
             Mode::LoadFile(path) => {
                 match util::load_ahi_from_file(&path) {
                     Ok(mut images) => {
-                        self.mode = Mode::Edit;
-                        self.filepath = path;
-                        self.current = Snapshot {
+                        let data = Data::AHI(AhiData {
                             image_index: 0,
                             images: images.drain(..).map(Rc::new).collect(),
-                            selection: None,
-                            unsaved: false,
-                        };
-                        self.undo_stack.clear();
-                        self.redo_stack.clear();
-                        self.persistent_mutation_active = false;
+                        });
+                        self.load_data(path, data);
                         true
                     }
-                    Err(_) => false,
+                    Err(_) => {
+                        match util::load_ahf_from_file(&path) {
+                            Ok(font) => {
+                                let data = Data::AHF(AhfData {
+                                    current_char: None,
+                                    font: font,
+                                });
+                                self.load_data(path, data);
+                                true
+                            }
+                            Err(_) => false,
+                        }
+                    }
+                }
+            }
+            Mode::NewGlyph(text) => {
+                let chars: Vec<char> = text.chars().collect();
+                if chars.len() == 1 &&
+                   self.mutation().add_new_image(chars[0]) {
+                    self.mode = Mode::Edit;
+                    true
+                } else {
+                    false
                 }
             }
             Mode::Resize(text) => {
@@ -349,6 +451,19 @@ impl EditorState {
             }
         }
     }
+
+    fn load_data(&mut self, path: String, data: Data) {
+        self.mode = Mode::Edit;
+        self.filepath = path;
+        self.current = Snapshot {
+            data: data,
+            selection: None,
+            unsaved: false,
+        };
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+        self.persistent_mutation_active = false;
+    }
 }
 
 // ========================================================================= //
@@ -359,51 +474,144 @@ pub struct Mutation<'a> {
 
 impl<'a> Mutation<'a> {
     fn image_rc(&self) -> Rc<Image> {
-        self.state.current.images[self.state.current.image_index].clone()
+        match self.state.current.data {
+            Data::AHI(ref ahi) => ahi.images[ahi.image_index].clone(),
+            Data::AHF(ref ahf) => {
+                Rc::new(match ahf.current_char {
+                    Some(chr) => ahf.font[chr].image().clone(),
+                    None => ahf.font.default_glyph().image().clone(),
+                })
+            }
+        }
     }
 
     pub fn image(&mut self) -> &mut Image {
-        Rc::make_mut(&mut self.state.current.images[self.state
-                                                        .current
-                                                        .image_index])
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                Rc::make_mut(&mut ahi.images[ahi.image_index])
+            }
+            Data::AHF(ref mut ahf) => {
+                match ahf.current_char {
+                    Some(chr) => ahf.font[chr].image_mut(),
+                    None => ahf.font.default_glyph_mut().image_mut(),
+                }
+            }
+        }
     }
 
-    pub fn add_new_image(&mut self) {
+    fn add_new_image(&mut self, chr: char) -> bool {
         self.unselect();
         let (width, height) = self.state.image_size();
-        self.state.current.image_index += 1;
-        let rc = Rc::new(Image::new(width, height));
-        self.state.current.images.insert(self.state.current.image_index, rc);
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                ahi.image_index += 1;
+                let rc = Rc::new(Image::new(width, height));
+                ahi.images.insert(ahi.image_index, rc);
+                true
+            }
+            Data::AHF(ref mut ahf) => {
+                ahf.current_char = Some(chr);
+                if ahf.font.get_char_glyph(chr).is_none() {
+                    let glyph = Glyph::new(Image::new(width, height),
+                                           1 + width as i32);
+                    ahf.font.set_char_glyph(chr, glyph);
+                    true
+                } else {
+                    false
+                }
+            }
+        }
     }
 
     pub fn delete_image(&mut self) -> bool {
-        if self.state.current.images.len() > 1 {
-            self.unselect();
-            let index = self.state.current.image_index;
-            self.state.current.images.remove(index);
-            if index == self.state.num_images() {
-                self.state.current.image_index -= 1;
+        self.unselect();
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                if ahi.images.len() > 1 {
+                    let index = ahi.image_index;
+                    ahi.images.remove(index);
+                    if index == ahi.images.len() {
+                        ahi.image_index -= 1;
+                    }
+                    true
+                } else {
+                    false
+                }
             }
-            true
-        } else {
-            false
+            Data::AHF(ref mut ahf) => {
+                if let Some(chr) = ahf.current_char {
+                    ahf.font.remove_char_glyph(chr);
+                    ahf.current_char = None;
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 
     pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
         self.unselect();
-        self.state.current.images = self.state
-                                        .current
-                                        .images
-                                        .iter()
-                                        .map(|old_image| {
-                                            let mut new_image =
-                                                Image::new(new_width,
-                                                           new_height);
-                                            new_image.draw(&old_image, 0, 0);
-                                            Rc::new(new_image)
-                                        })
-                                        .collect();
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                ahi.images = ahi.images
+                                .iter()
+                                .map(|image| {
+                                    Rc::new(image.crop(new_width, new_height))
+                                })
+                                .collect();
+            }
+            Data::AHF(ref mut ahf) => {
+                if new_height != ahf.font.glyph_height() {
+                    let mut font = Font::with_glyph_height(new_height);
+                    {
+                        let glyph = ahf.font.default_glyph();
+                        let new_glyph = Glyph::new(glyph.image()
+                                                        .crop(glyph.image()
+                                                                   .width(),
+                                                              new_height),
+                                                   glyph.spacing());
+                        font.set_default_glyph(new_glyph);
+                    }
+                    for chr in ahf.font.chars() {
+                        let glyph = &ahf.font[chr];
+                        let new_glyph = Glyph::new(glyph.image()
+                                                        .crop(glyph.image()
+                                                                   .width(),
+                                                              new_height),
+                                                   glyph.spacing());
+                        font.set_char_glyph(chr, new_glyph);
+                    }
+                    ahf.font = font;
+                }
+                match ahf.current_char {
+                    Some(chr) => {
+                        let new_glyph = {
+                            let glyph = &ahf.font[chr];
+                            Glyph::new(glyph.image().crop(new_width,
+                                                          glyph.image()
+                                                               .height()),
+                                       glyph.spacing() +
+                                       (new_width as i32 -
+                                        glyph.image().width() as i32))
+                        };
+                        ahf.font.set_char_glyph(chr, new_glyph);
+                    }
+                    None => {
+                        let new_glyph = {
+                            let glyph = ahf.font.default_glyph();
+                            Glyph::new(glyph.image().crop(new_width,
+                                                          glyph.image()
+                                                               .height()),
+                                       glyph.spacing() +
+                                       (new_width as i32 -
+                                        glyph.image().width() as i32))
+                        };
+                        ahf.font.set_default_glyph(new_glyph);
+                    }
+                }
+            }
+        }
     }
 
     pub fn select(&mut self, rect: &Rect) {

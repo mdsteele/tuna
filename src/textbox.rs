@@ -94,6 +94,10 @@ impl GuiElement<EditorState> for ModalTextBox {
                 self.element.draw(text, canvas);
                 "Load:"
             }
+            Mode::NewGlyph(ref text) => {
+                self.element.draw(text, canvas);
+                "Char:"
+            }
             Mode::Resize(ref text) => {
                 self.element.draw(text, canvas);
                 "Size:"
@@ -129,6 +133,7 @@ impl GuiElement<EditorState> for ModalTextBox {
                 match *state.mode_mut() {
                     Mode::Edit => Action::ignore().and_continue(),
                     Mode::LoadFile(ref mut text) |
+                    Mode::NewGlyph(ref mut text) |
                     Mode::Resize(ref mut text) |
                     Mode::SaveAs(ref mut text) => {
                         self.element.handle_event(event, text)

@@ -201,8 +201,7 @@ fn main() {
                 Action::redraw().and_stop()
             }
             Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
-                state.mutation().add_new_image();
-                Action::redraw().and_stop()
+                Action::redraw_if(state.begin_new_image()).and_stop()
             }
             Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
                 Action::redraw_if(state.begin_load_file()).and_stop()
