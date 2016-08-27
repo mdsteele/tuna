@@ -269,6 +269,13 @@ impl EditorState {
         }
     }
 
+    pub fn font(&self) -> Option<&Font> {
+        match self.current.data {
+            Data::AHI(_) => None,
+            Data::AHF(ref ahf) => Some(&ahf.font),
+        }
+    }
+
     pub fn selection(&self) -> Option<(&Image, Point)> {
         match self.current.selection {
             Some((ref image, position)) => Some((&image, position)),

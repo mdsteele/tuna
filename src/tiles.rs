@@ -17,10 +17,9 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use ahi::Image;
 use sdl2::rect::Rect;
 use super::canvas::Canvas;
-use super::element::{Action, GuiElement, SubrectElement};
+use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
 use super::util;
@@ -28,21 +27,43 @@ use super::util;
 // ========================================================================= //
 
 pub struct TileView {
-    element: SubrectElement<InnerTileView>,
+    rect: Rect,
 }
 
 impl TileView {
     pub fn new(left: i32, top: i32, width: u32, height: u32) -> TileView {
-        TileView {
-            element: SubrectElement::new(InnerTileView::new(),
-                                         Rect::new(left, top, width, height)),
-        }
+        TileView { rect: Rect::new(left, top, width, height) }
     }
 }
 
 impl GuiElement<EditorState> for TileView {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        self.element.draw(state.image(), canvas);
+        let mut canvas = canvas.subcanvas(self.rect);
+        let (width, height) = self.rect.size();
+        if let Some(font) = state.font() {
+            let mut top = 0;
+            let mut left = 0;
+            for chr in TEST_SENTENCE.chars() {
+                let glyph = &font[chr];
+                if left as u32 + glyph.image().width() > width && left > 0 {
+                    top += font.glyph_height() as i32 + 1;
+                    left = 0;
+                }
+                util::render_image(&mut canvas, glyph.image(), left, top, 1);
+                left += glyph.spacing();
+            }
+        } else {
+            let image = state.image();
+            let mut top = 0;
+            while top < height as i32 {
+                let mut left = 0;
+                while left < width as i32 {
+                    util::render_image(&mut canvas, image, left, top, 1);
+                    left += image.width() as i32;
+                }
+                top += image.height() as i32;
+            }
+        }
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
@@ -50,36 +71,8 @@ impl GuiElement<EditorState> for TileView {
     }
 }
 
-// ========================================================================= //
-
-struct InnerTileView {
-}
-
-impl InnerTileView {
-    fn new() -> InnerTileView {
-        InnerTileView {}
-    }
-}
-
-impl GuiElement<Image> for InnerTileView {
-    fn draw(&self, image: &Image, canvas: &mut Canvas) {
-        let rect = canvas.rect();
-        let width = rect.width();
-        let height = rect.height();
-        let mut top = 0;
-        while top < height {
-            let mut left = 0;
-            while left < width {
-                util::render_image(canvas, image, left as i32, top as i32, 1);
-                left += image.width();
-            }
-            top += image.height();
-        }
-    }
-
-    fn handle_event(&mut self, _: &Event, _: &mut Image) -> Action {
-        Action::ignore().and_continue()
-    }
-}
+const TEST_SENTENCE: &'static str = "The quick, brown fox jumped over a \
+                                     ``lazy'' dog.  Also: 213+495=708  \
+                                     @#$%&!?";
 
 // ========================================================================= //
