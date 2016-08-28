@@ -111,6 +111,10 @@ impl GuiElement<EditorState> for ModalTextBox {
                 self.element.draw(text, canvas);
                 "BaSp:"
             }
+            Mode::TestSentence => {
+                self.element.draw(state.test_sentence(), canvas);
+                "Text:"
+            }
         };
         util::render_string(canvas,
                             &self.font,
@@ -140,15 +144,17 @@ impl GuiElement<EditorState> for ModalTextBox {
             }
             _ => {
                 match *state.mode_mut() {
-                    Mode::Edit => Action::ignore().and_continue(),
+                    Mode::Edit => return Action::ignore().and_continue(),
                     Mode::LoadFile(ref mut text) |
                     Mode::NewGlyph(ref mut text) |
                     Mode::Resize(ref mut text) |
                     Mode::SaveAs(ref mut text) |
                     Mode::SetMetrics(ref mut text) => {
-                        self.element.handle_event(event, text)
+                        return self.element.handle_event(event, text)
                     }
+                    Mode::TestSentence => {}
                 }
+                self.element.handle_event(event, state.test_sentence_mut())
             }
         }
     }

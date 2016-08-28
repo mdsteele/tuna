@@ -215,6 +215,9 @@ fn main() {
             Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(state.begin_save_as()).and_stop()
             }
+            Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND | SHIFT => {
+                Action::redraw_if(state.begin_set_test_sentence()).and_stop()
+            }
             Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
                 state.mutation().paste_selection();
                 Action::redraw().and_stop()

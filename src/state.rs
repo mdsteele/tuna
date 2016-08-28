@@ -48,11 +48,10 @@ pub enum Mode {
     Resize(String),
     SaveAs(String),
     SetMetrics(String),
+    TestSentence,
 }
 
 // ========================================================================= //
-
-const MAX_UNDOS: usize = 100;
 
 #[derive(Clone)]
 struct AhiData {
@@ -92,6 +91,7 @@ pub struct EditorState {
     tool: Tool,
     prev_tool: Tool,
     persistent_mutation_active: bool,
+    test_sentence: String,
 }
 
 impl EditorState {
@@ -117,6 +117,7 @@ impl EditorState {
             tool: Tool::Pencil,
             prev_tool: Tool::Pencil,
             persistent_mutation_active: false,
+            test_sentence: DEFAULT_TEST_SENTENCE.to_string(),
         }
     }
 
@@ -154,6 +155,14 @@ impl EditorState {
             self.prev_tool = self.tool;
             self.tool = tool;
         }
+    }
+
+    pub fn test_sentence(&self) -> &String {
+        &self.test_sentence
+    }
+
+    pub fn test_sentence_mut(&mut self) -> &mut String {
+        &mut self.test_sentence
     }
 
     pub fn eyedrop_at(&mut self, position: (u32, u32)) {
@@ -424,6 +433,15 @@ impl EditorState {
         }
     }
 
+    pub fn begin_set_test_sentence(&mut self) -> bool {
+        if self.mode == Mode::Edit && self.font().is_some() {
+            self.mode = Mode::TestSentence;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn mode_cancel(&mut self) -> bool {
         match self.mode {
             Mode::Edit => false,
@@ -516,6 +534,10 @@ impl EditorState {
                     Err(_) => return false,
                 };
                 self.mutation().set_metrics(new_baseline, new_spacing);
+                self.mode = Mode::Edit;
+                true
+            }
+            Mode::TestSentence => {
                 self.mode = Mode::Edit;
                 true
             }
@@ -661,9 +683,7 @@ impl<'a> Mutation<'a> {
                             Glyph::new(glyph.image().crop(new_width,
                                                           glyph.image()
                                                                .height()),
-                                       glyph.spacing() +
-                                       (new_width as i32 -
-                                        glyph.image().width() as i32))
+                                       glyph.spacing())
                         };
                         ahf.font.set_char_glyph(chr, new_glyph);
                     }
@@ -673,9 +693,7 @@ impl<'a> Mutation<'a> {
                             Glyph::new(glyph.image().crop(new_width,
                                                           glyph.image()
                                                                .height()),
-                                       glyph.spacing() +
-                                       (new_width as i32 -
-                                        glyph.image().width() as i32))
+                                       glyph.spacing())
                         };
                         ahf.font.set_default_glyph(new_glyph);
                     }
@@ -790,5 +808,11 @@ impl<'a> Mutation<'a> {
         }
     }
 }
+
+// ========================================================================= //
+
+const DEFAULT_TEST_SENTENCE: &'static str = "The quick, brown fox jumps over a ``lazy'' dog.";
+
+const MAX_UNDOS: usize = 100;
 
 // ========================================================================= //

@@ -43,7 +43,7 @@ impl GuiElement<EditorState> for TileView {
         if let Some(font) = state.font() {
             let mut top = 0;
             let mut left = 0;
-            for chr in TEST_SENTENCE.chars() {
+            for chr in state.test_sentence().chars() {
                 let glyph = &font[chr];
                 if left as u32 + glyph.image().width() > width && left > 0 {
                     top += font.glyph_height() as i32 + 1;
@@ -70,9 +70,5 @@ impl GuiElement<EditorState> for TileView {
         Action::ignore().and_continue()
     }
 }
-
-const TEST_SENTENCE: &'static str = "The quick, brown fox jumped over a \
-                                     ``lazy'' dog.  Also: 213+495=708  \
-                                     @#$%&!?";
 
 // ========================================================================= //
