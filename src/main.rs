@@ -187,6 +187,9 @@ fn main() {
                 state.mutation().copy_selection();
                 Action::ignore().and_stop()
             }
+            Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND => {
+                Action::redraw_if(state.begin_goto()).and_stop()
+            }
             Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
                 state.mutation().flip_selection_horz();
                 Action::redraw().and_stop()

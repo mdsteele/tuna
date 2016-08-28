@@ -43,6 +43,7 @@ pub enum Tool {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Mode {
     Edit,
+    Goto(String),
     LoadFile(String),
     NewGlyph(String),
     Resize(String),
@@ -387,6 +388,16 @@ impl EditorState {
         }
     }
 
+    pub fn begin_goto(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
+            self.mode = Mode::Goto(String::new());
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn begin_load_file(&mut self) -> bool {
         if self.mode == Mode::Edit {
             self.unselect_if_necessary();
@@ -455,6 +466,36 @@ impl EditorState {
     pub fn mode_perform(&mut self) -> bool {
         match self.mode.clone() {
             Mode::Edit => false,
+            Mode::Goto(ref text) => {
+                match self.current.data {
+                    Data::AHI(ref mut ahi) => {
+                        match text.parse::<usize>() {
+                            Ok(index) if index < ahi.images.len() => {
+                                ahi.image_index = index;
+                                self.mode = Mode::Edit;
+                                true
+                            }
+                            _ => false,
+                        }
+                    }
+                    Data::AHF(ref mut ahf) => {
+                        if text == "def" {
+                            ahf.current_char = None;
+                            self.mode = Mode::Edit;
+                            true
+                        } else {
+                            let chars: Vec<char> = text.chars().collect();
+                            if chars.len() == 1 {
+                                ahf.current_char = Some(chars[0]);
+                                self.mode = Mode::Edit;
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                    }
+                }
+            }
             Mode::LoadFile(path) => {
                 match util::load_ahi_from_file(&path) {
                     Ok(mut images) => {
@@ -811,7 +852,8 @@ impl<'a> Mutation<'a> {
 
 // ========================================================================= //
 
-const DEFAULT_TEST_SENTENCE: &'static str = "The quick, brown fox jumps over a ``lazy'' dog.";
+const DEFAULT_TEST_SENTENCE: &'static str = "The quick, brown fox jumps over \
+                                             a ``lazy'' dog.";
 
 const MAX_UNDOS: usize = 100;
 

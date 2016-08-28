@@ -91,6 +91,10 @@ impl GuiElement<EditorState> for ModalTextBox {
                 self.element.draw(state.filepath(), canvas);
                 "Path:"
             }
+            Mode::Goto(ref text) => {
+                self.element.draw(text, canvas);
+                "Goto:"
+            }
             Mode::LoadFile(ref text) => {
                 self.element.draw(text, canvas);
                 "Load:"
@@ -145,6 +149,7 @@ impl GuiElement<EditorState> for ModalTextBox {
             _ => {
                 match *state.mode_mut() {
                     Mode::Edit => return Action::ignore().and_continue(),
+                    Mode::Goto(ref mut text) |
                     Mode::LoadFile(ref mut text) |
                     Mode::NewGlyph(ref mut text) |
                     Mode::Resize(ref mut text) |
