@@ -41,16 +41,17 @@ impl GuiElement<EditorState> for TileView {
         let mut canvas = canvas.subcanvas(self.rect);
         let (width, height) = self.rect.size();
         if let Some(font) = state.font() {
-            let mut top = 0;
-            let mut left = 0;
+            let mut top: i32 = 0;
+            let mut left: i32 = 0;
             for chr in state.test_sentence().chars() {
                 let glyph = &font[chr];
+                left -= glyph.left_edge();
                 if left as u32 + glyph.image().width() > width && left > 0 {
                     top += font.glyph_height() as i32 + 1;
-                    left = 0;
+                    left = -glyph.left_edge();
                 }
                 util::render_image(&mut canvas, glyph.image(), left, top, 1);
-                left += glyph.spacing();
+                left += glyph.right_edge();
             }
         } else {
             let image = state.image();

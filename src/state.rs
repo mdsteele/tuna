@@ -235,7 +235,7 @@ impl EditorState {
         }
     }
 
-    pub fn image_metrics(&self) -> Option<(i32, i32)> {
+    pub fn image_metrics(&self) -> Option<(i32, i32, i32)> {
         match self.current.data {
             Data::AHI(_) => None,
             Data::AHF(ref ahf) => {
@@ -243,7 +243,9 @@ impl EditorState {
                     Some(chr) => &ahf.font[chr],
                     None => ahf.font.default_glyph(),
                 };
-                Some((ahf.font.baseline(), glyph.spacing()))
+                Some((ahf.font.baseline(),
+                      glyph.left_edge(),
+                      glyph.right_edge()))
             }
         }
     }
@@ -432,9 +434,9 @@ impl EditorState {
 
     pub fn begin_set_metrics(&mut self) -> bool {
         if self.mode == Mode::Edit {
-            if let Some((bl, sp)) = self.image_metrics() {
+            if let Some((bl, le, re)) = self.image_metrics() {
                 self.unselect_if_necessary();
-                self.mode = Mode::SetMetrics(format!("{}/{}", bl, sp));
+                self.mode = Mode::SetMetrics(format!("{}/{}/{}", bl, le, re));
                 true
             } else {
                 false
@@ -563,18 +565,23 @@ impl EditorState {
             }
             Mode::SetMetrics(text) => {
                 let pieces: Vec<&str> = text.split('/').collect();
-                if pieces.len() != 2 {
+                if pieces.len() != 3 {
                     return false;
                 }
                 let new_baseline = match pieces[0].parse::<i32>() {
                     Ok(baseline) => baseline,
                     Err(_) => return false,
                 };
-                let new_spacing = match pieces[1].parse::<i32>() {
-                    Ok(spacing) => spacing,
+                let new_left_edge = match pieces[1].parse::<i32>() {
+                    Ok(left_edge) => left_edge,
                     Err(_) => return false,
                 };
-                self.mutation().set_metrics(new_baseline, new_spacing);
+                let new_right_edge = match pieces[2].parse::<i32>() {
+                    Ok(right_edge) => right_edge,
+                    Err(_) => return false,
+                };
+                self.mutation()
+                    .set_metrics(new_baseline, new_left_edge, new_right_edge);
                 self.mode = Mode::Edit;
                 true
             }
@@ -646,6 +653,7 @@ impl<'a> Mutation<'a> {
                 ahf.current_char = Some(chr);
                 if ahf.font.get_char_glyph(chr).is_none() {
                     let glyph = Glyph::new(Image::new(width, height),
+                                           0,
                                            1 + width as i32);
                     ahf.font.set_char_glyph(chr, glyph);
                     true
@@ -703,7 +711,8 @@ impl<'a> Mutation<'a> {
                                                         .crop(glyph.image()
                                                                    .width(),
                                                               new_height),
-                                                   glyph.spacing());
+                                                   glyph.left_edge(),
+                                                   glyph.right_edge());
                         font.set_default_glyph(new_glyph);
                     }
                     for chr in ahf.font.chars() {
@@ -712,7 +721,8 @@ impl<'a> Mutation<'a> {
                                                         .crop(glyph.image()
                                                                    .width(),
                                                               new_height),
-                                                   glyph.spacing());
+                                                   glyph.left_edge(),
+                                                   glyph.right_edge());
                         font.set_char_glyph(chr, new_glyph);
                     }
                     ahf.font = font;
@@ -724,7 +734,8 @@ impl<'a> Mutation<'a> {
                             Glyph::new(glyph.image().crop(new_width,
                                                           glyph.image()
                                                                .height()),
-                                       glyph.spacing())
+                                       glyph.left_edge(),
+                                       glyph.right_edge())
                         };
                         ahf.font.set_char_glyph(chr, new_glyph);
                     }
@@ -734,7 +745,8 @@ impl<'a> Mutation<'a> {
                             Glyph::new(glyph.image().crop(new_width,
                                                           glyph.image()
                                                                .height()),
-                                       glyph.spacing())
+                                       glyph.left_edge(),
+                                       glyph.right_edge())
                         };
                         ahf.font.set_default_glyph(new_glyph);
                     }
@@ -743,13 +755,18 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    fn set_metrics(&mut self, new_baseline: i32, new_spacing: i32) {
+    fn set_metrics(&mut self,
+                   new_baseline: i32,
+                   new_left_edge: i32,
+                   new_right_edge: i32) {
         if let Data::AHF(ref mut ahf) = self.state.current.data {
             ahf.font.set_baseline(new_baseline);
-            match ahf.current_char {
-                Some(chr) => ahf.font[chr].set_spacing(new_spacing),
-                None => ahf.font.default_glyph_mut().set_spacing(new_spacing),
-            }
+            let glyph = match ahf.current_char {
+                Some(chr) => &mut ahf.font[chr],
+                None => ahf.font.default_glyph_mut(),
+            };
+            glyph.set_left_edge(new_left_edge);
+            glyph.set_right_edge(new_right_edge);
         }
     }
 

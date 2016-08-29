@@ -9,7 +9,7 @@ dependencies = [
 [[package]]
 name = "ahi"
 version = "0.1.0"
-source = "git+https://github.com/mdsteele/ahi#8feb137182636d75ee1959cf9bc7076642d6c1d2"
+source = "git+https://github.com/mdsteele/ahi#8dfd2b39ba35d77a3260d95d53369c149e875ecf"
 
 [[package]]
 name = "bitflags"

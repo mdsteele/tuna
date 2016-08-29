@@ -267,16 +267,24 @@ impl GuiElement<EditorState> for ImageCanvas {
                            canvas_rect.x(),
                            canvas_rect.y(),
                            scale);
-        if let Some((baseline, spacing)) = state.image_metrics() {
+        if let Some((baseline, left_edge, right_edge)) =
+               state.image_metrics() {
             canvas.draw_rect((0, 127, 255, 255),
                              Rect::new(canvas_rect.x(),
                                        canvas_rect.y() +
                                        baseline * scale as i32,
                                        canvas_rect.width(),
                                        1));
+            canvas.draw_rect((127, 255, 0, 255),
+                             Rect::new(canvas_rect.x() +
+                                       left_edge * scale as i32 -
+                                       1,
+                                       canvas_rect.y(),
+                                       1,
+                                       canvas_rect.height()));
             canvas.draw_rect((255, 0, 127, 255),
                              Rect::new(canvas_rect.x() +
-                                       spacing * scale as i32,
+                                       right_edge * scale as i32,
                                        canvas_rect.y(),
                                        1,
                                        canvas_rect.height()));
