@@ -17,43 +17,33 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use ahi::Image;
+use ahi;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
 use sdl2::render::{Renderer, Texture};
 use sdl2::surface::Surface;
+use std::collections::BTreeMap;
 
 // ========================================================================= //
 
-pub struct Canvas<'a> {
-    clip_rect: Option<Rect>,
-    prev_clip_rect: Option<Rect>,
+pub struct Window<'a> {
     renderer: &'a mut Renderer<'static>,
 }
 
-impl<'a> Canvas<'a> {
-    pub fn from_renderer(renderer: &'a mut Renderer<'static>) -> Canvas<'a> {
-        Canvas {
-            clip_rect: None,
-            prev_clip_rect: None,
-            renderer: renderer,
-        }
+impl<'a> Window<'a> {
+    pub fn from_renderer(renderer: &'a mut Renderer<'static>) -> Window<'a> {
+        Window { renderer: renderer }
     }
 
-    pub fn size(&self) -> (u32, u32) {
-        if let Some(rect) = self.clip_rect {
-            (rect.width(), rect.height())
-        } else {
-            self.renderer.logical_size()
-        }
+    pub fn present(&mut self) {
+        self.renderer.present();
     }
 
-    pub fn rect(&self) -> Rect {
-        let (width, height) = self.size();
-        Rect::new(0, 0, width, height)
+    pub fn canvas(&mut self) -> Canvas {
+        Canvas::from_renderer(self.renderer)
     }
 
-    pub fn new_sprite(&self, image: &Image) -> Sprite {
+    pub fn new_sprite(&self, image: &ahi::Image) -> Sprite {
         let width = image.width();
         let height = image.height();
         let mut data = image.rgba_data();
@@ -75,6 +65,57 @@ impl<'a> Canvas<'a> {
                          .create_texture_from_surface(&surface)
                          .unwrap(),
         }
+    }
+
+    pub fn new_font(&self, font: &ahi::Font) -> Font {
+        let mut glyphs = BTreeMap::new();
+        for chr in font.chars() {
+            glyphs.insert(chr, self.new_glyph(&font[chr]));
+        }
+        Font {
+            glyphs: glyphs,
+            default_glyph: self.new_glyph(font.default_glyph()),
+            baseline: font.baseline(),
+        }
+    }
+
+    fn new_glyph(&self, glyph: &ahi::Glyph) -> Glyph {
+        Glyph {
+            sprite: self.new_sprite(glyph.image()),
+            left_edge: glyph.left_edge(),
+            right_edge: glyph.right_edge(),
+        }
+    }
+}
+
+// ========================================================================= //
+
+pub struct Canvas<'a> {
+    clip_rect: Option<Rect>,
+    prev_clip_rect: Option<Rect>,
+    renderer: &'a mut Renderer<'static>,
+}
+
+impl<'a> Canvas<'a> {
+    fn from_renderer(renderer: &'a mut Renderer<'static>) -> Canvas<'a> {
+        Canvas {
+            clip_rect: None,
+            prev_clip_rect: None,
+            renderer: renderer,
+        }
+    }
+
+    pub fn size(&self) -> (u32, u32) {
+        if let Some(rect) = self.clip_rect {
+            (rect.width(), rect.height())
+        } else {
+            self.renderer.logical_size()
+        }
+    }
+
+    pub fn rect(&self) -> Rect {
+        let (width, height) = self.size();
+        Rect::new(0, 0, width, height)
     }
 
     pub fn draw_sprite(&mut self, sprite: &Sprite, topleft: Point) {
@@ -100,10 +141,6 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    pub fn present(&mut self) {
-        self.renderer.present();
-    }
-
     pub fn draw_pixel(&mut self, color: (u8, u8, u8, u8), point: Point) {
         self.fill_rect(color, Rect::new(point.x(), point.y(), 1, 1));
     }
@@ -120,6 +157,17 @@ impl<'a> Canvas<'a> {
         self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
         let subrect = self.subrect(rect);
         self.renderer.fill_rect(subrect).unwrap();
+    }
+
+    pub fn draw_text(&mut self, font: &Font, start: Point, text: &str) {
+        let top = start.y() - font.baseline;
+        let mut left = start.x();
+        for chr in text.chars() {
+            let glyph = font.glyph(chr);
+            left -= glyph.left_edge;
+            self.draw_sprite(&glyph.sprite, Point::new(left, top));
+            left += glyph.right_edge;
+        }
     }
 
     pub fn subcanvas(&mut self, rect: Rect) -> Canvas {
@@ -168,6 +216,39 @@ impl Sprite {
 
     pub fn height(&self) -> u32 {
         self.height
+    }
+}
+
+// ========================================================================= //
+
+struct Glyph {
+    sprite: Sprite,
+    left_edge: i32,
+    right_edge: i32,
+}
+
+pub struct Font {
+    glyphs: BTreeMap<char, Glyph>,
+    default_glyph: Glyph,
+    baseline: i32,
+}
+
+impl Font {
+    pub fn baseline(&self) -> i32 {
+        self.baseline
+    }
+
+    pub fn text_width(&self, text: &str) -> i32 {
+        let mut width = 0;
+        for chr in text.chars() {
+            let glyph = self.glyph(chr);
+            width += glyph.right_edge - glyph.left_edge;
+        }
+        width
+    }
+
+    fn glyph(&self, chr: char) -> &Glyph {
+        self.glyphs.get(&chr).unwrap_or(&self.default_glyph)
     }
 }
 

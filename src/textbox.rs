@@ -20,7 +20,7 @@
 use sdl2::rect::Rect;
 use std::cmp;
 use std::rc::Rc;
-use super::canvas::{Canvas, Sprite};
+use super::canvas::{Canvas, Font};
 use super::element::{Action, GuiElement, SubrectElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode};
@@ -29,11 +29,11 @@ use super::util;
 // ========================================================================= //
 
 pub struct TextBox {
-    font: Rc<Vec<Sprite>>,
+    font: Rc<Font>,
 }
 
 impl TextBox {
-    pub fn new(font: Rc<Vec<Sprite>>) -> TextBox {
+    pub fn new(font: Rc<Font>) -> TextBox {
         TextBox { font: font }
     }
 }
@@ -42,9 +42,10 @@ impl GuiElement<String> for TextBox {
     fn draw(&self, text: &String, canvas: &mut Canvas) {
         let rect = canvas.rect();
         let rect_width = rect.width() as i32;
-        let text_width = util::CHAR_PIXEL_WIDTH * text.len() as i32;
-        let text_left = cmp::min(2, rect_width - 3 - text_width);
-        util::render_string(canvas, &self.font, text_left, 2, text);
+        let text_width = self.font.text_width(text);
+        let text_left = cmp::min(4, rect_width - 4 - text_width);
+        canvas.fill_rect((128, 128, 128, 255), rect);
+        util::render_string(canvas, &self.font, text_left, 4, text);
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
@@ -65,21 +66,27 @@ impl GuiElement<String> for TextBox {
 
 // ========================================================================= //
 
+const LABEL_WIDTH: i32 = 50;
+
 pub struct ModalTextBox {
     left: i32,
     top: i32,
-    font: Rc<Vec<Sprite>>,
+    font: Rc<Font>,
     element: SubrectElement<TextBox>,
 }
 
 impl ModalTextBox {
-    pub fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> ModalTextBox {
+    pub fn new(left: i32, top: i32, font: Rc<Font>) -> ModalTextBox {
         ModalTextBox {
             left: left,
             top: top,
             font: font.clone(),
-            element: SubrectElement::new(TextBox::new(font),
-                                         Rect::new(left + 70, top, 404, 20)),
+            element:
+                SubrectElement::new(TextBox::new(font),
+                                    Rect::new(left + LABEL_WIDTH,
+                                              top,
+                                              (700 - LABEL_WIDTH) as u32,
+                                              18)),
         }
     }
 }
@@ -113,17 +120,18 @@ impl GuiElement<EditorState> for ModalTextBox {
             }
             Mode::SetMetrics(ref text) => {
                 self.element.draw(text, canvas);
-                "BaSp:"
+                "Metrics:"
             }
             Mode::TestSentence => {
                 self.element.draw(state.test_sentence(), canvas);
                 "Text:"
             }
         };
+        let text_width = self.font.text_width(label);
         util::render_string(canvas,
                             &self.font,
-                            self.left,
-                            self.top + 2,
+                            self.left + LABEL_WIDTH - text_width - 2,
+                            self.top + 4,
                             label);
     }
 

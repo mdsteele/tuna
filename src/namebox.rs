@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 use std::rc::Rc;
-use super::canvas::{Canvas, Sprite};
+use super::canvas::{Canvas, Font};
 use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
@@ -29,11 +29,11 @@ use super::util;
 pub struct ImageNameBox {
     left: i32,
     top: i32,
-    font: Rc<Vec<Sprite>>,
+    font: Rc<Font>,
 }
 
 impl ImageNameBox {
-    pub fn new(left: i32, top: i32, font: Rc<Vec<Sprite>>) -> ImageNameBox {
+    pub fn new(left: i32, top: i32, font: Rc<Font>) -> ImageNameBox {
         ImageNameBox {
             left: left,
             top: top,

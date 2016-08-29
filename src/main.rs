@@ -38,7 +38,7 @@ mod unsaved;
 mod util;
 
 use sdl2::rect::Rect;
-use self::canvas::{Canvas, Sprite};
+use self::canvas::{Font, Sprite, Window};
 use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use self::event::{COMMAND, Event, Keycode, SHIFT};
 use self::namebox::ImageNameBox;
@@ -56,19 +56,32 @@ use std::rc::Rc;
 
 const FRAME_DELAY_MILLIS: u32 = 100;
 
-fn render_screen<E: GuiElement<EditorState>>(canvas: &mut Canvas,
+fn render_screen<E: GuiElement<EditorState>>(window: &mut Window,
                                              state: &EditorState,
                                              gui: &E) {
-    canvas.clear((64, 64, 64, 255));
-    let rect = canvas.rect();
-    canvas.draw_rect((127, 127, 127, 127), rect);
-    gui.draw(state, canvas);
-    canvas.present();
+    {
+        let mut canvas = window.canvas();
+        canvas.clear((64, 64, 64, 255));
+        let rect = canvas.rect();
+        canvas.draw_rect((127, 127, 127, 127), rect);
+        gui.draw(state, &mut canvas);
+    }
+    window.present();
 }
 
-fn load_sprites(canvas: &Canvas, path: &str) -> Vec<Sprite> {
+fn load_font(window: &Window, path: &str) -> Font {
+    let ahf = util::load_ahf_from_file(&path.to_string()).unwrap();
+    window.new_font(&ahf)
+}
+
+fn load_sprite(window: &Window, path: &str) -> Sprite {
     let images = util::load_ahi_from_file(&path.to_string()).unwrap();
-    images.iter().map(|image| canvas.new_sprite(image)).collect()
+    window.new_sprite(&images[0])
+}
+
+fn load_sprites(window: &Window, path: &str) -> Vec<Sprite> {
+    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
+    images.iter().map(|image| window.new_sprite(image)).collect()
 }
 
 fn window_size(ideal_width: u32,
@@ -97,6 +110,8 @@ fn window_size(ideal_width: u32,
     }
 }
 
+// ========================================================================= //
+
 fn main() {
     let mut state = {
         let args: Vec<String> = std::env::args().collect();
@@ -116,30 +131,25 @@ fn main() {
 
     let ideal_width = 480;
     let ideal_height = 320;
-    let window = video_subsystem.window("AHI Editor",
-                                        ideal_width,
-                                        ideal_height)
-                                .position_centered()
-                                .fullscreen_desktop()
-                                .build()
-                                .unwrap();
-    let (native_width, native_height) = window.size();
+    let sdl_window = video_subsystem.window("AHI Editor",
+                                            ideal_width,
+                                            ideal_height)
+                                    .position_centered()
+                                    .fullscreen_desktop()
+                                    .build()
+                                    .unwrap();
+    let (native_width, native_height) = sdl_window.size();
     let aspect_ratio: f64 = (native_width as f64) / (native_height as f64);
     let ((actual_width, actual_height), gui_subrect) =
         window_size(ideal_width, ideal_height, aspect_ratio);
-    let mut renderer = window.renderer().build().unwrap();
+    let mut renderer = sdl_window.renderer().build().unwrap();
     renderer.set_logical_size(actual_width, actual_height).unwrap();
-    let mut canvas = Canvas::from_renderer(&mut renderer);
+    let mut window = Window::from_renderer(&mut renderer);
 
-    let tool_icons: Vec<Sprite> = load_sprites(&canvas, "data/tool_icons.ahi");
-    let arrows: Vec<Sprite> = load_sprites(&canvas, "data/arrows.ahi");
-    let unsaved_sprite = {
-        let images = util::load_ahi_from_file(&"data/unsaved.ahi".to_string())
-                         .unwrap();
-        canvas.new_sprite(&images[0])
-    };
-    let font: Rc<Vec<Sprite>> = Rc::new(load_sprites(&canvas,
-                                                     "data/font.ahi"));
+    let tool_icons: Vec<Sprite> = load_sprites(&window, "data/tool_icons.ahi");
+    let arrows: Vec<Sprite> = load_sprites(&window, "data/arrows.ahi");
+    let unsaved_icon = load_sprite(&window, "data/unsaved.ahi");
+    let font: Rc<Font> = Rc::new(load_font(&window, "data/medfont.ahf"));
 
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
         Box::new(ModalTextBox::new(2, 296, font.clone())),
@@ -150,12 +160,12 @@ fn main() {
         Box::new(ImageCanvas::new(326, 16, 64)),
         Box::new(TileView::new(326, 96, 96, 96)),
         Box::new(ImageNameBox::new(326, 230, font.clone())),
-        Box::new(UnsavedIndicator::new(326, 256, unsaved_sprite)),
+        Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
     ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),
                                       gui_subrect);
 
-    render_screen(&mut canvas, &state, &gui);
+    render_screen(&mut window, &state, &gui);
 
     Event::register_clock_ticks(&event_subsystem);
     let _timer =
@@ -242,7 +252,7 @@ fn main() {
             event => gui.handle_event(&event, &mut state),
         };
         if action.should_redraw() {
-            render_screen(&mut canvas, &state, &gui);
+            render_screen(&mut window, &state, &gui);
         }
     }
 }

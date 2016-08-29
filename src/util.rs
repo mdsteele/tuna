@@ -17,11 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use ahi::{Color, Font, Image};
+use ahi;
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
-use super::canvas::{Canvas, Sprite};
+use super::canvas::{Canvas, Font};
 
 // ========================================================================= //
 
@@ -41,25 +41,25 @@ pub fn modulo(a: i32, b: i32) -> i32 {
 
 // ========================================================================= //
 
-pub fn load_ahf_from_file(path: &String) -> io::Result<Font> {
+pub fn load_ahf_from_file(path: &String) -> io::Result<ahi::Font> {
     let mut file = try!(File::open(path));
-    Font::read(&mut file)
+    ahi::Font::read(&mut file)
 }
 
-pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<Image>> {
+pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<ahi::Image>> {
     let mut file = try!(File::open(path));
-    Image::read_all(&mut file)
+    ahi::Image::read_all(&mut file)
 }
 
 pub fn render_image(canvas: &mut Canvas,
-                    image: &Image,
+                    image: &ahi::Image,
                     left: i32,
                     top: i32,
                     scale: u32) {
     for row in 0..image.height() {
         for col in 0..image.width() {
             let pixel = image[(col, row)];
-            if pixel != Color::Transparent {
+            if pixel != ahi::Color::Transparent {
                 canvas.fill_rect(pixel.rgba(),
                                  Rect::new(left + (scale * col) as i32,
                                            top + (scale * row) as i32,
@@ -72,29 +72,12 @@ pub fn render_image(canvas: &mut Canvas,
 
 // ========================================================================= //
 
-pub const CHAR_PIXEL_WIDTH: i32 = 14;
-
 pub fn render_string(canvas: &mut Canvas,
-                     font: &Vec<Sprite>,
+                     font: &Font,
                      left: i32,
                      top: i32,
                      string: &str) {
-    let mut x = left;
-    let mut y = top;
-    for ch in string.chars() {
-        if ch == '\n' {
-            x = left;
-            y += 24;
-        } else {
-            if ch >= '!' {
-                let index = ch as usize - '!' as usize;
-                if index < font.len() {
-                    canvas.draw_sprite(&font[index], Point::new(x, y));
-                }
-            }
-            x += CHAR_PIXEL_WIDTH;
-        }
-    }
+    canvas.draw_text(font, Point::new(left, top + font.baseline()), string);
 }
 
 // ========================================================================= //
