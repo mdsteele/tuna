@@ -119,7 +119,7 @@ fn main() {
             let filepath = &args[1];
             (filepath.clone(), util::load_ahi_from_file(filepath).unwrap())
         } else {
-            ("out.ahi".to_string(), vec![])
+            ("./out.ahi".to_string(), vec![])
         };
         EditorState::new(filepath, images)
     };

@@ -19,6 +19,9 @@
 
 use sdl2::rect::Rect;
 use std::cmp;
+use std::ffi::OsStr;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use super::canvas::{Canvas, Font};
 use super::element::{Action, GuiElement, SubrectElement};
@@ -54,6 +57,20 @@ impl GuiElement<String> for TextBox {
             &Event::KeyDown(Keycode::Backspace, _) => {
                 Action::redraw_if(text.pop().is_some()).and_stop()
             }
+            &Event::KeyDown(Keycode::Tab, _) => {
+                match tab_complete_path(Path::new(&text)) {
+                    Ok(path) => {
+                        match path.into_os_string().into_string() {
+                            Ok(string) => {
+                                *text = string;
+                                Action::redraw().and_stop()
+                            }
+                            Err(_) => Action::ignore().and_stop(),
+                        }
+                    }
+                    Err(_) => Action::ignore().and_stop(),
+                }
+            }
             &Event::KeyDown(_, _) => Action::ignore().and_stop(),
             &Event::TextInput(ref input) => {
                 text.push_str(input);
@@ -61,6 +78,34 @@ impl GuiElement<String> for TextBox {
             }
             _ => Action::ignore().and_continue(),
         }
+    }
+}
+
+fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
+    let dir = if path.is_dir() {
+        path
+    } else {
+        try!(path.parent().ok_or(io::Error::new(io::ErrorKind::Other, "")))
+    };
+    let prefix = path.file_name()
+                     .map(OsStr::to_str)
+                     .unwrap_or(None)
+                     .unwrap_or("");
+    let mut paths = Vec::new();
+    for entry_result in try!(dir.read_dir()) {
+        let entry = try!(entry_result);
+        if entry.file_name().to_str().unwrap_or("").starts_with(prefix) {
+            paths.push(entry.path());
+        }
+    }
+    if paths.is_empty() {
+        Err(io::Error::new(io::ErrorKind::Other, ""))
+    } else {
+        let mut completed = paths.pop().unwrap();
+        if completed.is_dir() {
+            completed.push("");
+        }
+        Ok(completed)
     }
 }
 
