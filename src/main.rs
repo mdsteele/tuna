@@ -153,8 +153,8 @@ fn main() {
 
     let elements: Vec<Box<GuiElement<EditorState>>> = vec![
         Box::new(ModalTextBox::new(2, 296, font.clone())),
-        Box::new(ColorPalette::new(10, 128)),
-        Box::new(Toolbox::new(4, 16, tool_icons)),
+        Box::new(ColorPalette::new(10, 136)),
+        Box::new(Toolbox::new(4, 10, tool_icons)),
         Box::new(ImagesScrollbar::new(436, 11, arrows)),
         Box::new(ImageCanvas::new(60, 16, 256)),
         Box::new(ImageCanvas::new(326, 16, 64)),

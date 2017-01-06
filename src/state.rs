@@ -35,6 +35,7 @@ pub enum Tool {
     Line,
     Oval,
     PaintBucket,
+    PaletteSwap,
     Pencil,
     Rectangle,
     Select,
