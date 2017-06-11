@@ -128,7 +128,7 @@ impl<'a> Canvas<'a> {
                            Some(Rect::new(x + topleft.x(),
                                           y + topleft.y(),
                                           sprite.width(),
-                                          sprite.height())));
+                                          sprite.height()))).unwrap();
     }
 
     pub fn clear(&mut self, color: (u8, u8, u8, u8)) {
