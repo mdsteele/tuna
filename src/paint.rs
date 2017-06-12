@@ -256,7 +256,8 @@ impl ImageCanvas {
         }
     }
 
-    fn try_palette_swap(&self, mouse: Point, state: &mut EditorState) -> bool {
+    fn try_palette_replace(&self, mouse: Point, state: &mut EditorState,
+                           swap: bool) -> bool {
         if let Some(start) = self.mouse_to_row_col(mouse, state) {
             let to_color = state.color();
             let from_color = state.image()[start];
@@ -271,10 +272,10 @@ impl ImageCanvas {
             for y in 0..height {
                 for x in 0..width {
                     let color = image[(x, y)];
-                    if color == to_color {
-                        image[(x, y)] = from_color;
-                    } else if color == from_color {
+                    if color == from_color {
                         image[(x, y)] = to_color;
+                    } else if swap && color == to_color {
+                        image[(x, y)] = from_color;
                     }
                 }
             }
@@ -406,8 +407,14 @@ impl GuiElement<EditorState> for ImageCanvas {
                             let changed = self.try_flood_fill(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
+                        Tool::PaletteReplace => {
+                            let changed =
+                                self.try_palette_replace(pt, state, false);
+                            return Action::redraw_if(changed).and_stop();
+                        }
                         Tool::PaletteSwap => {
-                            let changed = self.try_palette_swap(pt, state);
+                            let changed =
+                                self.try_palette_replace(pt, state, true);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Pencil => {
