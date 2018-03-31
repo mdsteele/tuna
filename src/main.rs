@@ -37,7 +37,6 @@ mod toolbox;
 mod unsaved;
 mod util;
 
-use sdl2::rect::Rect;
 use self::canvas::{Font, Sprite, Window};
 use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use self::event::{COMMAND, Event, Keycode, SHIFT};
@@ -50,6 +49,7 @@ use self::textbox::ModalTextBox;
 use self::tiles::TileView;
 use self::toolbox::Toolbox;
 use self::unsaved::UnsavedIndicator;
+use sdl2::rect::Rect;
 use std::rc::Rc;
 
 // ========================================================================= //
@@ -57,8 +57,7 @@ use std::rc::Rc;
 const FRAME_DELAY_MILLIS: u32 = 100;
 
 fn render_screen<E: GuiElement<EditorState>>(window: &mut Window,
-                                             state: &EditorState,
-                                             gui: &E) {
+                                             state: &EditorState, gui: &E) {
     {
         let mut canvas = window.canvas();
         canvas.clear((64, 64, 64, 255));
@@ -84,24 +83,20 @@ fn load_sprites(window: &Window, path: &str) -> Vec<Sprite> {
     images.iter().map(|image| window.new_sprite(image)).collect()
 }
 
-fn window_size(ideal_width: u32,
-               ideal_height: u32,
-               aspect_ratio: f64)
+fn window_size(ideal_width: u32, ideal_height: u32, aspect_ratio: f64)
                -> ((u32, u32), Rect) {
     let ideal_ratio = (ideal_width as f64) / (ideal_height as f64);
     if aspect_ratio > ideal_ratio {
-        let actual_width = (aspect_ratio *
-                            (ideal_height as f64))
-                               .round() as u32;
+        let actual_width = (aspect_ratio * (ideal_height as f64)).round() as
+            u32;
         ((actual_width, ideal_height),
          Rect::new(((actual_width - ideal_width) / 2) as i32,
                    0,
                    ideal_width,
                    ideal_height))
     } else {
-        let actual_height = ((ideal_width as f64) /
-                             aspect_ratio)
-                                .round() as u32;
+        let actual_height = ((ideal_width as f64) / aspect_ratio).round() as
+            u32;
         ((ideal_width, actual_height),
          Rect::new(0,
                    ((actual_height - ideal_height) / 2) as i32,
@@ -131,18 +126,17 @@ fn main() {
 
     let ideal_width = 480;
     let ideal_height = 320;
-    let sdl_window = video_subsystem.window("AHI Editor",
-                                            ideal_width,
-                                            ideal_height)
-                                    .position_centered()
-                                    .fullscreen_desktop()
-                                    .build()
-                                    .unwrap();
+    let sdl_window = video_subsystem
+        .window("AHI Editor", ideal_width, ideal_height)
+        .position_centered()
+        .fullscreen_desktop()
+        .build()
+        .unwrap();
     let (native_width, native_height) = sdl_window.size();
     let aspect_ratio: f64 = (native_width as f64) / (native_height as f64);
     let ((actual_width, actual_height), gui_subrect) =
         window_size(ideal_width, ideal_height, aspect_ratio);
-    let mut renderer = sdl_window.renderer().build().unwrap();
+    let mut renderer = sdl_window.into_canvas().build().unwrap();
     renderer.set_logical_size(actual_width, actual_height).unwrap();
     let mut window = Window::from_renderer(&mut renderer);
 
@@ -151,29 +145,31 @@ fn main() {
     let unsaved_icon = load_sprite(&window, "data/unsaved.ahi");
     let font: Rc<Font> = Rc::new(load_font(&window, "data/medfont.ahf"));
 
-    let elements: Vec<Box<GuiElement<EditorState>>> = vec![
-        Box::new(ModalTextBox::new(2, 296, font.clone())),
-        Box::new(ColorPalette::new(10, 136)),
-        Box::new(Toolbox::new(4, 10, tool_icons)),
-        Box::new(ImagesScrollbar::new(436, 11, arrows)),
-        Box::new(ImageCanvas::new(60, 16, 256)),
-        Box::new(ImageCanvas::new(326, 16, 64)),
-        Box::new(TileView::new(326, 96, 96, 96)),
-        Box::new(ImageNameBox::new(326, 230, font.clone())),
-        Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
-    ];
+    let elements: Vec<Box<GuiElement<EditorState>>> =
+        vec![
+            Box::new(ModalTextBox::new(2, 296, font.clone())),
+            Box::new(ColorPalette::new(10, 136)),
+            Box::new(Toolbox::new(4, 10, tool_icons)),
+            Box::new(ImagesScrollbar::new(436, 11, arrows)),
+            Box::new(ImageCanvas::new(60, 16, 256)),
+            Box::new(ImageCanvas::new(326, 16, 64)),
+            Box::new(TileView::new(326, 96, 96, 96)),
+            Box::new(ImageNameBox::new(326, 230, font.clone())),
+            Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
+        ];
     let mut gui = SubrectElement::new(AggregateElement::new(elements),
                                       gui_subrect);
 
     render_screen(&mut window, &state, &gui);
 
     Event::register_clock_ticks(&event_subsystem);
-    let _timer =
-        timer_subsystem.add_timer(FRAME_DELAY_MILLIS,
-                                  Box::new(|| {
-                                      Event::push_clock_tick(&event_subsystem);
-                                      FRAME_DELAY_MILLIS
-                                  }));
+    let _timer = timer_subsystem.add_timer(
+        FRAME_DELAY_MILLIS,
+        Box::new(|| {
+            Event::push_clock_tick(&event_subsystem);
+            FRAME_DELAY_MILLIS
+        }),
+    );
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     loop {

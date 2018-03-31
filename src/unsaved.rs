@@ -17,11 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::Point;
 use super::canvas::{Canvas, Sprite};
 use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
+use sdl2::rect::Point;
 
 // ========================================================================= //
 

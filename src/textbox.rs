@@ -17,17 +17,17 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use super::canvas::{Canvas, Font};
+use super::element::{Action, GuiElement, SubrectElement};
+use super::event::{Event, Keycode};
+use super::state::{EditorState, Mode};
+use super::util;
 use sdl2::rect::Rect;
 use std::cmp;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use super::canvas::{Canvas, Font};
-use super::element::{Action, GuiElement, SubrectElement};
-use super::event::{Event, Keycode};
-use super::state::{EditorState, Mode};
-use super::util;
 
 // ========================================================================= //
 
@@ -36,9 +36,7 @@ pub struct TextBox {
 }
 
 impl TextBox {
-    pub fn new(font: Rc<Font>) -> TextBox {
-        TextBox { font: font }
-    }
+    pub fn new(font: Rc<Font>) -> TextBox { TextBox { font: font } }
 }
 
 impl GuiElement<String> for TextBox {
@@ -85,15 +83,13 @@ fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
     let dir = if path.is_dir() {
         path
     } else {
-        try!(path.parent().ok_or(io::Error::new(io::ErrorKind::Other, "")))
+        path.parent().ok_or(io::Error::new(io::ErrorKind::Other, ""))?
     };
-    let prefix = path.file_name()
-                     .map(OsStr::to_str)
-                     .unwrap_or(None)
-                     .unwrap_or("");
+    let prefix =
+        path.file_name().map(OsStr::to_str).unwrap_or(None).unwrap_or("");
     let mut paths = Vec::new();
-    for entry_result in try!(dir.read_dir()) {
-        let entry = try!(entry_result);
+    for entry_result in dir.read_dir()? {
+        let entry = entry_result?;
         if entry.file_name().to_str().unwrap_or("").starts_with(prefix) {
             paths.push(entry.path());
         }
@@ -126,12 +122,12 @@ impl ModalTextBox {
             left: left,
             top: top,
             font: font.clone(),
-            element:
-                SubrectElement::new(TextBox::new(font),
-                                    Rect::new(left + LABEL_WIDTH,
-                                              top,
-                                              (700 - LABEL_WIDTH) as u32,
-                                              18)),
+            element: SubrectElement::new(TextBox::new(font),
+                                         Rect::new(left + LABEL_WIDTH,
+                                                   top,
+                                                   (700 - LABEL_WIDTH) as
+                                                       u32,
+                                                   18)),
         }
     }
 }
@@ -180,9 +176,7 @@ impl GuiElement<EditorState> for ModalTextBox {
                             label);
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
+    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
                     -> Action {
         match event {
             &Event::KeyDown(Keycode::Escape, _) => {

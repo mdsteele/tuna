@@ -18,11 +18,11 @@
 // +--------------------------------------------------------------------------+
 
 use sdl2;
+
+pub use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::rect::Point;
 use std::ops::{BitOr, BitOrAssign};
-
-pub use sdl2::keyboard::Keycode;
 
 // ========================================================================= //
 
@@ -58,25 +58,27 @@ impl Event {
                     None
                 }
             }
-            &sdl2::event::Event::MouseButtonDown { mouse_btn: MouseButton::Left,
-                                                   x, y, .. } => {
-              Some(Event::MouseDown(Point::new(x, y)))
-            }
-            &sdl2::event::Event::MouseButtonUp { mouse_btn: MouseButton::Left,
-                                                 .. } => {
-              Some(Event::MouseUp)
-            }
-            &sdl2::event::Event::KeyDown { keycode: Some(keycode),
-                                           keymod,
-                                           .. } => {
-                Some(Event::KeyDown(keycode, KeyMod::from_sdl2(keymod)))
-            }
+            &sdl2::event::Event::MouseButtonDown {
+                mouse_btn: MouseButton::Left,
+                x,
+                y,
+                ..
+            } => Some(Event::MouseDown(Point::new(x, y))),
+            &sdl2::event::Event::MouseButtonUp {
+                mouse_btn: MouseButton::Left, ..
+            } => Some(Event::MouseUp),
+            &sdl2::event::Event::KeyDown {
+                keycode: Some(keycode),
+                keymod,
+                ..
+            } => Some(Event::KeyDown(keycode, KeyMod::from_sdl2(keymod))),
             &sdl2::event::Event::TextInput { ref text, .. } => {
                 Some(Event::TextInput(text.clone()))
             }
             &sdl2::event::Event::User { .. }
-                if event.as_user_event_type::<ClockTick>()
-                        .is_some() => Some(Event::ClockTick),
+                if event.as_user_event_type::<ClockTick>().is_some() => {
+                Some(Event::ClockTick)
+            }
             _ => None,
         }
     }
@@ -132,9 +134,7 @@ impl BitOr for KeyMod {
 }
 
 impl BitOrAssign for KeyMod {
-    fn bitor_assign(&mut self, rhs: KeyMod) {
-        self.bits |= rhs.bits;
-    }
+    fn bitor_assign(&mut self, rhs: KeyMod) { self.bits |= rhs.bits; }
 }
 
 pub const NONE: KeyMod = KeyMod { bits: 0x0 };

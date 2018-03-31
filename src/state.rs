@@ -17,6 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use super::util;
 use ahi::{Color, Font, Glyph, Image};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
@@ -24,7 +25,6 @@ use std::io;
 use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
-use super::util;
 
 // ========================================================================= //
 
@@ -108,9 +108,12 @@ impl EditorState {
             filepath: filepath,
             current: Snapshot {
                 data: Data::AHI(AhiData {
-                    image_index: 0,
-                    images: images.drain(..).map(Rc::new).collect(),
-                }),
+                                    image_index: 0,
+                                    images: images
+                                        .drain(..)
+                                        .map(Rc::new)
+                                        .collect(),
+                                }),
                 selection: None,
                 unsaved: false,
             },
@@ -124,33 +127,19 @@ impl EditorState {
         }
     }
 
-    pub fn is_unsaved(&self) -> bool {
-        self.current.unsaved
-    }
+    pub fn is_unsaved(&self) -> bool { self.current.unsaved }
 
-    pub fn filepath(&self) -> &String {
-        &self.filepath
-    }
+    pub fn filepath(&self) -> &String { &self.filepath }
 
-    pub fn mode(&self) -> &Mode {
-        &self.mode
-    }
+    pub fn mode(&self) -> &Mode { &self.mode }
 
-    pub fn mode_mut(&mut self) -> &mut Mode {
-        &mut self.mode
-    }
+    pub fn mode_mut(&mut self) -> &mut Mode { &mut self.mode }
 
-    pub fn color(&self) -> Color {
-        self.color
-    }
+    pub fn color(&self) -> Color { self.color }
 
-    pub fn set_color(&mut self, color: Color) {
-        self.color = color;
-    }
+    pub fn set_color(&mut self, color: Color) { self.color = color; }
 
-    pub fn tool(&self) -> Tool {
-        self.tool
-    }
+    pub fn tool(&self) -> Tool { self.tool }
 
     pub fn set_tool(&mut self, tool: Tool) {
         if self.tool != tool {
@@ -160,9 +149,7 @@ impl EditorState {
         }
     }
 
-    pub fn test_sentence(&self) -> &String {
-        &self.test_sentence
-    }
+    pub fn test_sentence(&self) -> &String { &self.test_sentence }
 
     pub fn test_sentence_mut(&mut self) -> &mut String {
         &mut self.test_sentence
@@ -245,9 +232,10 @@ impl EditorState {
                     Some(chr) => &ahf.font[chr],
                     None => ahf.font.default_glyph(),
                 };
-                Some((ahf.font.baseline(),
-                      glyph.left_edge(),
-                      glyph.right_edge()))
+                let tuple = (ahf.font.baseline(),
+                             glyph.left_edge(),
+                             glyph.right_edge());
+                Some(tuple)
             }
         }
     }
@@ -360,17 +348,15 @@ impl EditorState {
 
     pub fn save_to_file(&mut self) -> io::Result<()> {
         self.unselect_if_necessary();
-        let mut file = try!(File::create(&self.filepath));
+        let mut file = File::create(&self.filepath)?;
         match self.current.data {
             Data::AHI(ref ahi) => {
-                let images: Vec<Image> = ahi.images
-                                            .iter()
-                                            .map(|rc| rc.deref().clone())
-                                            .collect();
-                try!(Image::write_all(&mut file, &images));
+                let images: Vec<Image> =
+                    ahi.images.iter().map(|rc| rc.deref().clone()).collect();
+                Image::write_all(&mut file, &images)?;
             }
             Data::AHF(ref ahf) => {
-                try!(ahf.font.write(file));
+                ahf.font.write(file)?;
             }
         }
         self.current.unsaved = false;
@@ -510,9 +496,12 @@ impl EditorState {
                 match util::load_ahi_from_file(&path) {
                     Ok(mut images) => {
                         let data = Data::AHI(AhiData {
-                            image_index: 0,
-                            images: images.drain(..).map(Rc::new).collect(),
-                        });
+                                                 image_index: 0,
+                                                 images: images
+                                                     .drain(..)
+                                                     .map(Rc::new)
+                                                     .collect(),
+                                             });
                         self.load_data(path, data);
                         true
                     }
@@ -520,9 +509,9 @@ impl EditorState {
                         match util::load_ahf_from_file(&path) {
                             Ok(font) => {
                                 let data = Data::AHF(AhfData {
-                                    current_char: None,
-                                    font: font,
-                                });
+                                                         current_char: None,
+                                                         font: font,
+                                                     });
                                 self.load_data(path, data);
                                 true
                             }
@@ -534,7 +523,8 @@ impl EditorState {
             Mode::NewGlyph(text) => {
                 let chars: Vec<char> = text.chars().collect();
                 if chars.len() == 1 &&
-                   self.mutation().add_new_image(chars[0]) {
+                    self.mutation().add_new_image(chars[0])
+                {
                     self.mode = Mode::Edit;
                     true
                 } else {
@@ -626,9 +616,9 @@ impl<'a> Mutation<'a> {
             Data::AHI(ref ahi) => ahi.images[ahi.image_index].clone(),
             Data::AHF(ref ahf) => {
                 Rc::new(match ahf.current_char {
-                    Some(chr) => ahf.font[chr].image().clone(),
-                    None => ahf.font.default_glyph().image().clone(),
-                })
+                            Some(chr) => ahf.font[chr].image().clone(),
+                            None => ahf.font.default_glyph().image().clone(),
+                        })
             }
         }
     }
@@ -704,33 +694,33 @@ impl<'a> Mutation<'a> {
         match self.state.current.data {
             Data::AHI(ref mut ahi) => {
                 ahi.images = ahi.images
-                                .iter()
-                                .map(|image| {
-                                    Rc::new(image.crop(new_width, new_height))
-                                })
-                                .collect();
+                    .iter()
+                    .map(|image| Rc::new(image.crop(new_width, new_height)))
+                    .collect();
             }
             Data::AHF(ref mut ahf) => {
                 if new_height != ahf.font.glyph_height() {
                     let mut font = Font::with_glyph_height(new_height);
                     {
                         let glyph = ahf.font.default_glyph();
-                        let new_glyph = Glyph::new(glyph.image()
-                                                        .crop(glyph.image()
-                                                                   .width(),
-                                                              new_height),
-                                                   glyph.left_edge(),
-                                                   glyph.right_edge());
+                        let new_glyph =
+                            Glyph::new(glyph
+                                           .image()
+                                           .crop(glyph.image().width(),
+                                                 new_height),
+                                       glyph.left_edge(),
+                                       glyph.right_edge());
                         font.set_default_glyph(new_glyph);
                     }
                     for chr in ahf.font.chars() {
                         let glyph = &ahf.font[chr];
-                        let new_glyph = Glyph::new(glyph.image()
-                                                        .crop(glyph.image()
-                                                                   .width(),
-                                                              new_height),
-                                                   glyph.left_edge(),
-                                                   glyph.right_edge());
+                        let new_glyph =
+                            Glyph::new(glyph
+                                           .image()
+                                           .crop(glyph.image().width(),
+                                                 new_height),
+                                       glyph.left_edge(),
+                                       glyph.right_edge());
                         font.set_char_glyph(chr, new_glyph);
                     }
                     ahf.font = font;
@@ -740,8 +730,9 @@ impl<'a> Mutation<'a> {
                         let new_glyph = {
                             let glyph = &ahf.font[chr];
                             Glyph::new(glyph.image().crop(new_width,
-                                                          glyph.image()
-                                                               .height()),
+                                                          glyph
+                                                              .image()
+                                                              .height()),
                                        glyph.left_edge(),
                                        glyph.right_edge())
                         };
@@ -751,8 +742,9 @@ impl<'a> Mutation<'a> {
                         let new_glyph = {
                             let glyph = ahf.font.default_glyph();
                             Glyph::new(glyph.image().crop(new_width,
-                                                          glyph.image()
-                                                               .height()),
+                                                          glyph
+                                                              .image()
+                                                              .height()),
                                        glyph.left_edge(),
                                        glyph.right_edge())
                         };
@@ -763,9 +755,7 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    fn set_metrics(&mut self,
-                   new_baseline: i32,
-                   new_left_edge: i32,
+    fn set_metrics(&mut self, new_baseline: i32, new_left_edge: i32,
                    new_right_edge: i32) {
         if let Data::AHF(ref mut ahf) = self.state.current.data {
             ahf.font.set_baseline(new_baseline);
@@ -839,9 +829,7 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    pub fn delete_selection(&mut self) {
-        self.state.current.selection = None;
-    }
+    pub fn delete_selection(&mut self) { self.state.current.selection = None; }
 
     pub fn cut_selection(&mut self) {
         if self.state.current.selection.is_some() {

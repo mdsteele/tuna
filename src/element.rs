@@ -17,9 +17,9 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::Rect;
 use super::canvas::Canvas;
 use super::event::Event;
+use sdl2::rect::Rect;
 
 // ========================================================================= //
 
@@ -30,25 +30,17 @@ pub struct Action {
 }
 
 impl Action {
-    pub fn ignore() -> ActionBuilder {
-        ActionBuilder { redraw: false }
-    }
+    pub fn ignore() -> ActionBuilder { ActionBuilder { redraw: false } }
 
-    pub fn redraw() -> ActionBuilder {
-        ActionBuilder { redraw: true }
-    }
+    pub fn redraw() -> ActionBuilder { ActionBuilder { redraw: true } }
 
     pub fn redraw_if(should_redraw: bool) -> ActionBuilder {
         ActionBuilder { redraw: should_redraw }
     }
 
-    pub fn should_redraw(&self) -> bool {
-        self.redraw
-    }
+    pub fn should_redraw(&self) -> bool { self.redraw }
 
-    pub fn should_stop(&self) -> bool {
-        self.stop
-    }
+    pub fn should_stop(&self) -> bool { self.stop }
 
     fn merge(&mut self, action: Action) {
         self.redraw |= action.redraw;
@@ -99,13 +91,12 @@ impl<E> SubrectElement<E> {
         }
     }
 
-    pub fn rect(&self) -> Rect {
-        self.subrect
-    }
+    pub fn rect(&self) -> Rect { self.subrect }
 }
 
 impl<E, S> GuiElement<S> for SubrectElement<E>
-    where E: GuiElement<S>
+where
+    E: GuiElement<S>,
 {
     fn draw(&self, state: &S, canvas: &mut Canvas) {
         let mut subcanvas = canvas.subcanvas(self.subrect);
@@ -115,7 +106,7 @@ impl<E, S> GuiElement<S> for SubrectElement<E>
     fn handle_event(&mut self, event: &Event, state: &mut S) -> Action {
         match event {
             &Event::MouseDown(pt) => {
-                if !self.subrect.contains(pt) {
+                if !self.subrect.contains_point(pt) {
                     return Action::ignore().and_continue();
                 }
             }

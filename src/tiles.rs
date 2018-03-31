@@ -17,12 +17,12 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::Rect;
 use super::canvas::Canvas;
 use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
 use super::util;
+use sdl2::rect::Rect;
 
 // ========================================================================= //
 
@@ -46,7 +46,9 @@ impl GuiElement<EditorState> for TileView {
             for chr in state.test_sentence().chars() {
                 let glyph = &font[chr];
                 left -= glyph.left_edge();
-                if left as u32 + glyph.image().width() > width && left > 0 {
+                if left + (glyph.image().width() as i32) > (width as i32) &&
+                    left > 0
+                {
                     top += font.glyph_height() as i32 + 1;
                     left = -glyph.left_edge();
                 }

@@ -17,11 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use super::canvas::{Canvas, Font};
 use ahi;
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
-use super::canvas::{Canvas, Font};
 
 // ========================================================================= //
 
@@ -42,20 +42,17 @@ pub fn modulo(a: i32, b: i32) -> i32 {
 // ========================================================================= //
 
 pub fn load_ahf_from_file(path: &String) -> io::Result<ahi::Font> {
-    let mut file = try!(File::open(path));
+    let mut file = File::open(path)?;
     ahi::Font::read(&mut file)
 }
 
 pub fn load_ahi_from_file(path: &String) -> io::Result<Vec<ahi::Image>> {
-    let mut file = try!(File::open(path));
+    let mut file = File::open(path)?;
     ahi::Image::read_all(&mut file)
 }
 
-pub fn render_image(canvas: &mut Canvas,
-                    image: &ahi::Image,
-                    left: i32,
-                    top: i32,
-                    scale: u32) {
+pub fn render_image(canvas: &mut Canvas, image: &ahi::Image, left: i32,
+                    top: i32, scale: u32) {
     for row in 0..image.height() {
         for col in 0..image.width() {
             let pixel = image[(col, row)];
@@ -72,10 +69,7 @@ pub fn render_image(canvas: &mut Canvas,
 
 // ========================================================================= //
 
-pub fn render_string(canvas: &mut Canvas,
-                     font: &Font,
-                     left: i32,
-                     top: i32,
+pub fn render_string(canvas: &mut Canvas, font: &Font, left: i32, top: i32,
                      string: &str) {
     canvas.draw_text(font, Point::new(left, top + font.baseline()), string);
 }

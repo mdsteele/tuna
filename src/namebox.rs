@@ -17,12 +17,12 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use std::rc::Rc;
 use super::canvas::{Canvas, Font};
 use super::element::{Action, GuiElement};
 use super::event::Event;
 use super::state::EditorState;
 use super::util;
+use std::rc::Rc;
 
 // ========================================================================= //
 

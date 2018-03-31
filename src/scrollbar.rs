@@ -17,12 +17,12 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::{Point, Rect};
 use super::canvas::{Canvas, Sprite};
 use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use super::event::{Event, Keycode, NONE};
 use super::state::EditorState;
 use super::util;
+use sdl2::rect::{Point, Rect};
 
 // ========================================================================= //
 
@@ -31,34 +31,33 @@ pub struct ImagesScrollbar {
 }
 
 impl ImagesScrollbar {
-    pub fn new(left: i32,
-               top: i32,
-               mut icons: Vec<Sprite>)
+    pub fn new(left: i32, top: i32, mut icons: Vec<Sprite>)
                -> ImagesScrollbar {
         icons.truncate(2);
         assert_eq!(icons.len(), 2);
         let down_icon = icons.pop().unwrap();
         let up_icon = icons.pop().unwrap();
-        let elements: Vec<Box<GuiElement<EditorState>>> = vec![
-            ImagesScrollbar::arrow_button(2, -1, Keycode::Up, up_icon),
-            ImagesScrollbar::picker(20, -2),
-            ImagesScrollbar::picker(58, -1),
-            ImagesScrollbar::picker(96, 0),
-            ImagesScrollbar::picker(134, 1),
-            ImagesScrollbar::picker(172, 2),
-            ImagesScrollbar::picker(210, 3),
-            ImagesScrollbar::arrow_button(248, 1, Keycode::Down, down_icon),
-        ];
+        let elements: Vec<Box<GuiElement<EditorState>>> =
+            vec![
+                ImagesScrollbar::arrow_button(2, -1, Keycode::Up, up_icon),
+                ImagesScrollbar::picker(20, -2),
+                ImagesScrollbar::picker(58, -1),
+                ImagesScrollbar::picker(96, 0),
+                ImagesScrollbar::picker(134, 1),
+                ImagesScrollbar::picker(172, 2),
+                ImagesScrollbar::picker(210, 3),
+                ImagesScrollbar::arrow_button(248,
+                                              1,
+                                              Keycode::Down,
+                                              down_icon),
+            ];
         ImagesScrollbar {
             element: SubrectElement::new(AggregateElement::new(elements),
                                          Rect::new(left, top, 40, 266)),
         }
     }
 
-    fn arrow_button(y: i32,
-                    delta: i32,
-                    key: Keycode,
-                    icon: Sprite)
+    fn arrow_button(y: i32, delta: i32, key: Keycode, icon: Sprite)
                     -> Box<GuiElement<EditorState>> {
         Box::new(SubrectElement::new(NextPrevImage::new(delta, key, icon),
                                      Rect::new(4, y, 32, 16)))
@@ -76,9 +75,7 @@ impl GuiElement<EditorState> for ImagesScrollbar {
         self.element.draw(state, canvas);
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
+    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
                     -> Action {
         self.element.handle_event(event, state)
     }
@@ -91,9 +88,7 @@ struct ImagePicker {
 }
 
 impl ImagePicker {
-    fn new(delta: i32) -> ImagePicker {
-        ImagePicker { delta: delta }
-    }
+    fn new(delta: i32) -> ImagePicker { ImagePicker { delta: delta } }
 
     fn index(&self, state: &EditorState) -> Option<usize> {
         let index = (state.image_index() as i32) + self.delta;
@@ -121,9 +116,7 @@ impl GuiElement<EditorState> for ImagePicker {
         canvas.draw_rect(color, rect);
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
+    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
                     -> Action {
         match event {
             &Event::MouseDown(_) => {
@@ -158,7 +151,7 @@ impl NextPrevImage {
 
     fn increment(&self, state: &mut EditorState) -> Action {
         let new_index = util::modulo((state.image_index() as i32) +
-                                     self.delta,
+                                         self.delta,
                                      state.num_images() as i32);
         state.set_image_index(new_index as usize);
         Action::redraw().and_stop()
@@ -170,9 +163,7 @@ impl GuiElement<EditorState> for NextPrevImage {
         canvas.draw_sprite(&self.icon, Point::new(0, 0));
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
+    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
                     -> Action {
         match event {
             &Event::MouseDown(_) => {

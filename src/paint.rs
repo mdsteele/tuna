@@ -17,13 +17,13 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2::rect::{Point, Rect};
-use std::cmp;
 use super::canvas::Canvas;
 use super::element::{Action, GuiElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode, Tool};
 use super::util;
+use sdl2::rect::{Point, Rect};
+use std::cmp;
 
 // ========================================================================= //
 
@@ -81,8 +81,7 @@ impl ImageCanvas {
                   height * scale)
     }
 
-    fn dragged_points(&self,
-                      state: &EditorState)
+    fn dragged_points(&self, state: &EditorState)
                       -> Option<((i32, i32), (i32, i32))> {
         if let Some(ref drag) = self.drag_from_to {
             let (x0, y0) = self.clamp_mouse_to_row_col(drag.from_pixel, state);
@@ -95,7 +94,8 @@ impl ImageCanvas {
 
     fn dragged_rect(&self, state: &EditorState) -> Option<Rect> {
         if let Some(((from_col, from_row), (to_col, to_row))) =
-               self.dragged_points(state) {
+            self.dragged_points(state)
+        {
             let x = cmp::min(from_col, to_col);
             let y = cmp::min(from_row, to_row);
             let w = ((from_col - to_col).abs() + 1) as u32;
@@ -106,9 +106,7 @@ impl ImageCanvas {
         }
     }
 
-    fn mouse_to_row_col(&self,
-                        mouse: Point,
-                        state: &EditorState)
+    fn mouse_to_row_col(&self, mouse: Point, state: &EditorState)
                         -> Option<(u32, u32)> {
         if mouse.x() < self.top_left.x() || mouse.y() < self.top_left.y() {
             return None;
@@ -116,16 +114,15 @@ impl ImageCanvas {
         let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
         if scaled.x() < 0 || scaled.x() >= (width as i32) ||
-           scaled.y() < 0 || scaled.y() >= (height as i32) {
+            scaled.y() < 0 || scaled.y() >= (height as i32)
+        {
             None
         } else {
             Some((scaled.x() as u32, scaled.y() as u32))
         }
     }
 
-    fn clamp_mouse_to_row_col(&self,
-                              mouse: Point,
-                              state: &EditorState)
+    fn clamp_mouse_to_row_col(&self, mouse: Point, state: &EditorState)
                               -> (u32, u32) {
         let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
@@ -152,12 +149,11 @@ impl ImageCanvas {
         }
     }
 
-    fn try_draw_shape(&mut self,
-                      shape: Shape,
-                      state: &mut EditorState)
+    fn try_draw_shape(&mut self, shape: Shape, state: &mut EditorState)
                       -> bool {
         if let Some(((col1, row1), (col2, row2))) =
-               self.dragged_points(state) {
+            self.dragged_points(state)
+        {
             let color = state.color();
             let mut mutation = state.mutation();
             let image = mutation.image();
@@ -257,7 +253,8 @@ impl ImageCanvas {
     }
 
     fn try_palette_replace(&self, mouse: Point, state: &mut EditorState,
-                           swap: bool) -> bool {
+                           swap: bool)
+                           -> bool {
         if let Some(start) = self.mouse_to_row_col(mouse, state) {
             let to_color = state.color();
             let from_color = state.image()[start];
@@ -297,23 +294,24 @@ impl GuiElement<EditorState> for ImageCanvas {
                            canvas_rect.y(),
                            scale);
         if let Some((baseline, left_edge, right_edge)) =
-               state.image_metrics() {
+            state.image_metrics()
+        {
             canvas.draw_rect((0, 127, 255, 255),
                              Rect::new(canvas_rect.x(),
                                        canvas_rect.y() +
-                                       baseline * scale as i32,
+                                           baseline * scale as i32,
                                        canvas_rect.width(),
                                        1));
             canvas.draw_rect((127, 255, 0, 255),
                              Rect::new(canvas_rect.x() +
-                                       left_edge * scale as i32 -
-                                       1,
+                                           left_edge * scale as i32 -
+                                           1,
                                        canvas_rect.y(),
                                        1,
                                        canvas_rect.height()));
             canvas.draw_rect((255, 0, 127, 255),
                              Rect::new(canvas_rect.x() +
-                                       right_edge * scale as i32,
+                                           right_edge * scale as i32,
                                        canvas_rect.y(),
                                        1,
                                        canvas_rect.height()));
@@ -332,7 +330,8 @@ impl GuiElement<EditorState> for ImageCanvas {
                          self.selection_animation_counter);
         } else if let Some(shape) = Shape::from_tool(state.tool()) {
             if let Some(((col1, row1), (col2, row2))) =
-                   self.dragged_points(state) {
+                self.dragged_points(state)
+            {
                 for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
                     canvas.draw_rect((191, 191, 191, 255),
                                      Rect::new(x * scale as i32,
@@ -350,9 +349,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         }
     }
 
-    fn handle_event(&mut self,
-                    event: &Event,
-                    state: &mut EditorState)
+    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
                     -> Action {
         if state.mode() != &Mode::Edit {
             return Action::ignore().and_continue();
@@ -385,7 +382,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                 }
             }
             &Event::MouseDown(pt) => {
-                if self.rect(state).contains(pt) {
+                if self.rect(state).contains_point(pt) {
                     match state.tool() {
                         Tool::Checkerboard => {
                             let changed = self.try_checker_fill(pt, state);
@@ -397,10 +394,11 @@ impl GuiElement<EditorState> for ImageCanvas {
                         }
                         Tool::Line | Tool::Oval | Tool::Rectangle => {
                             self.drag_from_to = Some(ImageCanvasDrag {
-                                from_selection: Point::new(0, 0),
-                                from_pixel: pt,
-                                to_pixel: pt,
-                            });
+                                                         from_selection:
+                                                             Point::new(0, 0),
+                                                         from_pixel: pt,
+                                                         to_pixel: pt,
+                                                     });
                             return Action::redraw().and_stop();
                         }
                         Tool::PaintBucket => {
@@ -423,8 +421,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = if let Some((ref selected, topleft)) =
-                                              state.selection() {
+                            let rect = if let Some((ref selected,
+                                                    topleft)) =
+                                state.selection()
+                            {
                                 Some(Rect::new(topleft.x(),
                                                topleft.y(),
                                                selected.width(),
@@ -434,14 +434,14 @@ impl GuiElement<EditorState> for ImageCanvas {
                             };
                             if let Some(rect) = rect {
                                 let screen_topleft = self.top_left +
-                                                     rect.top_left() *
-                                                     self.scale(state) as i32;
+                                    rect.top_left() * self.scale(state) as i32;
                                 let scale = self.scale(state);
                                 if !Rect::new(screen_topleft.x(),
                                               screen_topleft.y(),
                                               rect.width() * scale,
                                               rect.height() * scale)
-                                        .contains(pt) {
+                                    .contains_point(pt)
+                                {
                                     state.mutation().unselect();
                                 } else {
                                     state.reset_persistent_mutation();
@@ -509,9 +509,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                             drag.to_pixel = pt;
                             if state.selection().is_some() {
                                 let position = drag.from_selection +
-                                               (pt - drag.from_pixel) / scale;
-                                state.persistent_mutation()
-                                     .reposition_selection(position);
+                                    (pt - drag.from_pixel) / scale;
+                                state
+                                    .persistent_mutation()
+                                    .reposition_selection(position);
                             }
                             return Action::redraw().and_continue();
                         }
@@ -527,11 +528,7 @@ impl GuiElement<EditorState> for ImageCanvas {
 
 // ========================================================================= //
 
-fn bresenham_shape(shape: Shape,
-                   x1: i32,
-                   y1: i32,
-                   x2: i32,
-                   y2: i32)
+fn bresenham_shape(shape: Shape, x1: i32, y1: i32, x2: i32, y2: i32)
                    -> Vec<(i32, i32)> {
     match shape {
         Shape::Line => bresenham_line(x1, y1, x2, y2),
