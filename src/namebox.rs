@@ -34,11 +34,7 @@ pub struct ImageNameBox {
 
 impl ImageNameBox {
     pub fn new(left: i32, top: i32, font: Rc<Font>) -> ImageNameBox {
-        ImageNameBox {
-            left: left,
-            top: top,
-            font: font,
-        }
+        ImageNameBox { left, top, font }
     }
 }
 

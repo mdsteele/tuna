@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Matthew D. Steele <mdsteele@alum.mit.edu>"]
 license = "GPL-3.0+"
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 ahi = { git = "https://github.com/mdsteele/ahi", tag = "v0.1.0" }

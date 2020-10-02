@@ -61,7 +61,7 @@ impl ImageCanvas {
     pub fn new(left: i32, top: i32, max_size: u32) -> ImageCanvas {
         ImageCanvas {
             top_left: Point::new(left, top),
-            max_size: max_size,
+            max_size,
             drag_from_to: None,
             selection_animation_counter: 0,
         }
@@ -75,14 +75,18 @@ impl ImageCanvas {
     fn rect(&self, state: &EditorState) -> Rect {
         let scale = self.scale(state);
         let (width, height) = state.image_size();
-        Rect::new(self.top_left.x(),
-                  self.top_left.y(),
-                  width * scale,
-                  height * scale)
+        Rect::new(
+            self.top_left.x(),
+            self.top_left.y(),
+            width * scale,
+            height * scale,
+        )
     }
 
-    fn dragged_points(&self, state: &EditorState)
-                      -> Option<((i32, i32), (i32, i32))> {
+    fn dragged_points(
+        &self,
+        state: &EditorState,
+    ) -> Option<((i32, i32), (i32, i32))> {
         if let Some(ref drag) = self.drag_from_to {
             let (x0, y0) = self.clamp_mouse_to_row_col(drag.from_pixel, state);
             let (x1, y1) = self.clamp_mouse_to_row_col(drag.to_pixel, state);
@@ -106,15 +110,20 @@ impl ImageCanvas {
         }
     }
 
-    fn mouse_to_row_col(&self, mouse: Point, state: &EditorState)
-                        -> Option<(u32, u32)> {
+    fn mouse_to_row_col(
+        &self,
+        mouse: Point,
+        state: &EditorState,
+    ) -> Option<(u32, u32)> {
         if mouse.x() < self.top_left.x() || mouse.y() < self.top_left.y() {
             return None;
         }
         let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
-        if scaled.x() < 0 || scaled.x() >= (width as i32) ||
-            scaled.y() < 0 || scaled.y() >= (height as i32)
+        if scaled.x() < 0
+            || scaled.x() >= (width as i32)
+            || scaled.y() < 0
+            || scaled.y() >= (height as i32)
         {
             None
         } else {
@@ -122,12 +131,17 @@ impl ImageCanvas {
         }
     }
 
-    fn clamp_mouse_to_row_col(&self, mouse: Point, state: &EditorState)
-                              -> (u32, u32) {
+    fn clamp_mouse_to_row_col(
+        &self,
+        mouse: Point,
+        state: &EditorState,
+    ) -> (u32, u32) {
         let scaled = (mouse - self.top_left) / self.scale(state) as i32;
         let (width, height) = state.image_size();
-        (cmp::max(0, cmp::min(scaled.x(), width as i32 - 1)) as u32,
-         cmp::max(0, cmp::min(scaled.y(), height as i32 - 1)) as u32)
+        (
+            cmp::max(0, cmp::min(scaled.x(), width as i32 - 1)) as u32,
+            cmp::max(0, cmp::min(scaled.y(), height as i32 - 1)) as u32,
+        )
     }
 
     fn try_paint(&self, mouse: Point, state: &mut EditorState) -> bool {
@@ -149,10 +163,12 @@ impl ImageCanvas {
         }
     }
 
-    fn try_draw_shape(&mut self, shape: Shape, state: &mut EditorState)
-                      -> bool {
-        if let Some(((col1, row1), (col2, row2))) =
-            self.dragged_points(state)
+    fn try_draw_shape(
+        &mut self,
+        shape: Shape,
+        state: &mut EditorState,
+    ) -> bool {
+        if let Some(((col1, row1), (col2, row2))) = self.dragged_points(state)
         {
             let color = state.color();
             let mut mutation = state.mutation();
@@ -252,9 +268,12 @@ impl ImageCanvas {
         }
     }
 
-    fn try_palette_replace(&self, mouse: Point, state: &mut EditorState,
-                           swap: bool)
-                           -> bool {
+    fn try_palette_replace(
+        &self,
+        mouse: Point,
+        state: &mut EditorState,
+        swap: bool,
+    ) -> bool {
         if let Some(start) = self.mouse_to_row_col(mouse, state) {
             let to_color = state.color();
             let from_color = state.image()[start];
@@ -288,78 +307,101 @@ impl GuiElement<EditorState> for ImageCanvas {
         let scale = self.scale(state);
         let canvas_rect = self.rect(state);
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
-        util::render_image(canvas,
-                           state.image(),
-                           canvas_rect.x(),
-                           canvas_rect.y(),
-                           scale);
-        if let Some((baseline, left_edge, right_edge)) =
-            state.image_metrics()
+        util::render_image(
+            canvas,
+            state.image(),
+            canvas_rect.x(),
+            canvas_rect.y(),
+            scale,
+        );
+        if let Some((baseline, left_edge, right_edge)) = state.image_metrics()
         {
-            canvas.draw_rect((0, 127, 255, 255),
-                             Rect::new(canvas_rect.x(),
-                                       canvas_rect.y() +
-                                           baseline * scale as i32,
-                                       canvas_rect.width(),
-                                       1));
-            canvas.draw_rect((127, 255, 0, 255),
-                             Rect::new(canvas_rect.x() +
-                                           left_edge * scale as i32 -
-                                           1,
-                                       canvas_rect.y(),
-                                       1,
-                                       canvas_rect.height()));
-            canvas.draw_rect((255, 0, 127, 255),
-                             Rect::new(canvas_rect.x() +
-                                           right_edge * scale as i32,
-                                       canvas_rect.y(),
-                                       1,
-                                       canvas_rect.height()));
+            canvas.draw_rect(
+                (0, 127, 255, 255),
+                Rect::new(
+                    canvas_rect.x(),
+                    canvas_rect.y() + baseline * scale as i32,
+                    canvas_rect.width(),
+                    1,
+                ),
+            );
+            canvas.draw_rect(
+                (127, 255, 0, 255),
+                Rect::new(
+                    canvas_rect.x() + left_edge * scale as i32 - 1,
+                    canvas_rect.y(),
+                    1,
+                    canvas_rect.height(),
+                ),
+            );
+            canvas.draw_rect(
+                (255, 0, 127, 255),
+                Rect::new(
+                    canvas_rect.x() + right_edge * scale as i32,
+                    canvas_rect.y(),
+                    1,
+                    canvas_rect.height(),
+                ),
+            );
         }
         let mut canvas = canvas.subcanvas(canvas_rect);
         if let Some((ref selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
             util::render_image(&mut canvas, selected, left, top, scale);
-            let marquee_rect = Rect::new(left,
-                                         top,
-                                         selected.width() * scale,
-                                         selected.height() * scale);
-            draw_marquee(&mut canvas,
-                         marquee_rect,
-                         self.selection_animation_counter);
+            let marquee_rect = Rect::new(
+                left,
+                top,
+                selected.width() * scale,
+                selected.height() * scale,
+            );
+            draw_marquee(
+                &mut canvas,
+                marquee_rect,
+                self.selection_animation_counter,
+            );
         } else if let Some(shape) = Shape::from_tool(state.tool()) {
             if let Some(((col1, row1), (col2, row2))) =
                 self.dragged_points(state)
             {
                 for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
-                    canvas.draw_rect((191, 191, 191, 255),
-                                     Rect::new(x * scale as i32,
-                                               y * scale as i32,
-                                               scale,
-                                               scale));
+                    canvas.draw_rect(
+                        (191, 191, 191, 255),
+                        Rect::new(
+                            x * scale as i32,
+                            y * scale as i32,
+                            scale,
+                            scale,
+                        ),
+                    );
                 }
             }
         } else if let Some(rect) = self.dragged_rect(state) {
-            let marquee_rect = Rect::new(rect.x() * (scale as i32),
-                                         rect.y() * (scale as i32),
-                                         rect.width() * scale,
-                                         rect.height() * scale);
+            let marquee_rect = Rect::new(
+                rect.x() * (scale as i32),
+                rect.y() * (scale as i32),
+                rect.width() * scale,
+                rect.height() * scale,
+            );
             draw_marquee(&mut canvas, marquee_rect, 0);
         }
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
-                    -> Action {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action {
         if state.mode() != &Mode::Edit {
             return Action::ignore().and_continue();
         }
         match event {
             &Event::ClockTick => {
                 if state.selection().is_some() {
-                    self.selection_animation_counter =
-                        util::modulo(self.selection_animation_counter + 1,
-                                     MARQUEE_ANIMATION_MODULUS);
+                    self.selection_animation_counter = util::modulo(
+                        self.selection_animation_counter + 1,
+                        MARQUEE_ANIMATION_MODULUS,
+                    );
                     return Action::redraw().and_continue();
                 } else {
                     return Action::ignore().and_continue();
@@ -394,11 +436,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                         }
                         Tool::Line | Tool::Oval | Tool::Rectangle => {
                             self.drag_from_to = Some(ImageCanvasDrag {
-                                                         from_selection:
-                                                             Point::new(0, 0),
-                                                         from_pixel: pt,
-                                                         to_pixel: pt,
-                                                     });
+                                from_selection: Point::new(0, 0),
+                                from_pixel: pt,
+                                to_pixel: pt,
+                            });
                             return Action::redraw().and_stop();
                         }
                         Tool::PaintBucket => {
@@ -421,26 +462,30 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = if let Some((ref selected,
-                                                    topleft)) =
+                            let rect = if let Some((ref selected, topleft)) =
                                 state.selection()
                             {
-                                Some(Rect::new(topleft.x(),
-                                               topleft.y(),
-                                               selected.width(),
-                                               selected.height()))
+                                Some(Rect::new(
+                                    topleft.x(),
+                                    topleft.y(),
+                                    selected.width(),
+                                    selected.height(),
+                                ))
                             } else {
                                 None
                             };
                             if let Some(rect) = rect {
-                                let screen_topleft = self.top_left +
-                                    rect.top_left() * self.scale(state) as i32;
+                                let screen_topleft = self.top_left
+                                    + rect.top_left()
+                                        * self.scale(state) as i32;
                                 let scale = self.scale(state);
-                                if !Rect::new(screen_topleft.x(),
-                                              screen_topleft.y(),
-                                              rect.width() * scale,
-                                              rect.height() * scale)
-                                    .contains_point(pt)
+                                if !Rect::new(
+                                    screen_topleft.x(),
+                                    screen_topleft.y(),
+                                    rect.width() * scale,
+                                    rect.height() * scale,
+                                )
+                                .contains_point(pt)
                                 {
                                     state.mutation().unselect();
                                 } else {
@@ -491,35 +536,33 @@ impl GuiElement<EditorState> for ImageCanvas {
                 }
                 self.drag_from_to = None;
             }
-            &Event::MouseDrag(pt) => {
-                match state.tool() {
-                    Tool::Line | Tool::Oval | Tool::Rectangle => {
-                        if let Some(ref mut drag) = self.drag_from_to {
-                            drag.to_pixel = pt;
-                            return Action::redraw().and_continue();
-                        }
+            &Event::MouseDrag(pt) => match state.tool() {
+                Tool::Line | Tool::Oval | Tool::Rectangle => {
+                    if let Some(ref mut drag) = self.drag_from_to {
+                        drag.to_pixel = pt;
+                        return Action::redraw().and_continue();
                     }
-                    Tool::Pencil => {
-                        let changed = self.try_paint(pt, state);
-                        return Action::redraw_if(changed).and_continue();
-                    }
-                    Tool::Select => {
-                        let scale = self.scale(state) as i32;
-                        if let Some(ref mut drag) = self.drag_from_to {
-                            drag.to_pixel = pt;
-                            if state.selection().is_some() {
-                                let position = drag.from_selection +
-                                    (pt - drag.from_pixel) / scale;
-                                state
-                                    .persistent_mutation()
-                                    .reposition_selection(position);
-                            }
-                            return Action::redraw().and_continue();
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                Tool::Pencil => {
+                    let changed = self.try_paint(pt, state);
+                    return Action::redraw_if(changed).and_continue();
+                }
+                Tool::Select => {
+                    let scale = self.scale(state) as i32;
+                    if let Some(ref mut drag) = self.drag_from_to {
+                        drag.to_pixel = pt;
+                        if state.selection().is_some() {
+                            let position = drag.from_selection
+                                + (pt - drag.from_pixel) / scale;
+                            state
+                                .persistent_mutation()
+                                .reposition_selection(position);
+                        }
+                        return Action::redraw().and_continue();
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
         return Action::ignore().and_continue();
@@ -528,8 +571,13 @@ impl GuiElement<EditorState> for ImageCanvas {
 
 // ========================================================================= //
 
-fn bresenham_shape(shape: Shape, x1: i32, y1: i32, x2: i32, y2: i32)
-                   -> Vec<(i32, i32)> {
+fn bresenham_shape(
+    shape: Shape,
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+) -> Vec<(i32, i32)> {
     match shape {
         Shape::Line => bresenham_line(x1, y1, x2, y2),
         Shape::Oval => bresenham_oval(x1, y1, x2, y2),
@@ -624,10 +672,12 @@ fn bresenham_rect(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
 }
 
 fn expand(rect: Rect, by: i32) -> Rect {
-    Rect::new(rect.x() - by,
-              rect.y() - by,
-              ((rect.width() as i32) + 2 * by) as u32,
-              ((rect.height() as i32) + 2 * by) as u32)
+    Rect::new(
+        rect.x() - by,
+        rect.y() - by,
+        ((rect.width() as i32) + 2 * by) as u32,
+        ((rect.height() as i32) + 2 * by) as u32,
+    )
 }
 
 const MARQUEE_ANIMATION_MODULUS: i32 = 8;
@@ -640,8 +690,10 @@ fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
             canvas.draw_pixel(color, Point::new(rect.left() + x, rect.top()));
         }
         if util::modulo(x + anim, MARQUEE_ANIMATION_MODULUS) < 4 {
-            canvas.draw_pixel(color,
-                              Point::new(rect.left() + x, rect.bottom() - 1));
+            canvas.draw_pixel(
+                color,
+                Point::new(rect.left() + x, rect.bottom() - 1),
+            );
         }
     }
     for y in 0..(rect.height() as i32) {
@@ -649,8 +701,10 @@ fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
             canvas.draw_pixel(color, Point::new(rect.left(), rect.top() + y));
         }
         if util::modulo(y - anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
-            canvas.draw_pixel(color,
-                              Point::new(rect.right() - 1, rect.top() + y));
+            canvas.draw_pixel(
+                color,
+                Point::new(rect.right() - 1, rect.top() + y),
+            );
         }
     }
 }

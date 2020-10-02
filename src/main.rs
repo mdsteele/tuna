@@ -39,7 +39,7 @@ mod util;
 
 use self::canvas::{Font, Sprite, Window};
 use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use self::event::{COMMAND, Event, Keycode, SHIFT};
+use self::event::{Event, Keycode, COMMAND, SHIFT};
 use self::namebox::ImageNameBox;
 use self::paint::ImageCanvas;
 use self::palette::ColorPalette;
@@ -56,8 +56,11 @@ use std::rc::Rc;
 
 const FRAME_DELAY_MILLIS: u32 = 100;
 
-fn render_screen<E: GuiElement<EditorState>>(window: &mut Window,
-                                             state: &EditorState, gui: &E) {
+fn render_screen<E: GuiElement<EditorState>>(
+    window: &mut Window,
+    state: &EditorState,
+    gui: &E,
+) {
     {
         let mut canvas = window.canvas();
         canvas.clear((64, 64, 64, 255));
@@ -83,25 +86,36 @@ fn load_sprites(window: &Window, path: &str) -> Vec<Sprite> {
     images.iter().map(|image| window.new_sprite(image)).collect()
 }
 
-fn window_size(ideal_width: u32, ideal_height: u32, aspect_ratio: f64)
-               -> ((u32, u32), Rect) {
+fn window_size(
+    ideal_width: u32,
+    ideal_height: u32,
+    aspect_ratio: f64,
+) -> ((u32, u32), Rect) {
     let ideal_ratio = (ideal_width as f64) / (ideal_height as f64);
     if aspect_ratio > ideal_ratio {
-        let actual_width = (aspect_ratio * (ideal_height as f64)).round() as
-            u32;
-        ((actual_width, ideal_height),
-         Rect::new(((actual_width - ideal_width) / 2) as i32,
-                   0,
-                   ideal_width,
-                   ideal_height))
+        let actual_width =
+            (aspect_ratio * (ideal_height as f64)).round() as u32;
+        (
+            (actual_width, ideal_height),
+            Rect::new(
+                ((actual_width - ideal_width) / 2) as i32,
+                0,
+                ideal_width,
+                ideal_height,
+            ),
+        )
     } else {
-        let actual_height = ((ideal_width as f64) / aspect_ratio).round() as
-            u32;
-        ((ideal_width, actual_height),
-         Rect::new(0,
-                   ((actual_height - ideal_height) / 2) as i32,
-                   ideal_width,
-                   ideal_height))
+        let actual_height =
+            ((ideal_width as f64) / aspect_ratio).round() as u32;
+        (
+            (ideal_width, actual_height),
+            Rect::new(
+                0,
+                ((actual_height - ideal_height) / 2) as i32,
+                ideal_width,
+                ideal_height,
+            ),
+        )
     }
 }
 
@@ -145,20 +159,19 @@ fn main() {
     let unsaved_icon = load_sprite(&window, "data/unsaved.ahi");
     let font: Rc<Font> = Rc::new(load_font(&window, "data/medfont.ahf"));
 
-    let elements: Vec<Box<GuiElement<EditorState>>> =
-        vec![
-            Box::new(ModalTextBox::new(2, 296, font.clone())),
-            Box::new(ColorPalette::new(10, 136)),
-            Box::new(Toolbox::new(4, 10, tool_icons)),
-            Box::new(ImagesScrollbar::new(436, 11, arrows)),
-            Box::new(ImageCanvas::new(60, 16, 256)),
-            Box::new(ImageCanvas::new(326, 16, 64)),
-            Box::new(TileView::new(326, 96, 96, 96)),
-            Box::new(ImageNameBox::new(326, 230, font.clone())),
-            Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
-        ];
-    let mut gui = SubrectElement::new(AggregateElement::new(elements),
-                                      gui_subrect);
+    let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
+        Box::new(ModalTextBox::new(2, 296, font.clone())),
+        Box::new(ColorPalette::new(10, 136)),
+        Box::new(Toolbox::new(4, 10, tool_icons)),
+        Box::new(ImagesScrollbar::new(436, 11, arrows)),
+        Box::new(ImageCanvas::new(60, 16, 256)),
+        Box::new(ImageCanvas::new(326, 16, 64)),
+        Box::new(TileView::new(326, 96, 96, 96)),
+        Box::new(ImageNameBox::new(326, 230, font.clone())),
+        Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
+    ];
+    let mut gui =
+        SubrectElement::new(AggregateElement::new(elements), gui_subrect);
 
     render_screen(&mut window, &state, &gui);
 

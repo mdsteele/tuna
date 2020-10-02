@@ -36,7 +36,9 @@ pub struct TextBox {
 }
 
 impl TextBox {
-    pub fn new(font: Rc<Font>) -> TextBox { TextBox { font: font } }
+    pub fn new(font: Rc<Font>) -> TextBox {
+        TextBox { font }
+    }
 }
 
 impl GuiElement<String> for TextBox {
@@ -57,15 +59,13 @@ impl GuiElement<String> for TextBox {
             }
             &Event::KeyDown(Keycode::Tab, _) => {
                 match tab_complete_path(Path::new(&text)) {
-                    Ok(path) => {
-                        match path.into_os_string().into_string() {
-                            Ok(string) => {
-                                *text = string;
-                                Action::redraw().and_stop()
-                            }
-                            Err(_) => Action::ignore().and_stop(),
+                    Ok(path) => match path.into_os_string().into_string() {
+                        Ok(string) => {
+                            *text = string;
+                            Action::redraw().and_stop()
                         }
-                    }
+                        Err(_) => Action::ignore().and_stop(),
+                    },
                     Err(_) => Action::ignore().and_stop(),
                 }
             }
@@ -119,15 +119,18 @@ pub struct ModalTextBox {
 impl ModalTextBox {
     pub fn new(left: i32, top: i32, font: Rc<Font>) -> ModalTextBox {
         ModalTextBox {
-            left: left,
-            top: top,
+            left,
+            top,
             font: font.clone(),
-            element: SubrectElement::new(TextBox::new(font),
-                                         Rect::new(left + LABEL_WIDTH,
-                                                   top,
-                                                   (700 - LABEL_WIDTH) as
-                                                       u32,
-                                                   18)),
+            element: SubrectElement::new(
+                TextBox::new(font),
+                Rect::new(
+                    left + LABEL_WIDTH,
+                    top,
+                    (700 - LABEL_WIDTH) as u32,
+                    18,
+                ),
+            ),
         }
     }
 }
@@ -169,15 +172,20 @@ impl GuiElement<EditorState> for ModalTextBox {
             }
         };
         let text_width = self.font.text_width(label);
-        util::render_string(canvas,
-                            &self.font,
-                            self.left + LABEL_WIDTH - text_width - 2,
-                            self.top + 4,
-                            label);
+        util::render_string(
+            canvas,
+            &self.font,
+            self.left + LABEL_WIDTH - text_width - 2,
+            self.top + 4,
+            label,
+        );
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut EditorState)
-                    -> Action {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action {
         match event {
             &Event::KeyDown(Keycode::Escape, _) => {
                 if state.mode_cancel() {
@@ -196,12 +204,12 @@ impl GuiElement<EditorState> for ModalTextBox {
             _ => {
                 match *state.mode_mut() {
                     Mode::Edit => return Action::ignore().and_continue(),
-                    Mode::Goto(ref mut text) |
-                    Mode::LoadFile(ref mut text) |
-                    Mode::NewGlyph(ref mut text) |
-                    Mode::Resize(ref mut text) |
-                    Mode::SaveAs(ref mut text) |
-                    Mode::SetMetrics(ref mut text) => {
+                    Mode::Goto(ref mut text)
+                    | Mode::LoadFile(ref mut text)
+                    | Mode::NewGlyph(ref mut text)
+                    | Mode::Resize(ref mut text)
+                    | Mode::SaveAs(ref mut text)
+                    | Mode::SetMetrics(ref mut text) => {
                         return self.element.handle_event(event, text)
                     }
                     Mode::TestSentence => {}

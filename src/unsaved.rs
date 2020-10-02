@@ -32,10 +32,7 @@ pub struct UnsavedIndicator {
 
 impl UnsavedIndicator {
     pub fn new(left: i32, top: i32, icon: Sprite) -> UnsavedIndicator {
-        UnsavedIndicator {
-            topleft: Point::new(left, top),
-            icon: icon,
-        }
+        UnsavedIndicator { topleft: Point::new(left, top), icon }
     }
 }
 

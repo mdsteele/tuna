@@ -33,14 +33,19 @@ pub struct Window<'a> {
 }
 
 impl<'a> Window<'a> {
-    pub fn from_renderer(renderer: &'a mut SdlCanvas<SdlWindow>)
-                         -> Window<'a> {
-        Window { renderer: renderer }
+    pub fn from_renderer(
+        renderer: &'a mut SdlCanvas<SdlWindow>,
+    ) -> Window<'a> {
+        Window { renderer }
     }
 
-    pub fn present(&mut self) { self.renderer.present(); }
+    pub fn present(&mut self) {
+        self.renderer.present();
+    }
 
-    pub fn canvas(&mut self) -> Canvas { Canvas::from_renderer(self.renderer) }
+    pub fn canvas(&mut self) -> Canvas {
+        Canvas::from_renderer(self.renderer)
+    }
 
     pub fn new_sprite(&self, image: &ahi::Image) -> Sprite {
         let width = image.width();
@@ -55,9 +60,10 @@ impl<'a> Window<'a> {
             Surface::from_data(&mut data, width, height, width * 4, format)
                 .unwrap();
         Sprite {
-            width: width,
-            height: height,
-            texture: self.renderer
+            width,
+            height,
+            texture: self
+                .renderer
                 .create_texture_from_surface(&surface)
                 .unwrap(),
         }
@@ -69,7 +75,7 @@ impl<'a> Window<'a> {
             glyphs.insert(chr, self.new_glyph(&font[chr]));
         }
         Font {
-            glyphs: glyphs,
+            glyphs,
             default_glyph: self.new_glyph(font.default_glyph()),
             baseline: font.baseline(),
         }
@@ -94,11 +100,7 @@ pub struct Canvas<'a> {
 
 impl<'a> Canvas<'a> {
     fn from_renderer(renderer: &'a mut SdlCanvas<SdlWindow>) -> Canvas<'a> {
-        Canvas {
-            clip_rect: None,
-            prev_clip_rect: None,
-            renderer: renderer,
-        }
+        Canvas { clip_rect: None, prev_clip_rect: None, renderer }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -120,12 +122,16 @@ impl<'a> Canvas<'a> {
             None => (0, 0),
         };
         self.renderer
-            .copy(&sprite.texture,
-                  None,
-                  Some(Rect::new(x + topleft.x(),
-                                 y + topleft.y(),
-                                 sprite.width(),
-                                 sprite.height())))
+            .copy(
+                &sprite.texture,
+                None,
+                Some(Rect::new(
+                    x + topleft.x(),
+                    y + topleft.y(),
+                    sprite.width(),
+                    sprite.height(),
+                )),
+            )
             .unwrap();
     }
 
@@ -194,7 +200,9 @@ impl<'a> Canvas<'a> {
 }
 
 impl<'a> Drop for Canvas<'a> {
-    fn drop(&mut self) { self.renderer.set_clip_rect(self.prev_clip_rect); }
+    fn drop(&mut self) {
+        self.renderer.set_clip_rect(self.prev_clip_rect);
+    }
 }
 
 // ========================================================================= //
@@ -206,9 +214,13 @@ pub struct Sprite {
 }
 
 impl Sprite {
-    pub fn width(&self) -> u32 { self.width }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
 
-    pub fn height(&self) -> u32 { self.height }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 }
 
 // ========================================================================= //
@@ -226,7 +238,9 @@ pub struct Font {
 }
 
 impl Font {
-    pub fn baseline(&self) -> i32 { self.baseline }
+    pub fn baseline(&self) -> i32 {
+        self.baseline
+    }
 
     pub fn text_width(&self, text: &str) -> i32 {
         let mut width = 0;

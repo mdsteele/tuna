@@ -65,7 +65,8 @@ impl Event {
                 ..
             } => Some(Event::MouseDown(Point::new(x, y))),
             &sdl2::event::Event::MouseButtonUp {
-                mouse_btn: MouseButton::Left, ..
+                mouse_btn: MouseButton::Left,
+                ..
             } => Some(Event::MouseUp),
             &sdl2::event::Event::KeyDown {
                 keycode: Some(keycode),
@@ -76,7 +77,8 @@ impl Event {
                 Some(Event::TextInput(text.clone()))
             }
             &sdl2::event::Event::User { .. }
-                if event.as_user_event_type::<ClockTick>().is_some() => {
+                if event.as_user_event_type::<ClockTick>().is_some() =>
+            {
                 Some(Event::ClockTick)
             }
             _ => None,
@@ -134,7 +136,9 @@ impl BitOr for KeyMod {
 }
 
 impl BitOrAssign for KeyMod {
-    fn bitor_assign(&mut self, rhs: KeyMod) { self.bits |= rhs.bits; }
+    fn bitor_assign(&mut self, rhs: KeyMod) {
+        self.bits |= rhs.bits;
+    }
 }
 
 pub const NONE: KeyMod = KeyMod { bits: 0x0 };

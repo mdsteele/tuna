@@ -46,8 +46,8 @@ impl GuiElement<EditorState> for TileView {
             for chr in state.test_sentence().chars() {
                 let glyph = &font[chr];
                 left -= glyph.left_edge();
-                if left + (glyph.image().width() as i32) > (width as i32) &&
-                    left > 0
+                if left + (glyph.image().width() as i32) > (width as i32)
+                    && left > 0
                 {
                     top += font.glyph_height() as i32 + 1;
                     left = -glyph.left_edge();
