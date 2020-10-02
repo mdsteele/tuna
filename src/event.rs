@@ -19,7 +19,7 @@
 
 use sdl2;
 
-pub use sdl2::keyboard::Keycode;
+pub use sdl2::keyboard::{Keycode, Mod};
 use sdl2::mouse::MouseButton;
 use sdl2::rect::Point;
 use std::ops::{BitOr, BitOrAssign};
@@ -102,23 +102,23 @@ pub struct KeyMod {
 }
 
 impl KeyMod {
-    pub fn from_sdl2(kmod: sdl2::keyboard::Mod) -> KeyMod {
+    pub fn from_sdl2(kmod: Mod) -> KeyMod {
         let mut result = NONE;
 
-        let sdl2_shift = sdl2::keyboard::LSHIFTMOD | sdl2::keyboard::RSHIFTMOD;
+        let sdl2_shift = Mod::LSHIFTMOD | Mod::RSHIFTMOD;
         if kmod.intersects(sdl2_shift) {
             result |= SHIFT;
         }
 
-        let sdl2_alt = sdl2::keyboard::LALTMOD | sdl2::keyboard::RALTMOD;
+        let sdl2_alt = Mod::LALTMOD | Mod::RALTMOD;
         if kmod.intersects(sdl2_alt) {
             result |= ALT;
         }
 
         let sdl2_command = if cfg!(target_os = "macos") {
-            sdl2::keyboard::LGUIMOD | sdl2::keyboard::RGUIMOD
+            Mod::LGUIMOD | Mod::RGUIMOD
         } else {
-            sdl2::keyboard::LCTRLMOD | sdl2::keyboard::RCTRLMOD
+            Mod::LCTRLMOD | Mod::RCTRLMOD
         };
         if kmod.intersects(sdl2_command) {
             result |= COMMAND;
