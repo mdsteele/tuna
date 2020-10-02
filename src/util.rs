@@ -17,29 +17,13 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Font};
+use crate::canvas::{Canvas, Font};
 use ahi;
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
 
-// ========================================================================= //
-
-pub fn modulo(a: i32, b: i32) -> i32 {
-    if b == 0 {
-        panic!();
-    }
-    let remainder = a % b;
-    if remainder == 0 {
-        0
-    } else if (a < 0) ^ (b < 0) {
-        remainder + b
-    } else {
-        remainder
-    }
-}
-
-// ========================================================================= //
+//===========================================================================//
 
 pub fn load_ahf_from_file(path: &String) -> io::Result<ahi::Font> {
     let mut file = File::open(path)?;
@@ -76,7 +60,7 @@ pub fn render_image(
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 pub fn render_string(
     canvas: &mut Canvas,
@@ -88,4 +72,4 @@ pub fn render_string(
     canvas.draw_text(font, Point::new(left, top + font.baseline()), string);
 }
 
-// ========================================================================= //
+//===========================================================================//

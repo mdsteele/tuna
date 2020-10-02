@@ -22,10 +22,11 @@ use super::element::{Action, GuiElement};
 use super::event::{Event, Keycode};
 use super::state::{EditorState, Mode, Tool};
 use super::util;
+use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 use std::cmp;
 
-// ========================================================================= //
+//===========================================================================//
 
 enum Shape {
     Line,
@@ -398,7 +399,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         match event {
             &Event::ClockTick => {
                 if state.selection().is_some() {
-                    self.selection_animation_counter = util::modulo(
+                    self.selection_animation_counter = mod_floor(
                         self.selection_animation_counter + 1,
                         MARQUEE_ANIMATION_MODULUS,
                     );
@@ -569,7 +570,7 @@ impl GuiElement<EditorState> for ImageCanvas {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 fn bresenham_shape(
     shape: Shape,
@@ -686,10 +687,10 @@ fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
     canvas.draw_rect((255, 255, 255, 255), rect);
     let color = (0, 0, 0, 255);
     for x in 0..(rect.width() as i32) {
-        if util::modulo(x - anim, MARQUEE_ANIMATION_MODULUS) < 4 {
+        if mod_floor(x - anim, MARQUEE_ANIMATION_MODULUS) < 4 {
             canvas.draw_pixel(color, Point::new(rect.left() + x, rect.top()));
         }
-        if util::modulo(x + anim, MARQUEE_ANIMATION_MODULUS) < 4 {
+        if mod_floor(x + anim, MARQUEE_ANIMATION_MODULUS) < 4 {
             canvas.draw_pixel(
                 color,
                 Point::new(rect.left() + x, rect.bottom() - 1),
@@ -697,10 +698,10 @@ fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
         }
     }
     for y in 0..(rect.height() as i32) {
-        if util::modulo(y + anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
+        if mod_floor(y + anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
             canvas.draw_pixel(color, Point::new(rect.left(), rect.top() + y));
         }
-        if util::modulo(y - anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
+        if mod_floor(y - anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
             canvas.draw_pixel(
                 color,
                 Point::new(rect.right() - 1, rect.top() + y),
@@ -709,4 +710,4 @@ fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//

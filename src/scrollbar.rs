@@ -22,9 +22,10 @@ use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use super::event::{Event, Keycode, NONE};
 use super::state::EditorState;
 use super::util;
+use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct ImagesScrollbar {
     element: SubrectElement<AggregateElement<EditorState>>,
@@ -93,7 +94,7 @@ impl GuiElement<EditorState> for ImagesScrollbar {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 struct ImagePicker {
     delta: i32,
@@ -149,7 +150,7 @@ impl GuiElement<EditorState> for ImagePicker {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 struct NextPrevImage {
     delta: i32,
@@ -163,7 +164,7 @@ impl NextPrevImage {
     }
 
     fn increment(&self, state: &mut EditorState) -> Action {
-        let new_index = util::modulo(
+        let new_index = mod_floor(
             (state.image_index() as i32) + self.delta,
             state.num_images() as i32,
         );
@@ -197,4 +198,4 @@ impl GuiElement<EditorState> for NextPrevImage {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
