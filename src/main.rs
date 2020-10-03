@@ -25,6 +25,7 @@ extern crate num_integer;
 extern crate sdl2;
 
 mod canvas;
+mod editor;
 mod element;
 mod event;
 mod namebox;
@@ -39,18 +40,11 @@ mod unsaved;
 mod util;
 
 use self::canvas::{Font, Sprite, Window};
-use self::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use self::event::{Event, Keycode, COMMAND, SHIFT};
-use self::namebox::ImageNameBox;
-use self::paint::ImageCanvas;
-use self::palette::ColorPalette;
-use self::scrollbar::ImagesScrollbar;
+use self::editor::EditorView;
+use self::element::GuiElement;
+use self::event::Event;
 use self::state::EditorState;
-use self::textbox::ModalTextBox;
-use self::tiles::TileView;
-use self::toolbox::Toolbox;
-use self::unsaved::UnsavedIndicator;
-use sdl2::rect::Rect;
+use sdl2::rect::Point;
 use std::rc::Rc;
 
 //===========================================================================//
@@ -62,13 +56,7 @@ fn render_screen<E: GuiElement<EditorState>>(
     state: &EditorState,
     gui: &E,
 ) {
-    {
-        let mut canvas = window.canvas();
-        canvas.clear((64, 64, 64, 255));
-        let rect = canvas.rect();
-        canvas.draw_rect((127, 127, 127, 127), rect);
-        gui.draw(state, &mut canvas);
-    }
+    gui.draw(state, &mut window.canvas());
     window.present();
 }
 
@@ -88,34 +76,23 @@ fn load_sprites(window: &Window, path: &str) -> Vec<Sprite> {
 }
 
 fn window_size(
-    ideal_width: u32,
-    ideal_height: u32,
+    (ideal_width, ideal_height): (u32, u32),
     aspect_ratio: f64,
-) -> ((u32, u32), Rect) {
+) -> ((u32, u32), Point) {
     let ideal_ratio = (ideal_width as f64) / (ideal_height as f64);
     if aspect_ratio > ideal_ratio {
         let actual_width =
             (aspect_ratio * (ideal_height as f64)).round() as u32;
         (
             (actual_width, ideal_height),
-            Rect::new(
-                ((actual_width - ideal_width) / 2) as i32,
-                0,
-                ideal_width,
-                ideal_height,
-            ),
+            Point::new(((actual_width - ideal_width) / 2) as i32, 0),
         )
     } else {
         let actual_height =
             ((ideal_width as f64) / aspect_ratio).round() as u32;
         (
             (ideal_width, actual_height),
-            Rect::new(
-                0,
-                ((actual_height - ideal_height) / 2) as i32,
-                ideal_width,
-                ideal_height,
-            ),
+            Point::new(0, ((actual_height - ideal_height) / 2) as i32),
         )
     }
 }
@@ -139,8 +116,8 @@ fn main() {
     let timer_subsystem = sdl_context.timer().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let ideal_width = 480;
-    let ideal_height = 320;
+    let ideal_width = EditorView::WIDTH;
+    let ideal_height = EditorView::HEIGHT;
     let sdl_window = video_subsystem
         .window("AHI Editor", ideal_width, ideal_height)
         .position_centered()
@@ -149,8 +126,8 @@ fn main() {
         .unwrap();
     let (native_width, native_height) = sdl_window.size();
     let aspect_ratio: f64 = (native_width as f64) / (native_height as f64);
-    let ((actual_width, actual_height), gui_subrect) =
-        window_size(ideal_width, ideal_height, aspect_ratio);
+    let ((actual_width, actual_height), gui_offset) =
+        window_size((ideal_width, ideal_height), aspect_ratio);
     let mut renderer = sdl_window.into_canvas().build().unwrap();
     renderer.set_logical_size(actual_width, actual_height).unwrap();
     let mut window = Window::from_renderer(&mut renderer);
@@ -160,19 +137,8 @@ fn main() {
     let unsaved_icon = load_sprite(&window, "data/unsaved.ahi");
     let font: Rc<Font> = Rc::new(load_font(&window, "data/medfont.ahf"));
 
-    let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
-        Box::new(ModalTextBox::new(2, 296, font.clone())),
-        Box::new(ColorPalette::new(10, 136)),
-        Box::new(Toolbox::new(4, 10, tool_icons)),
-        Box::new(ImagesScrollbar::new(436, 11, arrows)),
-        Box::new(ImageCanvas::new(60, 16, 256)),
-        Box::new(ImageCanvas::new(326, 16, 64)),
-        Box::new(TileView::new(326, 96, 96, 96)),
-        Box::new(ImageNameBox::new(326, 230, font.clone())),
-        Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
-    ];
     let mut gui =
-        SubrectElement::new(AggregateElement::new(elements), gui_subrect);
+        EditorView::new(tool_icons, arrows, unsaved_icon, font, gui_offset);
 
     render_screen(&mut window, &state, &gui);
 
@@ -193,76 +159,6 @@ fn main() {
         };
         let action = match event {
             Event::Quit => return,
-            Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.mutation().delete_image()).and_stop()
-            }
-            Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
-                state.mutation().select_all();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::B, kmod) if kmod == COMMAND | SHIFT => {
-                Action::redraw_if(state.begin_set_metrics()).and_stop()
-            }
-            Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
-                state.mutation().copy_selection();
-                Action::ignore().and_stop()
-            }
-            Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.begin_goto()).and_stop()
-            }
-            Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_selection_horz();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::L, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().rotate_selection_counterclockwise();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.begin_new_image()).and_stop()
-            }
-            Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.begin_load_file()).and_stop()
-            }
-            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.begin_resize()).and_stop()
-            }
-            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().rotate_selection_clockwise();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
-                state.save_to_file().unwrap();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
-                Action::redraw_if(state.begin_save_as()).and_stop()
-            }
-            Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND | SHIFT => {
-                Action::redraw_if(state.begin_set_test_sentence()).and_stop()
-            }
-            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
-                state.mutation().paste_selection();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_selection_vert();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
-                state.mutation().cut_selection();
-                Action::redraw().and_stop()
-            }
-            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {
-                Action::redraw_if(state.undo()).and_stop()
-            }
-            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
-                Action::redraw_if(state.redo()).and_stop()
-            }
-            Event::KeyDown(Keycode::Num2, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().scale_selection_2x();
-                Action::redraw().and_stop()
-            }
             event => gui.handle_event(&event, &mut state),
         };
         if action.should_redraw() {
