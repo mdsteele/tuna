@@ -24,9 +24,9 @@ use sdl2::render::Canvas as SdlCanvas;
 use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use sdl2::video::Window as SdlWindow;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct Window<'a> {
     renderer: &'a mut SdlCanvas<SdlWindow>,
@@ -70,7 +70,7 @@ impl<'a> Window<'a> {
     }
 
     pub fn new_font(&self, font: &ahi::Font) -> Font {
-        let mut glyphs = BTreeMap::new();
+        let mut glyphs = HashMap::new();
         for chr in font.chars() {
             glyphs.insert(chr, self.new_glyph(&font[chr]));
         }
@@ -90,7 +90,7 @@ impl<'a> Window<'a> {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct Canvas<'a> {
     clip_rect: Option<Rect>,
@@ -234,7 +234,7 @@ impl<'a> Drop for Canvas<'a> {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct Sprite {
     width: u32,
@@ -252,7 +252,7 @@ impl Sprite {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 struct Glyph {
     sprite: Sprite,
@@ -261,7 +261,7 @@ struct Glyph {
 }
 
 pub struct Font {
-    glyphs: BTreeMap<char, Glyph>,
+    glyphs: HashMap<char, Glyph>,
     default_glyph: Glyph,
     _baseline: i32,
 }
@@ -281,4 +281,4 @@ impl Font {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//

@@ -19,12 +19,13 @@
 
 use sdl2;
 
-pub use sdl2::keyboard::{Keycode, Mod};
+pub use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Mod;
 use sdl2::mouse::MouseButton;
 use sdl2::rect::Point;
 use std::ops::{BitOr, BitOrAssign};
 
-// ========================================================================= //
+//===========================================================================//
 
 struct ClockTick;
 
@@ -94,7 +95,7 @@ impl Event {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct KeyMod {
@@ -146,4 +147,4 @@ pub const SHIFT: KeyMod = KeyMod { bits: 0x1 };
 pub const ALT: KeyMod = KeyMod { bits: 0x2 };
 pub const COMMAND: KeyMod = KeyMod { bits: 0x4 };
 
-// ========================================================================= //
+//===========================================================================//
