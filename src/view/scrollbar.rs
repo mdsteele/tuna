@@ -21,7 +21,6 @@ use crate::canvas::{Canvas, Sprite};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::EditorState;
-use crate::util;
 use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 
@@ -118,7 +117,7 @@ impl ImagePicker {
 impl GuiElement<EditorState> for ImagePicker {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let color = if let Some(index) = self.index(state) {
-            util::render_image(canvas, state.image_at(index), 2, 2, 1);
+            canvas.draw_image(state.image_at(index), 2, 2, 1);
             if self.delta == 0 {
                 (255, 255, 127, 255)
             } else {

@@ -21,7 +21,6 @@ use crate::canvas::{Canvas, Font};
 use crate::element::{Action, GuiElement};
 use crate::event::Event;
 use crate::state::EditorState;
-use crate::util;
 use std::rc::Rc;
 
 //===========================================================================//
@@ -41,7 +40,7 @@ impl ImageNameBox {
 impl GuiElement<EditorState> for ImageNameBox {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
         let text = state.image_name();
-        util::render_string(canvas, &self.font, self.left, self.top, &text);
+        canvas.draw_string(&self.font, self.left, self.top, &text);
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {

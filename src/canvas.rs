@@ -77,7 +77,7 @@ impl<'a> Window<'a> {
         Font {
             glyphs,
             default_glyph: self.new_glyph(font.default_glyph()),
-            baseline: font.baseline(),
+            _baseline: font.baseline(),
         }
     }
 
@@ -145,6 +145,31 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    pub fn draw_image(
+        &mut self,
+        image: &ahi::Image,
+        left: i32,
+        top: i32,
+        scale: u32,
+    ) {
+        for row in 0..image.height() {
+            for col in 0..image.width() {
+                let pixel = image[(col, row)];
+                if pixel != ahi::Color::Transparent {
+                    self.fill_rect(
+                        pixel.rgba(),
+                        Rect::new(
+                            left + (scale * col) as i32,
+                            top + (scale * row) as i32,
+                            scale,
+                            scale,
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
     pub fn draw_pixel(&mut self, color: (u8, u8, u8, u8), point: Point) {
         self.fill_rect(color, Rect::new(point.x(), point.y(), 1, 1));
     }
@@ -163,10 +188,14 @@ impl<'a> Canvas<'a> {
         self.renderer.fill_rect(subrect).unwrap();
     }
 
-    pub fn draw_text(&mut self, font: &Font, start: Point, text: &str) {
-        let top = start.y() - font.baseline;
-        let mut left = start.x();
-        for chr in text.chars() {
+    pub fn draw_string(
+        &mut self,
+        font: &Font,
+        mut left: i32,
+        top: i32,
+        string: &str,
+    ) {
+        for chr in string.chars() {
             let glyph = font.glyph(chr);
             left -= glyph.left_edge;
             self.draw_sprite(&glyph.sprite, Point::new(left, top));
@@ -234,14 +263,10 @@ struct Glyph {
 pub struct Font {
     glyphs: BTreeMap<char, Glyph>,
     default_glyph: Glyph,
-    baseline: i32,
+    _baseline: i32,
 }
 
 impl Font {
-    pub fn baseline(&self) -> i32 {
-        self.baseline
-    }
-
     pub fn text_width(&self, text: &str) -> i32 {
         let mut width = 0;
         for chr in text.chars() {

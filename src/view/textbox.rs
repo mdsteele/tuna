@@ -21,7 +21,6 @@ use crate::canvas::{Canvas, Font};
 use crate::element::{Action, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode};
 use crate::state::{EditorState, Mode};
-use crate::util;
 use sdl2::rect::Rect;
 use std::cmp;
 use std::ffi::OsStr;
@@ -48,7 +47,7 @@ impl GuiElement<String> for TextBox {
         let text_width = self.font.text_width(text);
         let text_left = cmp::min(4, rect_width - 4 - text_width);
         canvas.fill_rect((128, 128, 128, 255), rect);
-        util::render_string(canvas, &self.font, text_left, 4, text);
+        canvas.draw_string(&self.font, text_left, 4, text);
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
@@ -172,8 +171,7 @@ impl GuiElement<EditorState> for ModalTextBox {
             }
         };
         let text_width = self.font.text_width(label);
-        util::render_string(
-            canvas,
+        canvas.draw_string(
             &self.font,
             self.left + LABEL_WIDTH - text_width - 2,
             self.top + 4,

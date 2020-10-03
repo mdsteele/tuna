@@ -17,11 +17,10 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::Canvas;
-use super::element::{Action, GuiElement};
-use super::event::{Event, Keycode};
-use super::state::{EditorState, Mode, Tool};
-use super::util;
+use crate::canvas::Canvas;
+use crate::element::{Action, GuiElement};
+use crate::event::{Event, Keycode};
+use crate::state::{EditorState, Mode, Tool};
 use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 use std::cmp;
@@ -308,8 +307,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         let scale = self.scale(state);
         let canvas_rect = self.rect(state);
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
-        util::render_image(
-            canvas,
+        canvas.draw_image(
             state.image(),
             canvas_rect.x(),
             canvas_rect.y(),
@@ -349,7 +347,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         if let Some((ref selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
-            util::render_image(&mut canvas, selected, left, top, scale);
+            canvas.draw_image(selected, left, top, scale);
             let marquee_rect = Rect::new(
                 left,
                 top,
