@@ -17,11 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Sprite};
-use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use super::event::{Event, Keycode, NONE};
-use super::state::EditorState;
-use super::util;
+use crate::canvas::{Canvas, Sprite};
+use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
+use crate::event::{Event, Keycode, NONE};
+use crate::state::EditorState;
+use crate::util;
 use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 

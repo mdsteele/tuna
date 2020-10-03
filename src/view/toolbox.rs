@@ -17,13 +17,13 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Sprite};
-use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use super::event::{Event, Keycode, NONE};
-use super::state::{EditorState, Tool};
+use crate::canvas::{Canvas, Sprite};
+use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
+use crate::event::{Event, Keycode, NONE};
+use crate::state::{EditorState, Tool};
 use sdl2::rect::{Point, Rect};
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct Toolbox {
     element: SubrectElement<AggregateElement<Tool>>,
@@ -109,7 +109,7 @@ impl GuiElement<EditorState> for Toolbox {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 struct ToolPicker {
     tool: Tool,
@@ -151,4 +151,4 @@ impl GuiElement<Tool> for ToolPicker {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//

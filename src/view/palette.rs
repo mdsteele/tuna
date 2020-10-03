@@ -17,15 +17,15 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::Canvas;
-use super::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use super::event::{Event, Keycode, NONE};
-use super::state::{EditorState, Tool};
+use crate::canvas::Canvas;
+use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
+use crate::event::{Event, Keycode, NONE};
+use crate::state::{EditorState, Tool};
 use ahi::Color;
 use sdl2::rect::Rect;
 use std::cmp;
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct ColorPalette {
     element: SubrectElement<AggregateElement<Color>>,
@@ -95,7 +95,7 @@ impl GuiElement<EditorState> for ColorPalette {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 struct ColorPicker {
     color: Color,
@@ -142,7 +142,7 @@ impl GuiElement<Color> for ColorPicker {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 fn shrink(rect: Rect, by: i32) -> Rect {
     Rect::new(
@@ -153,4 +153,4 @@ fn shrink(rect: Rect, by: i32) -> Rect {
     )
 }
 
-// ========================================================================= //
+//===========================================================================//

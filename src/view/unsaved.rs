@@ -17,31 +17,30 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Font};
-use super::element::{Action, GuiElement};
-use super::event::Event;
-use super::state::EditorState;
-use super::util;
-use std::rc::Rc;
+use crate::canvas::{Canvas, Sprite};
+use crate::element::{Action, GuiElement};
+use crate::event::Event;
+use crate::state::EditorState;
+use sdl2::rect::Point;
 
-// ========================================================================= //
+//===========================================================================//
 
-pub struct ImageNameBox {
-    left: i32,
-    top: i32,
-    font: Rc<Font>,
+pub struct UnsavedIndicator {
+    topleft: Point,
+    icon: Sprite,
 }
 
-impl ImageNameBox {
-    pub fn new(left: i32, top: i32, font: Rc<Font>) -> ImageNameBox {
-        ImageNameBox { left, top, font }
+impl UnsavedIndicator {
+    pub fn new(left: i32, top: i32, icon: Sprite) -> UnsavedIndicator {
+        UnsavedIndicator { topleft: Point::new(left, top), icon }
     }
 }
 
-impl GuiElement<EditorState> for ImageNameBox {
+impl GuiElement<EditorState> for UnsavedIndicator {
     fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        let text = state.image_name();
-        util::render_string(canvas, &self.font, self.left, self.top, &text);
+        if state.is_unsaved() {
+            canvas.draw_sprite(&self.icon, self.topleft);
+        }
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
@@ -49,4 +48,4 @@ impl GuiElement<EditorState> for ImageNameBox {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//

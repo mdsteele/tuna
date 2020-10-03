@@ -17,35 +17,15 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Sprite};
-use super::element::{Action, GuiElement};
-use super::event::Event;
-use super::state::EditorState;
-use sdl2::rect::Point;
+mod editor;
+mod namebox;
+mod palette;
+mod scrollbar;
+mod textbox;
+mod tiles;
+mod toolbox;
+mod unsaved;
 
-// ========================================================================= //
+pub use editor::EditorView;
 
-pub struct UnsavedIndicator {
-    topleft: Point,
-    icon: Sprite,
-}
-
-impl UnsavedIndicator {
-    pub fn new(left: i32, top: i32, icon: Sprite) -> UnsavedIndicator {
-        UnsavedIndicator { topleft: Point::new(left, top), icon }
-    }
-}
-
-impl GuiElement<EditorState> for UnsavedIndicator {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
-        if state.is_unsaved() {
-            canvas.draw_sprite(&self.icon, self.topleft);
-        }
-    }
-
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
-        Action::ignore().and_continue()
-    }
-}
-
-// ========================================================================= //
+//===========================================================================//

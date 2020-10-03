@@ -17,18 +17,18 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use super::namebox::ImageNameBox;
+use super::palette::ColorPalette;
+use super::scrollbar::ImagesScrollbar;
+use super::textbox::ModalTextBox;
+use super::tiles::TileView;
+use super::toolbox::Toolbox;
+use super::unsaved::UnsavedIndicator;
 use crate::canvas::{Canvas, Font, Sprite};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, COMMAND, SHIFT};
-use crate::namebox::ImageNameBox;
 use crate::paint::ImageCanvas;
-use crate::palette::ColorPalette;
-use crate::scrollbar::ImagesScrollbar;
 use crate::state::EditorState;
-use crate::textbox::ModalTextBox;
-use crate::tiles::TileView;
-use crate::toolbox::Toolbox;
-use crate::unsaved::UnsavedIndicator;
 use sdl2::rect::{Point, Rect};
 use std::rc::Rc;
 

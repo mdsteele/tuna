@@ -17,14 +17,14 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::Canvas;
-use super::element::{Action, GuiElement};
-use super::event::Event;
-use super::state::EditorState;
-use super::util;
+use crate::canvas::Canvas;
+use crate::element::{Action, GuiElement};
+use crate::event::Event;
+use crate::state::EditorState;
+use crate::util;
 use sdl2::rect::Rect;
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct TileView {
     rect: Rect,
@@ -74,4 +74,4 @@ impl GuiElement<EditorState> for TileView {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//

@@ -25,25 +25,18 @@ extern crate num_integer;
 extern crate sdl2;
 
 mod canvas;
-mod editor;
 mod element;
 mod event;
-mod namebox;
 mod paint;
-mod palette;
-mod scrollbar;
 mod state;
-mod textbox;
-mod tiles;
-mod toolbox;
-mod unsaved;
 mod util;
+mod view;
 
 use self::canvas::{Font, Sprite, Window};
-use self::editor::EditorView;
 use self::element::GuiElement;
 use self::event::Event;
 use self::state::EditorState;
+use self::view::EditorView;
 use sdl2::rect::Point;
 use std::rc::Rc;
 

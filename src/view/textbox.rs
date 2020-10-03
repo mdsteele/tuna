@@ -17,11 +17,11 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::{Canvas, Font};
-use super::element::{Action, GuiElement, SubrectElement};
-use super::event::{Event, Keycode};
-use super::state::{EditorState, Mode};
-use super::util;
+use crate::canvas::{Canvas, Font};
+use crate::element::{Action, GuiElement, SubrectElement};
+use crate::event::{Event, Keycode};
+use crate::state::{EditorState, Mode};
+use crate::util;
 use sdl2::rect::Rect;
 use std::cmp;
 use std::ffi::OsStr;
@@ -29,7 +29,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct TextBox {
     font: Rc<Font>,
@@ -105,7 +105,7 @@ fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 const LABEL_WIDTH: i32 = 50;
 
@@ -220,4 +220,4 @@ impl GuiElement<EditorState> for ModalTextBox {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
