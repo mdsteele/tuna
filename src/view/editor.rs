@@ -24,13 +24,12 @@ use super::textbox::ModalTextBox;
 use super::tiles::TileView;
 use super::toolbox::Toolbox;
 use super::unsaved::UnsavedIndicator;
-use crate::canvas::{Canvas, Font, Sprite};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, COMMAND, SHIFT};
 use crate::paint::ImageCanvas;
 use crate::state::EditorState;
 use sdl2::rect::{Point, Rect};
-use std::rc::Rc;
 
 //===========================================================================//
 
@@ -42,23 +41,17 @@ impl EditorView {
     pub const WIDTH: u32 = 480;
     pub const HEIGHT: u32 = 320;
 
-    pub fn new(
-        tool_icons: Vec<Sprite>,
-        arrows: Vec<Sprite>,
-        unsaved_icon: Sprite,
-        font: Rc<Font>,
-        offset: Point,
-    ) -> EditorView {
+    pub fn new(offset: Point) -> EditorView {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
-            Box::new(ModalTextBox::new(2, 296, font.clone())),
+            Box::new(ModalTextBox::new(2, 296)),
             Box::new(ColorPalette::new(10, 136)),
-            Box::new(Toolbox::new(4, 10, tool_icons)),
-            Box::new(ImagesScrollbar::new(436, 11, arrows)),
+            Box::new(Toolbox::new(4, 10)),
+            Box::new(ImagesScrollbar::new(436, 11)),
             Box::new(ImageCanvas::new(60, 16, 256)),
             Box::new(ImageCanvas::new(326, 16, 64)),
             Box::new(TileView::new(326, 96, 96, 96)),
-            Box::new(ImageNameBox::new(326, 230, font.clone())),
-            Box::new(UnsavedIndicator::new(326, 256, unsaved_icon)),
+            Box::new(ImageNameBox::new(326, 230)),
+            Box::new(UnsavedIndicator::new(326, 256)),
         ];
         EditorView {
             element: SubrectElement::new(
@@ -75,11 +68,16 @@ impl EditorView {
 }
 
 impl GuiElement<EditorState> for EditorView {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         canvas.clear((64, 64, 64, 255));
         let rect = canvas.rect();
         canvas.draw_rect((127, 127, 127, 127), rect);
-        self.element.draw(state, canvas);
+        self.element.draw(state, resources, canvas);
     }
 
     fn handle_event(

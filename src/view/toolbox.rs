@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Sprite};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
@@ -30,42 +30,18 @@ pub struct Toolbox {
 }
 
 impl Toolbox {
-    pub fn new(left: i32, top: i32, mut icons: Vec<Sprite>) -> Toolbox {
-        icons.truncate(10);
-        assert_eq!(icons.len(), 10);
-        let replace_icon = icons.pop().unwrap();
-        let swap_icon = icons.pop().unwrap();
-        let rect_icon = icons.pop().unwrap();
-        let oval_icon = icons.pop().unwrap();
-        let checker_icon = icons.pop().unwrap();
-        let line_icon = icons.pop().unwrap();
-        let select_icon = icons.pop().unwrap();
-        let eyedrop_icon = icons.pop().unwrap();
-        let bucket_icon = icons.pop().unwrap();
-        let pencil_icon = icons.pop().unwrap();
+    pub fn new(left: i32, top: i32) -> Toolbox {
         let elements: Vec<Box<dyn GuiElement<Tool>>> = vec![
-            Toolbox::picker(2, 2, Tool::Pencil, Keycode::P, pencil_icon),
-            Toolbox::picker(26, 2, Tool::Line, Keycode::L, line_icon),
-            Toolbox::picker(2, 26, Tool::Oval, Keycode::O, oval_icon),
-            Toolbox::picker(26, 26, Tool::Rectangle, Keycode::R, rect_icon),
-            Toolbox::picker(2, 50, Tool::PaintBucket, Keycode::K, bucket_icon),
-            Toolbox::picker(
-                26,
-                50,
-                Tool::Checkerboard,
-                Keycode::H,
-                checker_icon,
-            ),
-            Toolbox::picker(2, 74, Tool::PaletteSwap, Keycode::W, swap_icon),
-            Toolbox::picker(
-                26,
-                74,
-                Tool::PaletteReplace,
-                Keycode::Q,
-                replace_icon,
-            ),
-            Toolbox::picker(2, 98, Tool::Eyedropper, Keycode::Y, eyedrop_icon),
-            Toolbox::picker(26, 98, Tool::Select, Keycode::S, select_icon),
+            Toolbox::picker(2, 2, Tool::Pencil, Keycode::P, 0),
+            Toolbox::picker(26, 2, Tool::Line, Keycode::L, 4),
+            Toolbox::picker(2, 26, Tool::Oval, Keycode::O, 6),
+            Toolbox::picker(26, 26, Tool::Rectangle, Keycode::R, 7),
+            Toolbox::picker(2, 50, Tool::PaintBucket, Keycode::K, 1),
+            Toolbox::picker(26, 50, Tool::Checkerboard, Keycode::H, 5),
+            Toolbox::picker(2, 74, Tool::PaletteSwap, Keycode::W, 8),
+            Toolbox::picker(26, 74, Tool::PaletteReplace, Keycode::Q, 9),
+            Toolbox::picker(2, 98, Tool::Eyedropper, Keycode::Y, 2),
+            Toolbox::picker(26, 98, Tool::Select, Keycode::S, 3),
         ];
         Toolbox {
             element: SubrectElement::new(
@@ -80,19 +56,24 @@ impl Toolbox {
         y: i32,
         tool: Tool,
         key: Keycode,
-        icon: Sprite,
+        icon_index: usize,
     ) -> Box<dyn GuiElement<Tool>> {
         Box::new(SubrectElement::new(
-            ToolPicker::new(tool, key, icon),
+            ToolPicker::new(tool, key, icon_index),
             Rect::new(x, y, 20, 20),
         ))
     }
 }
 
 impl GuiElement<EditorState> for Toolbox {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(&state.tool(), canvas);
+        self.element.draw(&state.tool(), resources, canvas);
     }
 
     fn handle_event(
@@ -114,23 +95,26 @@ impl GuiElement<EditorState> for Toolbox {
 struct ToolPicker {
     tool: Tool,
     key: Keycode,
-    icon: Sprite,
+    icon_index: usize,
 }
 
 impl ToolPicker {
-    fn new(tool: Tool, key: Keycode, icon: Sprite) -> ToolPicker {
-        ToolPicker { tool, key, icon }
+    fn new(tool: Tool, key: Keycode, icon_index: usize) -> ToolPicker {
+        ToolPicker { tool, key, icon_index }
     }
 }
 
 impl GuiElement<Tool> for ToolPicker {
-    fn draw(&self, tool: &Tool, canvas: &mut Canvas) {
+    fn draw(&self, tool: &Tool, resources: &Resources, canvas: &mut Canvas) {
         if *tool == self.tool {
             canvas.clear((255, 255, 255, 255));
         } else {
             canvas.clear((95, 95, 95, 255));
         }
-        canvas.draw_sprite(&self.icon, Point::new(2, 2));
+        canvas.draw_sprite(
+            resources.tool_icon(self.icon_index),
+            Point::new(2, 2),
+        );
     }
 
     fn handle_event(&mut self, event: &Event, tool: &mut Tool) -> Action {

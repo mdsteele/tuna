@@ -9,7 +9,4 @@ edition = "2018"
 [dependencies]
 ahi = { git = "https://github.com/mdsteele/ahi", tag = "v0.1.0" }
 num-integer = "0.1"
-
-[dependencies.sdl2]
-version = "0.34"
-features = ["unsafe_textures", "use_mac_framework"]
+sdl2 = { version = "0.34", features = ["use_mac_framework"] }

@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::canvas::Canvas;
+use super::canvas::{Canvas, Resources};
 use super::event::Event;
 use sdl2::rect::Rect;
 
@@ -74,7 +74,7 @@ impl ActionBuilder {
 // ========================================================================= //
 
 pub trait GuiElement<S> {
-    fn draw(&self, state: &S, canvas: &mut Canvas);
+    fn draw(&self, state: &S, resources: &Resources, canvas: &mut Canvas);
     fn handle_event(&mut self, event: &Event, state: &mut S) -> Action;
 }
 
@@ -99,9 +99,9 @@ impl<E, S> GuiElement<S> for SubrectElement<E>
 where
     E: GuiElement<S>,
 {
-    fn draw(&self, state: &S, canvas: &mut Canvas) {
+    fn draw(&self, state: &S, resources: &Resources, canvas: &mut Canvas) {
         let mut subcanvas = canvas.subcanvas(self.subrect);
-        self.element.draw(state, &mut subcanvas);
+        self.element.draw(state, resources, &mut subcanvas);
     }
 
     fn handle_event(&mut self, event: &Event, state: &mut S) -> Action {
@@ -133,9 +133,9 @@ impl<S> AggregateElement<S> {
 }
 
 impl<S> GuiElement<S> for AggregateElement<S> {
-    fn draw(&self, state: &S, canvas: &mut Canvas) {
+    fn draw(&self, state: &S, resources: &Resources, canvas: &mut Canvas) {
         for element in self.elements.iter().rev() {
-            element.draw(state, canvas);
+            element.draw(state, resources, canvas);
         }
     }
 

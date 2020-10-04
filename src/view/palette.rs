@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::Canvas;
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
@@ -73,9 +73,14 @@ impl ColorPalette {
 }
 
 impl GuiElement<EditorState> for ColorPalette {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(&state.color(), canvas);
+        self.element.draw(&state.color(), resources, canvas);
     }
 
     fn handle_event(
@@ -109,7 +114,12 @@ impl ColorPicker {
 }
 
 impl GuiElement<Color> for ColorPicker {
-    fn draw(&self, state: &Color, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &Color,
+        _resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let rect = canvas.rect();
         let inner = shrink(rect, 2);
         if self.color == Color::Transparent {

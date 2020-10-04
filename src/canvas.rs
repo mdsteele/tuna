@@ -17,89 +17,26 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use crate::util;
 use ahi;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Canvas as SdlCanvas;
-use sdl2::render::Texture;
+use sdl2::render::{Texture, TextureCreator};
 use sdl2::surface::Surface;
-use sdl2::video::Window as SdlWindow;
+use sdl2::video::{Window, WindowContext};
 use std::collections::HashMap;
-
-//===========================================================================//
-
-pub struct Window<'a> {
-    renderer: &'a mut SdlCanvas<SdlWindow>,
-}
-
-impl<'a> Window<'a> {
-    pub fn from_renderer(
-        renderer: &'a mut SdlCanvas<SdlWindow>,
-    ) -> Window<'a> {
-        Window { renderer }
-    }
-
-    pub fn present(&mut self) {
-        self.renderer.present();
-    }
-
-    pub fn canvas(&mut self) -> Canvas {
-        Canvas::from_renderer(self.renderer)
-    }
-
-    pub fn new_sprite(&self, image: &ahi::Image) -> Sprite {
-        let width = image.width();
-        let height = image.height();
-        let mut data = image.rgba_data();
-        let format = if cfg!(target_endian = "big") {
-            PixelFormatEnum::RGBA8888
-        } else {
-            PixelFormatEnum::ABGR8888
-        };
-        let surface =
-            Surface::from_data(&mut data, width, height, width * 4, format)
-                .unwrap();
-        Sprite {
-            width,
-            height,
-            texture: self
-                .renderer
-                .create_texture_from_surface(&surface)
-                .unwrap(),
-        }
-    }
-
-    pub fn new_font(&self, font: &ahi::Font) -> Font {
-        let mut glyphs = HashMap::new();
-        for chr in font.chars() {
-            glyphs.insert(chr, self.new_glyph(&font[chr]));
-        }
-        Font {
-            glyphs,
-            default_glyph: self.new_glyph(font.default_glyph()),
-            _baseline: font.baseline(),
-        }
-    }
-
-    fn new_glyph(&self, glyph: &ahi::Glyph) -> Glyph {
-        Glyph {
-            sprite: self.new_sprite(glyph.image()),
-            left_edge: glyph.left_edge(),
-            right_edge: glyph.right_edge(),
-        }
-    }
-}
 
 //===========================================================================//
 
 pub struct Canvas<'a> {
     clip_rect: Option<Rect>,
     prev_clip_rect: Option<Rect>,
-    renderer: &'a mut SdlCanvas<SdlWindow>,
+    renderer: &'a mut SdlCanvas<Window>,
 }
 
 impl<'a> Canvas<'a> {
-    fn from_renderer(renderer: &'a mut SdlCanvas<SdlWindow>) -> Canvas<'a> {
+    pub fn from_renderer(renderer: &'a mut SdlCanvas<Window>) -> Canvas<'a> {
         Canvas { clip_rect: None, prev_clip_rect: None, renderer }
     }
 
@@ -236,13 +173,13 @@ impl<'a> Drop for Canvas<'a> {
 
 //===========================================================================//
 
-pub struct Sprite {
+pub struct Sprite<'a> {
     width: u32,
     height: u32,
-    texture: Texture,
+    texture: Texture<'a>,
 }
 
-impl Sprite {
+impl<'a> Sprite<'a> {
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -254,19 +191,19 @@ impl Sprite {
 
 //===========================================================================//
 
-struct Glyph {
-    sprite: Sprite,
+struct Glyph<'a> {
+    sprite: Sprite<'a>,
     left_edge: i32,
     right_edge: i32,
 }
 
-pub struct Font {
-    glyphs: HashMap<char, Glyph>,
-    default_glyph: Glyph,
+pub struct Font<'a> {
+    glyphs: HashMap<char, Glyph<'a>>,
+    default_glyph: Glyph<'a>,
     _baseline: i32,
 }
 
-impl Font {
+impl<'a> Font<'a> {
     pub fn text_width(&self, text: &str) -> i32 {
         let mut width = 0;
         for chr in text.chars() {
@@ -278,6 +215,113 @@ impl Font {
 
     fn glyph(&self, chr: char) -> &Glyph {
         self.glyphs.get(&chr).unwrap_or(&self.default_glyph)
+    }
+}
+
+//===========================================================================//
+
+pub struct Resources<'a> {
+    arrows: Vec<Sprite<'a>>,
+    font: Font<'a>,
+    tool_icons: Vec<Sprite<'a>>,
+    unsaved_icon: Sprite<'a>,
+}
+
+impl<'a> Resources<'a> {
+    pub fn new(creator: &'a TextureCreator<WindowContext>) -> Resources<'a> {
+        Resources {
+            arrows: load_sprites_from_file(creator, "data/arrows.ahi"),
+            font: load_font_from_file(creator, "data/medfont.ahf"),
+            tool_icons: load_sprites_from_file(creator, "data/tool_icons.ahi"),
+            unsaved_icon: load_sprite_from_file(creator, "data/unsaved.ahi"),
+        }
+    }
+
+    pub fn arrow_down(&self) -> &Sprite {
+        &self.arrows[1]
+    }
+
+    pub fn arrow_up(&self) -> &Sprite {
+        &self.arrows[0]
+    }
+
+    pub fn font(&self) -> &Font {
+        &self.font
+    }
+
+    pub fn tool_icon(&self, index: usize) -> &Sprite {
+        &self.tool_icons[index]
+    }
+
+    pub fn unsaved_icon(&self) -> &Sprite {
+        &self.unsaved_icon
+    }
+}
+
+//===========================================================================//
+
+fn load_glyph<'a>(
+    creator: &'a TextureCreator<WindowContext>,
+    glyph: &ahi::Glyph,
+) -> Glyph<'a> {
+    Glyph {
+        sprite: load_sprite_from_image(creator, glyph.image()),
+        left_edge: glyph.left_edge(),
+        right_edge: glyph.right_edge(),
+    }
+}
+
+fn load_font_from_file<'a>(
+    creator: &'a TextureCreator<WindowContext>,
+    path: &str,
+) -> Font<'a> {
+    let font = util::load_ahf_from_file(&path.to_string()).unwrap();
+    let mut glyphs = HashMap::new();
+    for chr in font.chars() {
+        glyphs.insert(chr, load_glyph(creator, &font[chr]));
+    }
+    Font {
+        glyphs,
+        default_glyph: load_glyph(creator, font.default_glyph()),
+        _baseline: font.baseline(),
+    }
+}
+
+fn load_sprites_from_file<'a>(
+    creator: &'a TextureCreator<WindowContext>,
+    path: &str,
+) -> Vec<Sprite<'a>> {
+    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
+    images.iter().map(|image| load_sprite_from_image(creator, image)).collect()
+}
+
+fn load_sprite_from_file<'a>(
+    creator: &'a TextureCreator<WindowContext>,
+    path: &str,
+) -> Sprite<'a> {
+    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
+    load_sprite_from_image(creator, &images[0])
+}
+
+fn load_sprite_from_image<'a>(
+    creator: &'a TextureCreator<WindowContext>,
+    image: &ahi::Image,
+) -> Sprite<'a> {
+    let width = image.width();
+    let height = image.height();
+    let mut data = image.rgba_data();
+    let format = if cfg!(target_endian = "big") {
+        PixelFormatEnum::RGBA8888
+    } else {
+        PixelFormatEnum::ABGR8888
+    };
+    let surface =
+        Surface::from_data(&mut data, width, height, width * 4, format)
+            .unwrap();
+    Sprite {
+        width,
+        height,
+        texture: creator.create_texture_from_surface(&surface).unwrap(),
     }
 }
 

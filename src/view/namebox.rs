@@ -17,30 +17,33 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Font};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::Event;
 use crate::state::EditorState;
-use std::rc::Rc;
 
 //===========================================================================//
 
 pub struct ImageNameBox {
     left: i32,
     top: i32,
-    font: Rc<Font>,
 }
 
 impl ImageNameBox {
-    pub fn new(left: i32, top: i32, font: Rc<Font>) -> ImageNameBox {
-        ImageNameBox { left, top, font }
+    pub fn new(left: i32, top: i32) -> ImageNameBox {
+        ImageNameBox { left, top }
     }
 }
 
 impl GuiElement<EditorState> for ImageNameBox {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let text = state.image_name();
-        canvas.draw_string(&self.font, self.left, self.top, &text);
+        canvas.draw_string(resources.font(), self.left, self.top, &text);
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {

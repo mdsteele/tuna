@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::Canvas;
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::Event;
 use crate::state::EditorState;
@@ -36,7 +36,12 @@ impl TileView {
 }
 
 impl GuiElement<EditorState> for TileView {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        _resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let mut canvas = canvas.subcanvas(self.rect);
         let (width, height) = self.rect.size();
         if let Some(font) = state.font() {

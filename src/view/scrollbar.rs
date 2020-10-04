@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Sprite};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::EditorState;
@@ -31,24 +31,16 @@ pub struct ImagesScrollbar {
 }
 
 impl ImagesScrollbar {
-    pub fn new(
-        left: i32,
-        top: i32,
-        mut icons: Vec<Sprite>,
-    ) -> ImagesScrollbar {
-        icons.truncate(2);
-        assert_eq!(icons.len(), 2);
-        let down_icon = icons.pop().unwrap();
-        let up_icon = icons.pop().unwrap();
+    pub fn new(left: i32, top: i32) -> ImagesScrollbar {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
-            ImagesScrollbar::arrow_button(2, -1, Keycode::Up, up_icon),
+            ImagesScrollbar::arrow_button(2, -1, Keycode::Up),
             ImagesScrollbar::picker(20, -2),
             ImagesScrollbar::picker(58, -1),
             ImagesScrollbar::picker(96, 0),
             ImagesScrollbar::picker(134, 1),
             ImagesScrollbar::picker(172, 2),
             ImagesScrollbar::picker(210, 3),
-            ImagesScrollbar::arrow_button(248, 1, Keycode::Down, down_icon),
+            ImagesScrollbar::arrow_button(248, 1, Keycode::Down),
         ];
         ImagesScrollbar {
             element: SubrectElement::new(
@@ -62,10 +54,9 @@ impl ImagesScrollbar {
         y: i32,
         delta: i32,
         key: Keycode,
-        icon: Sprite,
     ) -> Box<dyn GuiElement<EditorState>> {
         Box::new(SubrectElement::new(
-            NextPrevImage::new(delta, key, icon),
+            NextPrevImage::new(delta, key),
             Rect::new(4, y, 32, 16),
         ))
     }
@@ -79,9 +70,14 @@ impl ImagesScrollbar {
 }
 
 impl GuiElement<EditorState> for ImagesScrollbar {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(state, canvas);
+        self.element.draw(state, resources, canvas);
     }
 
     fn handle_event(
@@ -115,7 +111,12 @@ impl ImagePicker {
 }
 
 impl GuiElement<EditorState> for ImagePicker {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        _resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let color = if let Some(index) = self.index(state) {
             canvas.draw_image(state.image_at(index), 2, 2, 1);
             if self.delta == 0 {
@@ -154,12 +155,11 @@ impl GuiElement<EditorState> for ImagePicker {
 struct NextPrevImage {
     delta: i32,
     key: Keycode,
-    icon: Sprite,
 }
 
 impl NextPrevImage {
-    fn new(delta: i32, key: Keycode, icon: Sprite) -> NextPrevImage {
-        NextPrevImage { delta, key, icon }
+    fn new(delta: i32, key: Keycode) -> NextPrevImage {
+        NextPrevImage { delta, key }
     }
 
     fn increment(&self, state: &mut EditorState) -> Action {
@@ -173,8 +173,18 @@ impl NextPrevImage {
 }
 
 impl GuiElement<EditorState> for NextPrevImage {
-    fn draw(&self, _: &EditorState, canvas: &mut Canvas) {
-        canvas.draw_sprite(&self.icon, Point::new(0, 0));
+    fn draw(
+        &self,
+        _: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        let icon = if self.delta > 0 {
+            resources.arrow_down()
+        } else {
+            resources.arrow_up()
+        };
+        canvas.draw_sprite(icon, Point::new(0, 0));
     }
 
     fn handle_event(

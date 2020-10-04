@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Sprite};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::Event;
 use crate::state::EditorState;
@@ -27,19 +27,23 @@ use sdl2::rect::Point;
 
 pub struct UnsavedIndicator {
     topleft: Point,
-    icon: Sprite,
 }
 
 impl UnsavedIndicator {
-    pub fn new(left: i32, top: i32, icon: Sprite) -> UnsavedIndicator {
-        UnsavedIndicator { topleft: Point::new(left, top), icon }
+    pub fn new(left: i32, top: i32) -> UnsavedIndicator {
+        UnsavedIndicator { topleft: Point::new(left, top) }
     }
 }
 
 impl GuiElement<EditorState> for UnsavedIndicator {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         if state.is_unsaved() {
-            canvas.draw_sprite(&self.icon, self.topleft);
+            canvas.draw_sprite(resources.unsaved_icon(), self.topleft);
         }
     }
 

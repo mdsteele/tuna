@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::Canvas;
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::{Event, Keycode};
 use crate::state::{EditorState, Mode, Tool};
@@ -303,7 +303,12 @@ impl ImageCanvas {
 }
 
 impl GuiElement<EditorState> for ImageCanvas {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        _resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let scale = self.scale(state);
         let canvas_rect = self.rect(state);
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));

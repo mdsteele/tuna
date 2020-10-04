@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Font};
+use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode};
 use crate::state::{EditorState, Mode};
@@ -26,28 +26,26 @@ use std::cmp;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 //===========================================================================//
 
-pub struct TextBox {
-    font: Rc<Font>,
-}
+pub struct TextBox {}
 
 impl TextBox {
-    pub fn new(font: Rc<Font>) -> TextBox {
-        TextBox { font }
+    pub fn new() -> TextBox {
+        TextBox {}
     }
 }
 
 impl GuiElement<String> for TextBox {
-    fn draw(&self, text: &String, canvas: &mut Canvas) {
+    fn draw(&self, text: &String, resources: &Resources, canvas: &mut Canvas) {
         let rect = canvas.rect();
         let rect_width = rect.width() as i32;
-        let text_width = self.font.text_width(text);
+        let font = resources.font();
+        let text_width = font.text_width(text);
         let text_left = cmp::min(4, rect_width - 4 - text_width);
         canvas.fill_rect((128, 128, 128, 255), rect);
-        canvas.draw_string(&self.font, text_left, 4, text);
+        canvas.draw_string(font, text_left, 4, text);
         canvas.draw_rect((255, 255, 255, 255), rect);
     }
 
@@ -111,18 +109,16 @@ const LABEL_WIDTH: i32 = 50;
 pub struct ModalTextBox {
     left: i32,
     top: i32,
-    font: Rc<Font>,
     element: SubrectElement<TextBox>,
 }
 
 impl ModalTextBox {
-    pub fn new(left: i32, top: i32, font: Rc<Font>) -> ModalTextBox {
+    pub fn new(left: i32, top: i32) -> ModalTextBox {
         ModalTextBox {
             left,
             top,
-            font: font.clone(),
             element: SubrectElement::new(
-                TextBox::new(font),
+                TextBox::new(),
                 Rect::new(
                     left + LABEL_WIDTH,
                     top,
@@ -135,44 +131,50 @@ impl ModalTextBox {
 }
 
 impl GuiElement<EditorState> for ModalTextBox {
-    fn draw(&self, state: &EditorState, canvas: &mut Canvas) {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
         let label = match *state.mode() {
             Mode::Edit => {
-                self.element.draw(state.filepath(), canvas);
+                self.element.draw(state.filepath(), resources, canvas);
                 "Path:"
             }
             Mode::Goto(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Goto:"
             }
             Mode::LoadFile(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Load:"
             }
             Mode::NewGlyph(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Char:"
             }
             Mode::Resize(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Size:"
             }
             Mode::SaveAs(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Save:"
             }
             Mode::SetMetrics(ref text) => {
-                self.element.draw(text, canvas);
+                self.element.draw(text, resources, canvas);
                 "Metrics:"
             }
             Mode::TestSentence => {
-                self.element.draw(state.test_sentence(), canvas);
+                self.element.draw(state.test_sentence(), resources, canvas);
                 "Text:"
             }
         };
-        let text_width = self.font.text_width(label);
+        let font = resources.font();
+        let text_width = font.text_width(label);
         canvas.draw_string(
-            &self.font,
+            font,
             self.left + LABEL_WIDTH - text_width - 2,
             self.top + 4,
             label,

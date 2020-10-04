@@ -32,40 +32,27 @@ mod state;
 mod util;
 mod view;
 
-use self::canvas::{Font, Sprite, Window};
+use self::canvas::{Canvas, Resources};
 use self::element::GuiElement;
 use self::event::Event;
 use self::state::EditorState;
 use self::view::EditorView;
 use sdl2::rect::Point;
-use std::rc::Rc;
+use sdl2::render::Canvas as SdlCanvas;
+use sdl2::video::Window;
 
 //===========================================================================//
 
 const FRAME_DELAY_MILLIS: u32 = 100;
 
 fn render_screen<E: GuiElement<EditorState>>(
-    window: &mut Window,
+    renderer: &mut SdlCanvas<Window>,
+    resources: &Resources,
     state: &EditorState,
     gui: &E,
 ) {
-    gui.draw(state, &mut window.canvas());
-    window.present();
-}
-
-fn load_font(window: &Window, path: &str) -> Font {
-    let ahf = util::load_ahf_from_file(&path.to_string()).unwrap();
-    window.new_font(&ahf)
-}
-
-fn load_sprite(window: &Window, path: &str) -> Sprite {
-    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
-    window.new_sprite(&images[0])
-}
-
-fn load_sprites(window: &Window, path: &str) -> Vec<Sprite> {
-    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
-    images.iter().map(|image| window.new_sprite(image)).collect()
+    gui.draw(state, resources, &mut Canvas::from_renderer(renderer));
+    renderer.present();
 }
 
 fn window_size(
@@ -123,17 +110,11 @@ fn main() {
         window_size((ideal_width, ideal_height), aspect_ratio);
     let mut renderer = sdl_window.into_canvas().build().unwrap();
     renderer.set_logical_size(actual_width, actual_height).unwrap();
-    let mut window = Window::from_renderer(&mut renderer);
+    let texture_creator = renderer.texture_creator();
+    let resources = Resources::new(&texture_creator);
 
-    let tool_icons: Vec<Sprite> = load_sprites(&window, "data/tool_icons.ahi");
-    let arrows: Vec<Sprite> = load_sprites(&window, "data/arrows.ahi");
-    let unsaved_icon = load_sprite(&window, "data/unsaved.ahi");
-    let font: Rc<Font> = Rc::new(load_font(&window, "data/medfont.ahf"));
-
-    let mut gui =
-        EditorView::new(tool_icons, arrows, unsaved_icon, font, gui_offset);
-
-    render_screen(&mut window, &state, &gui);
+    let mut gui = EditorView::new(gui_offset);
+    render_screen(&mut renderer, &resources, &state, &gui);
 
     Event::register_clock_ticks(&event_subsystem);
     let _timer = timer_subsystem.add_timer(
@@ -155,7 +136,7 @@ fn main() {
             event => gui.handle_event(&event, &mut state),
         };
         if action.should_redraw() {
-            render_screen(&mut window, &state, &gui);
+            render_screen(&mut renderer, &resources, &state, &gui);
         }
     }
 }
