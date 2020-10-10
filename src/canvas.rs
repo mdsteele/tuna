@@ -253,13 +253,32 @@ impl<'a> Resources<'a> {
         &self.font
     }
 
-    pub fn tool_icon(&self, index: usize) -> &Sprite {
-        &self.tool_icons[index]
+    pub fn tool_icon(&self, icon: ToolIcon) -> &Sprite {
+        &self.tool_icons[icon as usize]
     }
 
     pub fn unsaved_icon(&self) -> &Sprite {
         &self.unsaved_icon
     }
+}
+
+//===========================================================================//
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ToolIcon {
+    Pencil = 0,
+    PaintBucket,
+    Eyedropper,
+    Select,
+    Line,
+    Checkerboard,
+    Oval,
+    Rectangle,
+    PaletteSwap,
+    PaletteReplace,
+    Watercolor,
+    ArrowLeft,
+    ArrowRight,
 }
 
 //===========================================================================//

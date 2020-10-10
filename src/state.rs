@@ -40,6 +40,7 @@ pub enum Tool {
     Pencil,
     Rectangle,
     Select,
+    Watercolor,
 }
 
 #[derive(Clone, Eq, PartialEq)]

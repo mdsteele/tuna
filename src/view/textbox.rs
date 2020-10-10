@@ -122,7 +122,7 @@ impl ModalTextBox {
                 Rect::new(
                     left + LABEL_WIDTH,
                     top,
-                    (700 - LABEL_WIDTH) as u32,
+                    (440 - LABEL_WIDTH) as u32,
                     18,
                 ),
             ),

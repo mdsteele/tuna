@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Resources};
+use crate::canvas::{Canvas, Resources, ToolIcon};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
@@ -30,23 +30,27 @@ pub struct Toolbox {
 }
 
 impl Toolbox {
+    const WIDTH: u32 = 72;
+    const HEIGHT: u32 = 96;
+
     pub fn new(left: i32, top: i32) -> Toolbox {
         let elements: Vec<Box<dyn GuiElement<Tool>>> = vec![
-            Toolbox::picker(2, 2, Tool::Pencil, Keycode::P, 0),
-            Toolbox::picker(26, 2, Tool::Line, Keycode::L, 4),
-            Toolbox::picker(2, 26, Tool::Oval, Keycode::O, 6),
-            Toolbox::picker(26, 26, Tool::Rectangle, Keycode::R, 7),
-            Toolbox::picker(2, 50, Tool::PaintBucket, Keycode::K, 1),
-            Toolbox::picker(26, 50, Tool::Checkerboard, Keycode::H, 5),
-            Toolbox::picker(2, 74, Tool::PaletteSwap, Keycode::W, 8),
-            Toolbox::picker(26, 74, Tool::PaletteReplace, Keycode::Q, 9),
-            Toolbox::picker(2, 98, Tool::Eyedropper, Keycode::Y, 2),
-            Toolbox::picker(26, 98, Tool::Select, Keycode::S, 3),
+            Toolbox::picker(2, 2, Tool::Pencil, Keycode::P),
+            Toolbox::picker(26, 2, Tool::PaintBucket, Keycode::K),
+            Toolbox::picker(50, 2, Tool::PaletteReplace, Keycode::V),
+            Toolbox::picker(2, 26, Tool::Watercolor, Keycode::W),
+            Toolbox::picker(26, 26, Tool::Checkerboard, Keycode::H),
+            Toolbox::picker(50, 26, Tool::PaletteSwap, Keycode::X),
+            Toolbox::picker(2, 50, Tool::Line, Keycode::L),
+            Toolbox::picker(26, 50, Tool::Rectangle, Keycode::R),
+            Toolbox::picker(50, 50, Tool::Oval, Keycode::O),
+            Toolbox::picker(2, 74, Tool::Eyedropper, Keycode::Y),
+            Toolbox::picker(26, 74, Tool::Select, Keycode::S),
         ];
         Toolbox {
             element: SubrectElement::new(
                 AggregateElement::new(elements),
-                Rect::new(left, top, 48, 120),
+                Rect::new(left, top, Toolbox::WIDTH, Toolbox::HEIGHT),
             ),
         }
     }
@@ -56,10 +60,9 @@ impl Toolbox {
         y: i32,
         tool: Tool,
         key: Keycode,
-        icon_index: usize,
     ) -> Box<dyn GuiElement<Tool>> {
         Box::new(SubrectElement::new(
-            ToolPicker::new(tool, key, icon_index),
+            ToolPicker::new(tool, key),
             Rect::new(x, y, 20, 20),
         ))
     }
@@ -95,12 +98,25 @@ impl GuiElement<EditorState> for Toolbox {
 struct ToolPicker {
     tool: Tool,
     key: Keycode,
-    icon_index: usize,
+    icon: ToolIcon,
 }
 
 impl ToolPicker {
-    fn new(tool: Tool, key: Keycode, icon_index: usize) -> ToolPicker {
-        ToolPicker { tool, key, icon_index }
+    fn new(tool: Tool, key: Keycode) -> ToolPicker {
+        let icon = match tool {
+            Tool::Checkerboard => ToolIcon::Checkerboard,
+            Tool::Eyedropper => ToolIcon::Eyedropper,
+            Tool::Line => ToolIcon::Line,
+            Tool::Oval => ToolIcon::Oval,
+            Tool::PaintBucket => ToolIcon::PaintBucket,
+            Tool::PaletteReplace => ToolIcon::PaletteReplace,
+            Tool::PaletteSwap => ToolIcon::PaletteSwap,
+            Tool::Pencil => ToolIcon::Pencil,
+            Tool::Rectangle => ToolIcon::Rectangle,
+            Tool::Select => ToolIcon::Select,
+            Tool::Watercolor => ToolIcon::Watercolor,
+        };
+        ToolPicker { tool, key, icon }
     }
 }
 
@@ -111,10 +127,7 @@ impl GuiElement<Tool> for ToolPicker {
         } else {
             canvas.clear((95, 95, 95, 255));
         }
-        canvas.draw_sprite(
-            resources.tool_icon(self.icon_index),
-            Point::new(2, 2),
-        );
+        canvas.draw_sprite(resources.tool_icon(self.icon), Point::new(2, 2));
     }
 
     fn handle_event(&mut self, event: &Event, tool: &mut Tool) -> Action {

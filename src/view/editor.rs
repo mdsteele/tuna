@@ -43,15 +43,15 @@ impl EditorView {
 
     pub fn new(offset: Point) -> EditorView {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
-            Box::new(ModalTextBox::new(2, 296)),
-            Box::new(PaletteView::new(10, 136)),
-            Box::new(Toolbox::new(4, 10)),
-            Box::new(ImagesScrollbar::new(436, 11)),
-            Box::new(ImageCanvas::new(60, 16, 256)),
-            Box::new(ImageCanvas::new(326, 16, 64)),
-            Box::new(TileView::new(326, 96, 96, 96)),
-            Box::new(ImageNameBox::new(326, 230)),
-            Box::new(UnsavedIndicator::new(326, 256)),
+            Box::new(UnsavedIndicator::new(4, 11)),
+            Box::new(ModalTextBox::new(20, 10)),
+            Box::new(PaletteView::new(3, 144)),
+            Box::new(Toolbox::new(3, 34)),
+            Box::new(ImagesScrollbar::new(440, 34)),
+            Box::new(ImageCanvas::new(80, 36, 256)),
+            Box::new(ImageCanvas::new(348, 36, 64)),
+            Box::new(TileView::new(341, 126, 96, 96)),
+            Box::new(ImageNameBox::new(348, 260)),
         ];
         EditorView {
             element: SubrectElement::new(

@@ -45,7 +45,7 @@ impl ImagesScrollbar {
         ImagesScrollbar {
             element: SubrectElement::new(
                 AggregateElement::new(elements),
-                Rect::new(left, top, 40, 266),
+                Rect::new(left, top, 38, 266),
             ),
         }
     }
@@ -57,14 +57,14 @@ impl ImagesScrollbar {
     ) -> Box<dyn GuiElement<EditorState>> {
         Box::new(SubrectElement::new(
             NextPrevImage::new(delta, key),
-            Rect::new(4, y, 32, 16),
+            Rect::new(2, y, 32, 16),
         ))
     }
 
     fn picker(y: i32, delta: i32) -> Box<dyn GuiElement<EditorState>> {
         Box::new(SubrectElement::new(
             ImagePicker::new(delta),
-            Rect::new(2, y, 36, 36),
+            Rect::new(1, y, 36, 36),
         ))
     }
 }

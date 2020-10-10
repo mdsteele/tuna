@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::canvas::{Canvas, Resources};
+use crate::canvas::{Canvas, Resources, ToolIcon};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
@@ -41,7 +41,7 @@ impl PaletteView {
                 Keycode::Left,
             ),
             PaletteView::arrow(
-                NextPrevPalette::WIDTH as i32,
+                3 * (NextPrevPalette::WIDTH as i32),
                 ColorPalette::HEIGHT as i32,
                 1,
                 Keycode::Right,
@@ -104,27 +104,27 @@ struct ColorPalette {
 }
 
 impl ColorPalette {
-    const WIDTH: u32 = 36;
-    const HEIGHT: u32 = 144;
+    const WIDTH: u32 = 72;
+    const HEIGHT: u32 = 72;
 
     fn new(left: i32, top: i32) -> ColorPalette {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
             ColorPalette::picker(0, 0, Color::C0, Keycode::Num0),
             ColorPalette::picker(18, 0, Color::C1, Keycode::Num1),
-            ColorPalette::picker(0, 18, Color::C2, Keycode::Num2),
-            ColorPalette::picker(18, 18, Color::C3, Keycode::Num3),
-            ColorPalette::picker(0, 36, Color::C4, Keycode::Num4),
-            ColorPalette::picker(18, 36, Color::C5, Keycode::Num5),
-            ColorPalette::picker(0, 54, Color::C6, Keycode::Num6),
-            ColorPalette::picker(18, 54, Color::C7, Keycode::Num7),
-            ColorPalette::picker(0, 72, Color::C8, Keycode::Num8),
-            ColorPalette::picker(18, 72, Color::C9, Keycode::Num9),
-            ColorPalette::picker(0, 90, Color::Ca, Keycode::A),
-            ColorPalette::picker(18, 90, Color::Cb, Keycode::B),
-            ColorPalette::picker(0, 108, Color::Cc, Keycode::C),
-            ColorPalette::picker(18, 108, Color::Cd, Keycode::D),
-            ColorPalette::picker(0, 126, Color::Ce, Keycode::E),
-            ColorPalette::picker(18, 126, Color::Cf, Keycode::F),
+            ColorPalette::picker(36, 0, Color::C2, Keycode::Num2),
+            ColorPalette::picker(54, 0, Color::C3, Keycode::Num3),
+            ColorPalette::picker(0, 18, Color::C4, Keycode::Num4),
+            ColorPalette::picker(18, 18, Color::C5, Keycode::Num5),
+            ColorPalette::picker(36, 18, Color::C6, Keycode::Num6),
+            ColorPalette::picker(54, 18, Color::C7, Keycode::Num7),
+            ColorPalette::picker(0, 36, Color::C8, Keycode::Num8),
+            ColorPalette::picker(18, 36, Color::C9, Keycode::Num9),
+            ColorPalette::picker(36, 36, Color::Ca, Keycode::A),
+            ColorPalette::picker(54, 36, Color::Cb, Keycode::B),
+            ColorPalette::picker(0, 54, Color::Cc, Keycode::C),
+            ColorPalette::picker(18, 54, Color::Cd, Keycode::D),
+            ColorPalette::picker(36, 54, Color::Ce, Keycode::E),
+            ColorPalette::picker(54, 54, Color::Cf, Keycode::F),
         ];
         ColorPalette {
             element: SubrectElement::new(
@@ -270,9 +270,9 @@ impl GuiElement<EditorState> for NextPrevPalette {
         canvas: &mut Canvas,
     ) {
         let icon = if self.delta > 0 {
-            resources.tool_icon(11)
+            resources.tool_icon(ToolIcon::ArrowRight)
         } else {
-            resources.tool_icon(10)
+            resources.tool_icon(ToolIcon::ArrowLeft)
         };
         canvas.draw_sprite(icon, Point::new(1, 1));
     }

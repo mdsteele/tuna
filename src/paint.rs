@@ -55,6 +55,7 @@ pub struct ImageCanvas {
     max_size: u32,
     drag_from_to: Option<ImageCanvasDrag>,
     selection_animation_counter: i32,
+    watercolor_parity: u32,
 }
 
 impl ImageCanvas {
@@ -64,6 +65,7 @@ impl ImageCanvas {
             max_size,
             drag_from_to: None,
             selection_animation_counter: 0,
+            watercolor_parity: 0,
         }
     }
 
@@ -144,7 +146,7 @@ impl ImageCanvas {
         )
     }
 
-    fn try_paint(&self, mouse: Point, state: &mut EditorState) -> bool {
+    fn try_pencil(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(position) = self.mouse_to_row_col(mouse, state) {
             let color = state.color();
             state.persistent_mutation().image()[position] = color;
@@ -152,6 +154,23 @@ impl ImageCanvas {
         } else {
             false
         }
+    }
+
+    fn start_watercolor(&mut self, mouse: Point, state: &mut EditorState) {
+        if let Some(position) = self.mouse_to_row_col(mouse, state) {
+            self.watercolor_parity = (position.0 + position.1) % 2;
+        }
+    }
+
+    fn try_watercolor(&self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(position) = self.mouse_to_row_col(mouse, state) {
+            if self.watercolor_parity == (position.0 + position.1) % 2 {
+                let color = state.color();
+                state.persistent_mutation().image()[position] = color;
+                return true;
+            }
+        }
+        return false;
     }
 
     fn try_eyedrop(&self, mouse: Point, state: &mut EditorState) -> bool {
@@ -463,22 +482,19 @@ impl GuiElement<EditorState> for ImageCanvas {
                         }
                         Tool::Pencil => {
                             state.reset_persistent_mutation();
-                            let changed = self.try_paint(pt, state);
+                            let changed = self.try_pencil(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = if let Some((ref selected, topleft)) =
-                                state.selection()
-                            {
-                                Some(Rect::new(
-                                    topleft.x(),
-                                    topleft.y(),
-                                    selected.width(),
-                                    selected.height(),
-                                ))
-                            } else {
-                                None
-                            };
+                            let rect =
+                                state.selection().map(|(ref img, pt)| {
+                                    Rect::new(
+                                        pt.x(),
+                                        pt.y(),
+                                        img.width(),
+                                        img.height(),
+                                    )
+                                });
                             if let Some(rect) = rect {
                                 let screen_topleft = self.top_left
                                     + rect.top_left()
@@ -493,6 +509,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 .contains_point(pt)
                                 {
                                     state.mutation().unselect();
+                                    return Action::redraw().and_stop();
                                 } else {
                                     state.reset_persistent_mutation();
                                 }
@@ -507,6 +524,12 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 to_pixel: pt,
                             });
                             return Action::redraw().and_stop();
+                        }
+                        Tool::Watercolor => {
+                            state.reset_persistent_mutation();
+                            self.start_watercolor(pt, state);
+                            let changed = self.try_watercolor(pt, state);
+                            return Action::redraw_if(changed).and_stop();
                         }
                     }
                 } else {
@@ -549,7 +572,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                     }
                 }
                 Tool::Pencil => {
-                    let changed = self.try_paint(pt, state);
+                    let changed = self.try_pencil(pt, state);
                     return Action::redraw_if(changed).and_continue();
                 }
                 Tool::Select => {
@@ -565,6 +588,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                         }
                         return Action::redraw().and_continue();
                     }
+                }
+                Tool::Watercolor => {
+                    let changed = self.try_watercolor(pt, state);
+                    return Action::redraw_if(changed).and_continue();
                 }
                 _ => {}
             },
