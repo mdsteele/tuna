@@ -118,7 +118,7 @@ impl GuiElement<EditorState> for ImagePicker {
         canvas: &mut Canvas,
     ) {
         let color = if let Some(index) = self.index(state) {
-            canvas.draw_image(state.image_at(index), 2, 2, 1);
+            canvas.draw_image(state.image_at(index), state.palette(), 2, 2, 1);
             if self.delta == 0 {
                 (255, 255, 127, 255)
             } else {

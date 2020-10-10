@@ -56,7 +56,13 @@ impl GuiElement<EditorState> for TileView {
                     top += font.glyph_height() as i32 + 1;
                     left = -glyph.left_edge();
                 }
-                canvas.draw_image(glyph.image(), left, top, 1);
+                canvas.draw_image(
+                    glyph.image(),
+                    state.palette(),
+                    left,
+                    top,
+                    1,
+                );
                 left += glyph.right_edge();
             }
         } else {
@@ -65,7 +71,7 @@ impl GuiElement<EditorState> for TileView {
             while top < height as i32 {
                 let mut left = 0;
                 while left < width as i32 {
-                    canvas.draw_image(image, left, top, 1);
+                    canvas.draw_image(image, state.palette(), left, top, 1);
                     left += image.width() as i32;
                 }
                 top += image.height() as i32;

@@ -314,6 +314,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
         canvas.draw_image(
             state.image(),
+            state.palette(),
             canvas_rect.x(),
             canvas_rect.y(),
             scale,
@@ -352,7 +353,7 @@ impl GuiElement<EditorState> for ImageCanvas {
         if let Some((ref selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
-            canvas.draw_image(selected, left, top, scale);
+            canvas.draw_image(selected, state.palette(), left, top, scale);
             let marquee_rect = Rect::new(
                 left,
                 top,

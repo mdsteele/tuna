@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 use super::namebox::ImageNameBox;
-use super::palette::ColorPalette;
+use super::palette::PaletteView;
 use super::scrollbar::ImagesScrollbar;
 use super::textbox::ModalTextBox;
 use super::tiles::TileView;
@@ -44,7 +44,7 @@ impl EditorView {
     pub fn new(offset: Point) -> EditorView {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
             Box::new(ModalTextBox::new(2, 296)),
-            Box::new(ColorPalette::new(10, 136)),
+            Box::new(PaletteView::new(10, 136)),
             Box::new(Toolbox::new(4, 10)),
             Box::new(ImagesScrollbar::new(436, 11)),
             Box::new(ImageCanvas::new(60, 16, 256)),

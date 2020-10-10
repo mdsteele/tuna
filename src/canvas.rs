@@ -85,11 +85,11 @@ impl<'a> Canvas<'a> {
     pub fn draw_image(
         &mut self,
         image: &ahi::Image,
+        palette: &ahi::Palette,
         left: i32,
         top: i32,
         scale: u32,
     ) {
-        let palette = ahi::Palette::default();
         for row in 0..image.height() {
             for col in 0..image.width() {
                 let pixel = image[(col, row)];

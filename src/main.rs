@@ -82,16 +82,13 @@ fn window_size(
 fn main() {
     let mut state = {
         let args: Vec<String> = std::env::args().collect();
-        let (filepath, images) = if args.len() >= 2 {
+        let (filepath, collection) = if args.len() >= 2 {
             let filepath = &args[1];
-            (
-                filepath.clone(),
-                util::load_ahi_from_file(filepath).unwrap().images,
-            )
+            (filepath.clone(), util::load_ahi_from_file(filepath).unwrap())
         } else {
-            ("./out.ahi".to_string(), vec![])
+            ("./out.ahi".to_string(), ahi::Collection::new())
         };
-        EditorState::new(filepath, images)
+        EditorState::new(filepath, collection)
     };
 
     let sdl_context = sdl2::init().unwrap();
@@ -113,6 +110,7 @@ fn main() {
         window_size((ideal_width, ideal_height), aspect_ratio);
     let mut renderer = sdl_window.into_canvas().build().unwrap();
     renderer.set_logical_size(actual_width, actual_height).unwrap();
+    renderer.set_blend_mode(sdl2::render::BlendMode::Blend);
     let texture_creator = renderer.texture_creator();
     let resources = Resources::new(&texture_creator);
 

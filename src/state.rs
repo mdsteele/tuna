@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 use super::util;
-use ahi::{Collection, Color, Font, Glyph, Image};
+use ahi::{Collection, Color, Font, Glyph, Image, Palette};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
@@ -26,7 +26,7 @@ use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
 
-// ========================================================================= //
+//===========================================================================//
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Tool {
@@ -54,12 +54,28 @@ pub enum Mode {
     TestSentence,
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 #[derive(Clone)]
 struct AhiData {
+    palette_index: usize,
+    palettes: Vec<Rc<Palette>>,
     image_index: usize,
     images: Vec<Rc<Image>>,
+}
+
+impl AhiData {
+    fn new(mut collection: Collection) -> AhiData {
+        if collection.images.is_empty() {
+            collection.images.push(Image::new(32, 32));
+        }
+        AhiData {
+            palette_index: 0,
+            palettes: collection.palettes.drain(..).map(Rc::new).collect(),
+            image_index: 0,
+            images: collection.images.drain(..).map(Rc::new).collect(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -74,6 +90,12 @@ enum Data {
     AHF(AhfData),
 }
 
+impl Data {
+    fn from_collection(collection: Collection) -> Data {
+        Data::AHI(AhiData::new(collection))
+    }
+}
+
 #[derive(Clone)]
 struct Snapshot {
     data: Data,
@@ -81,7 +103,7 @@ struct Snapshot {
     unsaved: bool,
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct EditorState {
     mode: Mode,
@@ -98,19 +120,13 @@ pub struct EditorState {
 }
 
 impl EditorState {
-    pub fn new(filepath: String, mut images: Vec<Image>) -> EditorState {
-        if images.is_empty() {
-            images.push(Image::new(32, 32));
-        }
+    pub fn new(filepath: String, collection: Collection) -> EditorState {
         EditorState {
             mode: Mode::Edit,
             color: Color::C1,
             filepath,
             current: Snapshot {
-                data: Data::AHI(AhiData {
-                    image_index: 0,
-                    images: images.drain(..).map(Rc::new).collect(),
-                }),
+                data: Data::from_collection(collection),
                 selection: None,
                 unsaved: false,
             },
@@ -179,6 +195,42 @@ impl EditorState {
         }
     }
 
+    pub fn num_palettes(&self) -> usize {
+        match self.current.data {
+            Data::AHI(ref ahi) => 1 + ahi.palettes.len(),
+            Data::AHF(_) => 1,
+        }
+    }
+
+    pub fn palette_index(&self) -> usize {
+        match self.current.data {
+            Data::AHI(ref ahi) => ahi.palette_index,
+            Data::AHF(_) => 0,
+        }
+    }
+
+    pub fn set_palette_index(&mut self, index: usize) {
+        match self.current.data {
+            Data::AHI(ref mut ahi) => {
+                ahi.palette_index = index % (1 + ahi.palettes.len());
+            }
+            Data::AHF(_) => {}
+        }
+    }
+
+    pub fn palette(&self) -> &Palette {
+        match self.current.data {
+            Data::AHI(ref ahi) => {
+                if ahi.palette_index < ahi.palettes.len() {
+                    &ahi.palettes[ahi.palette_index]
+                } else {
+                    Palette::default()
+                }
+            }
+            Data::AHF(_) => Palette::default(),
+        }
+    }
+
     pub fn num_images(&self) -> usize {
         match self.current.data {
             Data::AHI(ref ahi) => ahi.images.len(),
@@ -206,6 +258,7 @@ impl EditorState {
         self.unselect_if_necessary();
         match self.current.data {
             Data::AHI(ref mut ahi) => {
+                debug_assert!(!ahi.images.is_empty());
                 ahi.image_index = index % ahi.images.len();
             }
             Data::AHF(ref mut ahf) => {
@@ -505,11 +558,8 @@ impl EditorState {
                 }
             },
             Mode::LoadFile(path) => match util::load_ahi_from_file(&path) {
-                Ok(mut col) => {
-                    let data = Data::AHI(AhiData {
-                        image_index: 0,
-                        images: col.images.drain(..).map(Rc::new).collect(),
-                    });
+                Ok(collection) => {
+                    let data = Data::from_collection(collection);
                     self.load_data(path, data);
                     true
                 }
@@ -605,7 +655,7 @@ impl EditorState {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 pub struct Mutation<'a> {
     state: &'a mut EditorState,
@@ -883,7 +933,7 @@ impl<'a> Mutation<'a> {
     }
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 fn scale_2x(image: &Image) -> Image {
     let mut scaled = Image::new(image.width() * 2, image.height() * 2);
@@ -896,11 +946,11 @@ fn scale_2x(image: &Image) -> Image {
     scaled
 }
 
-// ========================================================================= //
+//===========================================================================//
 
 const DEFAULT_TEST_SENTENCE: &'static str = "The quick, brown fox jumps over \
                                              a ``lazy'' dog.";
 
 const MAX_UNDOS: usize = 100;
 
-// ========================================================================= //
+//===========================================================================//

@@ -22,18 +22,93 @@ use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
 use ahi::{self, Color};
-use sdl2::rect::Rect;
+use sdl2::rect::{Point, Rect};
 use std::cmp;
 
 //===========================================================================//
 
-pub struct ColorPalette {
-    element: SubrectElement<AggregateElement<Color>>,
+pub struct PaletteView {
+    element: SubrectElement<AggregateElement<EditorState>>,
+}
+impl PaletteView {
+    pub fn new(left: i32, top: i32) -> PaletteView {
+        let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
+            Box::new(ColorPalette::new(0, 0)),
+            PaletteView::arrow(
+                0,
+                ColorPalette::HEIGHT as i32,
+                -1,
+                Keycode::Left,
+            ),
+            PaletteView::arrow(
+                NextPrevPalette::WIDTH as i32,
+                ColorPalette::HEIGHT as i32,
+                1,
+                Keycode::Right,
+            ),
+        ];
+        PaletteView {
+            element: SubrectElement::new(
+                AggregateElement::new(elements),
+                Rect::new(
+                    left,
+                    top,
+                    ColorPalette::WIDTH,
+                    ColorPalette::HEIGHT + NextPrevPalette::HEIGHT,
+                ),
+            ),
+        }
+    }
+
+    fn arrow(
+        x: i32,
+        y: i32,
+        delta: i32,
+        key: Keycode,
+    ) -> Box<dyn GuiElement<EditorState>> {
+        Box::new(SubrectElement::new(
+            NextPrevPalette::new(delta, key),
+            Rect::new(
+                x,
+                y,
+                NextPrevPalette::WIDTH as u32,
+                NextPrevPalette::HEIGHT as u32,
+            ),
+        ))
+    }
+}
+
+impl GuiElement<EditorState> for PaletteView {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        self.element.draw(state, resources, canvas);
+    }
+
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action {
+        self.element.handle_event(event, state)
+    }
+}
+
+//===========================================================================//
+
+struct ColorPalette {
+    element: SubrectElement<AggregateElement<EditorState>>,
 }
 
 impl ColorPalette {
-    pub fn new(left: i32, top: i32) -> ColorPalette {
-        let elements: Vec<Box<dyn GuiElement<Color>>> = vec![
+    const WIDTH: u32 = 36;
+    const HEIGHT: u32 = 144;
+
+    fn new(left: i32, top: i32) -> ColorPalette {
+        let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
             ColorPalette::picker(0, 0, Color::C0, Keycode::Num0),
             ColorPalette::picker(18, 0, Color::C1, Keycode::Num1),
             ColorPalette::picker(0, 18, Color::C2, Keycode::Num2),
@@ -54,7 +129,12 @@ impl ColorPalette {
         ColorPalette {
             element: SubrectElement::new(
                 AggregateElement::new(elements),
-                Rect::new(left, top, 36, 144),
+                Rect::new(
+                    left,
+                    top,
+                    ColorPalette::WIDTH,
+                    ColorPalette::HEIGHT,
+                ),
             ),
         }
     }
@@ -64,7 +144,7 @@ impl ColorPalette {
         y: i32,
         color: Color,
         key: Keycode,
-    ) -> Box<dyn GuiElement<Color>> {
+    ) -> Box<dyn GuiElement<EditorState>> {
         Box::new(SubrectElement::new(
             ColorPicker::new(color, key),
             Rect::new(x, y, 18, 18),
@@ -80,7 +160,7 @@ impl GuiElement<EditorState> for ColorPalette {
         canvas: &mut Canvas,
     ) {
         canvas.fill_rect((95, 95, 95, 255), self.element.rect());
-        self.element.draw(&state.color(), resources, canvas);
+        self.element.draw(state, resources, canvas);
     }
 
     fn handle_event(
@@ -88,15 +168,7 @@ impl GuiElement<EditorState> for ColorPalette {
         event: &Event,
         state: &mut EditorState,
     ) -> Action {
-        let mut new_color = state.color();
-        let result = self.element.handle_event(event, &mut new_color);
-        if new_color != state.color() {
-            state.set_color(new_color);
-            if state.tool() == Tool::Select {
-                state.set_tool(Tool::Pencil);
-            }
-        }
-        result
+        self.element.handle_event(event, state)
     }
 }
 
@@ -111,18 +183,27 @@ impl ColorPicker {
     fn new(color: Color, key: Keycode) -> ColorPicker {
         ColorPicker { color, key }
     }
+
+    fn pick_color(&self, state: &mut EditorState) {
+        if state.color() != self.color {
+            state.set_color(self.color);
+            if state.tool() == Tool::Select {
+                state.set_tool(Tool::Pencil);
+            }
+        }
+    }
 }
 
-impl GuiElement<Color> for ColorPicker {
+impl GuiElement<EditorState> for ColorPicker {
     fn draw(
         &self,
-        state: &Color,
+        state: &EditorState,
         _resources: &Resources,
         canvas: &mut Canvas,
     ) {
         let rect = canvas.rect();
         let inner = shrink(rect, 2);
-        let (r, g, b, a) = ahi::Palette::default()[self.color];
+        let (r, g, b, a) = state.palette()[self.color];
         if a < u8::MAX {
             canvas.draw_rect((0, 0, 0, 255), inner);
             canvas.draw_rect((0, 0, 0, 255), shrink(inner, 2));
@@ -131,21 +212,83 @@ impl GuiElement<Color> for ColorPicker {
         if a > 0 {
             canvas.fill_rect((r, g, b, a), inner);
         }
-        if *state == self.color {
+        if state.color() == self.color {
             canvas.draw_rect((255, 255, 255, 255), rect);
         }
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut Color) -> Action {
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action {
         match event {
             &Event::MouseDown(_) => {
-                *state = self.color;
+                self.pick_color(state);
                 return Action::redraw().and_stop();
             }
             &Event::KeyDown(key, kmod) => {
                 if key == self.key && kmod == NONE {
-                    *state = self.color;
+                    self.pick_color(state);
                     return Action::redraw().and_stop();
+                }
+            }
+            _ => {}
+        }
+        Action::ignore().and_continue()
+    }
+}
+
+//===========================================================================//
+
+struct NextPrevPalette {
+    delta: i32,
+    key: Keycode,
+}
+
+impl NextPrevPalette {
+    const WIDTH: u32 = 18;
+    const HEIGHT: u32 = 18;
+
+    fn new(delta: i32, key: Keycode) -> NextPrevPalette {
+        NextPrevPalette { delta, key }
+    }
+
+    fn increment(&self, state: &mut EditorState) -> Action {
+        let new_index = ((state.palette_index() as i32) + self.delta)
+            .rem_euclid(state.num_palettes() as i32);
+        state.set_palette_index(new_index as usize);
+        Action::redraw().and_stop()
+    }
+}
+
+impl GuiElement<EditorState> for NextPrevPalette {
+    fn draw(
+        &self,
+        _: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        let icon = if self.delta > 0 {
+            resources.tool_icon(11)
+        } else {
+            resources.tool_icon(10)
+        };
+        canvas.draw_sprite(icon, Point::new(1, 1));
+    }
+
+    fn handle_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action {
+        match event {
+            &Event::MouseDown(_) => {
+                return self.increment(state);
+            }
+            &Event::KeyDown(key, kmod) => {
+                if key == self.key && kmod == NONE {
+                    return self.increment(state);
                 }
             }
             _ => {}
