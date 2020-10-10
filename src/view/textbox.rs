@@ -162,9 +162,17 @@ impl GuiElement<EditorState> for ModalTextBox {
                 self.element.draw(text, resources, canvas);
                 "Save:"
             }
+            Mode::SetMetadata(ref text) => {
+                self.element.draw(text, resources, canvas);
+                "Meta:"
+            }
             Mode::SetMetrics(ref text) => {
                 self.element.draw(text, resources, canvas);
                 "Metrics:"
+            }
+            Mode::SetTag(ref text) => {
+                self.element.draw(text, resources, canvas);
+                "Tag:"
             }
             Mode::TestSentence => {
                 self.element.draw(state.test_sentence(), resources, canvas);
@@ -209,7 +217,9 @@ impl GuiElement<EditorState> for ModalTextBox {
                     | Mode::NewGlyph(ref mut text)
                     | Mode::Resize(ref mut text)
                     | Mode::SaveAs(ref mut text)
-                    | Mode::SetMetrics(ref mut text) => {
+                    | Mode::SetMetadata(ref mut text)
+                    | Mode::SetMetrics(ref mut text)
+                    | Mode::SetTag(ref mut text) => {
                         return self.element.handle_event(event, text)
                     }
                     Mode::TestSentence => {}

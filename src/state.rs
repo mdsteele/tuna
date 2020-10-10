@@ -51,7 +51,9 @@ pub enum Mode {
     NewGlyph(String),
     Resize(String),
     SaveAs(String),
+    SetMetadata(String),
     SetMetrics(String),
+    SetTag(String),
     TestSentence,
 }
 
@@ -496,6 +498,23 @@ impl EditorState {
         }
     }
 
+    pub fn begin_set_metadata(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
+            self.mode = Mode::SetMetadata(
+                self.image()
+                    .metadata()
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn begin_set_metrics(&mut self) -> bool {
         if self.mode == Mode::Edit {
             if let Some((bl, le, re)) = self.image_metrics() {
@@ -505,6 +524,16 @@ impl EditorState {
             } else {
                 false
             }
+        } else {
+            false
+        }
+    }
+
+    pub fn begin_set_tag(&mut self) -> bool {
+        if self.mode == Mode::Edit {
+            self.unselect_if_necessary();
+            self.mode = Mode::SetTag(self.image().tag().to_string());
+            true
         } else {
             false
         }
@@ -614,6 +643,21 @@ impl EditorState {
                     }
                 }
             }
+            Mode::SetMetadata(text) => {
+                let result = if text.is_empty() {
+                    Ok(vec![])
+                } else {
+                    text.split(",").map(|s| s.parse::<i16>()).collect()
+                };
+                match result {
+                    Ok(metadata) => {
+                        self.mutation().set_metadata(metadata);
+                        self.mode = Mode::Edit;
+                        true
+                    }
+                    Err(_) => false,
+                }
+            }
             Mode::SetMetrics(text) => {
                 let pieces: Vec<&str> = text.split('/').collect();
                 if pieces.len() != 3 {
@@ -636,6 +680,11 @@ impl EditorState {
                     new_left_edge,
                     new_right_edge,
                 );
+                self.mode = Mode::Edit;
+                true
+            }
+            Mode::SetTag(text) => {
+                self.mutation().set_tag(text);
                 self.mode = Mode::Edit;
                 true
             }
@@ -808,6 +857,12 @@ impl<'a> Mutation<'a> {
         }
     }
 
+    fn set_metadata(&mut self, data: Vec<i16>) {
+        if let Data::AHI(ref mut ahi) = self.state.current.data {
+            Rc::make_mut(&mut ahi.images[ahi.image_index]).set_metadata(data);
+        }
+    }
+
     fn set_metrics(
         &mut self,
         new_baseline: i32,
@@ -822,6 +877,12 @@ impl<'a> Mutation<'a> {
             };
             glyph.set_left_edge(new_left_edge);
             glyph.set_right_edge(new_right_edge);
+        }
+    }
+
+    fn set_tag(&mut self, tag: String) {
+        if let Data::AHI(ref mut ahi) = self.state.current.data {
+            Rc::make_mut(&mut ahi.images[ahi.image_index]).set_tag(tag);
         }
     }
 

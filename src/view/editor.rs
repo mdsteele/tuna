@@ -17,7 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::namebox::ImageNameBox;
+use super::metadata::MetadataView;
 use super::palette::PaletteView;
 use super::scrollbar::ImagesScrollbar;
 use super::textbox::ModalTextBox;
@@ -51,7 +51,7 @@ impl EditorView {
             Box::new(ImageCanvas::new(80, 36, 256)),
             Box::new(ImageCanvas::new(348, 36, 64)),
             Box::new(TileView::new(341, 126, 96, 96)),
-            Box::new(ImageNameBox::new(348, 260)),
+            Box::new(MetadataView::new(348, 230)),
         ];
         EditorView {
             element: SubrectElement::new(
@@ -111,6 +111,9 @@ impl GuiElement<EditorState> for EditorView {
                 state.mutation().rotate_selection_counterclockwise();
                 Action::redraw().and_stop()
             }
+            &Event::KeyDown(Keycode::M, kmod) if kmod == COMMAND | SHIFT => {
+                Action::redraw_if(state.begin_set_metadata()).and_stop()
+            }
             &Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
                 Action::redraw_if(state.begin_new_image()).and_stop()
             }
@@ -130,6 +133,9 @@ impl GuiElement<EditorState> for EditorView {
             }
             &Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(state.begin_save_as()).and_stop()
+            }
+            &Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND => {
+                Action::redraw_if(state.begin_set_tag()).and_stop()
             }
             &Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(state.begin_set_test_sentence()).and_stop()

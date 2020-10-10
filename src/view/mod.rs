@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 mod editor;
-mod namebox;
+mod metadata;
 mod palette;
 mod scrollbar;
 mod textbox;

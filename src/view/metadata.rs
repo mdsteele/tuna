@@ -24,26 +24,51 @@ use crate::state::EditorState;
 
 //===========================================================================//
 
-pub struct ImageNameBox {
+pub struct MetadataView {
     left: i32,
     top: i32,
 }
 
-impl ImageNameBox {
-    pub fn new(left: i32, top: i32) -> ImageNameBox {
-        ImageNameBox { left, top }
+impl MetadataView {
+    pub fn new(left: i32, top: i32) -> MetadataView {
+        MetadataView { left, top }
     }
 }
 
-impl GuiElement<EditorState> for ImageNameBox {
+impl GuiElement<EditorState> for MetadataView {
     fn draw(
         &self,
         state: &EditorState,
         resources: &Resources,
         canvas: &mut Canvas,
     ) {
-        let text = state.image_name();
-        canvas.draw_string(resources.font(), self.left, self.top, &text);
+        let name = state.image_name();
+        let num_images = state.num_images();
+        canvas.draw_string(
+            resources.font(),
+            self.left,
+            self.top,
+            &format!("{}/{}", name, num_images),
+        );
+        let image = state.image();
+        canvas.draw_string(
+            resources.font(),
+            self.left,
+            self.top + 14,
+            &format!("{}x{}", image.width(), image.height()),
+        );
+        canvas.draw_string(
+            resources.font(),
+            self.left,
+            self.top + 28,
+            &format!("`{}'", image.tag().escape_default()),
+        );
+        canvas.draw_string(
+            resources.font(),
+            self.left,
+            self.top + 42,
+            &format!("{:?}", image.metadata()),
+        );
     }
 
     fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
