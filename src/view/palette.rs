@@ -21,7 +21,7 @@ use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
-use ahi::Color;
+use ahi::{self, Color};
 use sdl2::rect::Rect;
 use std::cmp;
 
@@ -34,22 +34,22 @@ pub struct ColorPalette {
 impl ColorPalette {
     pub fn new(left: i32, top: i32) -> ColorPalette {
         let elements: Vec<Box<dyn GuiElement<Color>>> = vec![
-            ColorPalette::picker(0, 0, Color::Transparent, Keycode::Num0),
-            ColorPalette::picker(18, 0, Color::Black, Keycode::Num1),
-            ColorPalette::picker(0, 18, Color::DarkRed, Keycode::Num2),
-            ColorPalette::picker(18, 18, Color::Red, Keycode::Num3),
-            ColorPalette::picker(0, 36, Color::DarkGreen, Keycode::Num4),
-            ColorPalette::picker(18, 36, Color::Green, Keycode::Num5),
-            ColorPalette::picker(0, 54, Color::DarkYellow, Keycode::Num6),
-            ColorPalette::picker(18, 54, Color::Yellow, Keycode::Num7),
-            ColorPalette::picker(0, 72, Color::DarkBlue, Keycode::Num8),
-            ColorPalette::picker(18, 72, Color::Blue, Keycode::Num9),
-            ColorPalette::picker(0, 90, Color::DarkMagenta, Keycode::A),
-            ColorPalette::picker(18, 90, Color::Magenta, Keycode::B),
-            ColorPalette::picker(0, 108, Color::DarkCyan, Keycode::C),
-            ColorPalette::picker(18, 108, Color::Cyan, Keycode::D),
-            ColorPalette::picker(0, 126, Color::Gray, Keycode::E),
-            ColorPalette::picker(18, 126, Color::White, Keycode::F),
+            ColorPalette::picker(0, 0, Color::C0, Keycode::Num0),
+            ColorPalette::picker(18, 0, Color::C1, Keycode::Num1),
+            ColorPalette::picker(0, 18, Color::C2, Keycode::Num2),
+            ColorPalette::picker(18, 18, Color::C3, Keycode::Num3),
+            ColorPalette::picker(0, 36, Color::C4, Keycode::Num4),
+            ColorPalette::picker(18, 36, Color::C5, Keycode::Num5),
+            ColorPalette::picker(0, 54, Color::C6, Keycode::Num6),
+            ColorPalette::picker(18, 54, Color::C7, Keycode::Num7),
+            ColorPalette::picker(0, 72, Color::C8, Keycode::Num8),
+            ColorPalette::picker(18, 72, Color::C9, Keycode::Num9),
+            ColorPalette::picker(0, 90, Color::Ca, Keycode::A),
+            ColorPalette::picker(18, 90, Color::Cb, Keycode::B),
+            ColorPalette::picker(0, 108, Color::Cc, Keycode::C),
+            ColorPalette::picker(18, 108, Color::Cd, Keycode::D),
+            ColorPalette::picker(0, 126, Color::Ce, Keycode::E),
+            ColorPalette::picker(18, 126, Color::Cf, Keycode::F),
         ];
         ColorPalette {
             element: SubrectElement::new(
@@ -122,12 +122,14 @@ impl GuiElement<Color> for ColorPicker {
     ) {
         let rect = canvas.rect();
         let inner = shrink(rect, 2);
-        if self.color == Color::Transparent {
+        let (r, g, b, a) = ahi::Palette::default()[self.color];
+        if a < u8::MAX {
             canvas.draw_rect((0, 0, 0, 255), inner);
             canvas.draw_rect((0, 0, 0, 255), shrink(inner, 2));
             canvas.draw_rect((0, 0, 0, 255), shrink(inner, 4));
-        } else {
-            canvas.fill_rect(self.color.rgba(), inner);
+        }
+        if a > 0 {
+            canvas.fill_rect((r, g, b, a), inner);
         }
         if *state == self.color {
             canvas.draw_rect((255, 255, 255, 255), rect);

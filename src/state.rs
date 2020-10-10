@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 use super::util;
-use ahi::{Color, Font, Glyph, Image};
+use ahi::{Collection, Color, Font, Glyph, Image};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
 use std::io;
@@ -104,7 +104,7 @@ impl EditorState {
         }
         EditorState {
             mode: Mode::Edit,
-            color: Color::Black,
+            color: Color::C1,
             filepath,
             current: Snapshot {
                 data: Data::AHI(AhiData {
@@ -366,7 +366,8 @@ impl EditorState {
             Data::AHI(ref ahi) => {
                 let images: Vec<Image> =
                     ahi.images.iter().map(|rc| rc.deref().clone()).collect();
-                Image::write_all(&mut file, &images)?;
+                let collection = Collection { images, palettes: vec![] };
+                collection.write(&mut file)?;
             }
             Data::AHF(ref ahf) => {
                 ahf.font.write(file)?;
@@ -504,10 +505,10 @@ impl EditorState {
                 }
             },
             Mode::LoadFile(path) => match util::load_ahi_from_file(&path) {
-                Ok(mut images) => {
+                Ok(mut col) => {
                     let data = Data::AHI(AhiData {
                         image_index: 0,
-                        images: images.drain(..).map(Rc::new).collect(),
+                        images: col.images.drain(..).map(Rc::new).collect(),
                     });
                     self.load_data(path, data);
                     true
@@ -784,7 +785,7 @@ impl<'a> Mutation<'a> {
             rect.y(),
             rect.width(),
             rect.height(),
-            Color::Transparent,
+            Color::C0,
         );
         self.state.tool = Tool::Select;
     }

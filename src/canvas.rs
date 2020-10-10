@@ -89,12 +89,14 @@ impl<'a> Canvas<'a> {
         top: i32,
         scale: u32,
     ) {
+        let palette = ahi::Palette::default();
         for row in 0..image.height() {
             for col in 0..image.width() {
                 let pixel = image[(col, row)];
-                if pixel != ahi::Color::Transparent {
+                let (r, g, b, a) = palette[pixel];
+                if a > 0 {
                     self.fill_rect(
-                        pixel.rgba(),
+                        (r, g, b, a),
                         Rect::new(
                             left + (scale * col) as i32,
                             top + (scale * row) as i32,
@@ -120,9 +122,11 @@ impl<'a> Canvas<'a> {
 
     pub fn fill_rect(&mut self, color: (u8, u8, u8, u8), rect: Rect) {
         let (r, g, b, a) = color;
-        self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
-        let subrect = self.subrect(rect);
-        self.renderer.fill_rect(subrect).unwrap();
+        if a > 0 {
+            self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
+            let subrect = self.subrect(rect);
+            self.renderer.fill_rect(subrect).unwrap();
+        }
     }
 
     pub fn draw_string(
@@ -291,16 +295,20 @@ fn load_sprites_from_file<'a>(
     creator: &'a TextureCreator<WindowContext>,
     path: &str,
 ) -> Vec<Sprite<'a>> {
-    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
-    images.iter().map(|image| load_sprite_from_image(creator, image)).collect()
+    let collection = util::load_ahi_from_file(&path.to_string()).unwrap();
+    collection
+        .images
+        .iter()
+        .map(|image| load_sprite_from_image(creator, image))
+        .collect()
 }
 
 fn load_sprite_from_file<'a>(
     creator: &'a TextureCreator<WindowContext>,
     path: &str,
 ) -> Sprite<'a> {
-    let images = util::load_ahi_from_file(&path.to_string()).unwrap();
-    load_sprite_from_image(creator, &images[0])
+    let collection = util::load_ahi_from_file(&path.to_string()).unwrap();
+    load_sprite_from_image(creator, &collection.images[0])
 }
 
 fn load_sprite_from_image<'a>(
@@ -309,7 +317,7 @@ fn load_sprite_from_image<'a>(
 ) -> Sprite<'a> {
     let width = image.width();
     let height = image.height();
-    let mut data = image.rgba_data();
+    let mut data = image.rgba_data(ahi::Palette::default());
     let format = if cfg!(target_endian = "big") {
         PixelFormatEnum::RGBA8888
     } else {

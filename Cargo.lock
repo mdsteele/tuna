@@ -3,7 +3,7 @@
 [[package]]
 name = "ahi"
 version = "0.1.0"
-source = "git+https://github.com/mdsteele/ahi?tag=v0.1.0#8dfd2b39ba35d77a3260d95d53369c149e875ecf"
+source = "git+https://github.com/mdsteele/ahi?rev=1534f7c8#1534f7c819443665132c0c0fc664aa1797237b32"
 
 [[package]]
 name = "bitflags"
@@ -63,7 +63,7 @@ dependencies = [
 name = "tuna"
 version = "0.1.0"
 dependencies = [
- "ahi 0.1.0 (git+https://github.com/mdsteele/ahi?tag=v0.1.0)",
+ "ahi 0.1.0 (git+https://github.com/mdsteele/ahi?rev=1534f7c8)",
  "num-integer 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "sdl2 0.34.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -74,7 +74,7 @@ version = "0.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [metadata]
-"checksum ahi 0.1.0 (git+https://github.com/mdsteele/ahi?tag=v0.1.0)" = "<none>"
+"checksum ahi 0.1.0 (git+https://github.com/mdsteele/ahi?rev=1534f7c8)" = "<none>"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 "checksum cfg-if 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d4c819a1287eb618df47cc647173c5c4c66ba19d888a6e50d605672aed3140de"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"

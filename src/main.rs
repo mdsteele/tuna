@@ -84,7 +84,10 @@ fn main() {
         let args: Vec<String> = std::env::args().collect();
         let (filepath, images) = if args.len() >= 2 {
             let filepath = &args[1];
-            (filepath.clone(), util::load_ahi_from_file(filepath).unwrap())
+            (
+                filepath.clone(),
+                util::load_ahi_from_file(filepath).unwrap().images,
+            )
         } else {
             ("./out.ahi".to_string(), vec![])
         };
