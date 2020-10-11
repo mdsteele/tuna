@@ -54,6 +54,7 @@ pub struct ImageCanvas {
     top_left: Point,
     max_size: u32,
     drag_from_to: Option<ImageCanvasDrag>,
+    lasso_points: Vec<(u32, u32)>,
     selection_animation_counter: i32,
     watercolor_parity: u32,
 }
@@ -64,6 +65,7 @@ impl ImageCanvas {
             top_left: Point::new(left, top),
             max_size,
             drag_from_to: None,
+            lasso_points: Vec::new(),
             selection_animation_counter: 0,
             watercolor_parity: 0,
         }
@@ -180,6 +182,16 @@ impl ImageCanvas {
         } else {
             false
         }
+    }
+
+    fn try_lasso(&mut self, mouse: Point, state: &mut EditorState) -> bool {
+        if let Some(position) = self.mouse_to_row_col(mouse, state) {
+            if !self.lasso_points.contains(&position) {
+                self.lasso_points.push(position);
+                return true;
+            }
+        }
+        return false;
     }
 
     fn try_draw_shape(
@@ -390,10 +402,10 @@ impl GuiElement<EditorState> for ImageCanvas {
             {
                 for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
                     canvas.draw_rect(
-                        (191, 191, 191, 255),
+                        (192, 64, 192, 255),
                         Rect::new(
-                            x * scale as i32,
-                            y * scale as i32,
+                            x * (scale as i32),
+                            y * (scale as i32),
                             scale,
                             scale,
                         ),
@@ -408,6 +420,18 @@ impl GuiElement<EditorState> for ImageCanvas {
                 rect.height() * scale,
             );
             draw_marquee(&mut canvas, marquee_rect, 0);
+        } else if state.tool() == Tool::Lasso {
+            for &(x, y) in self.lasso_points.iter() {
+                canvas.draw_rect(
+                    (192, 192, 64, 255),
+                    Rect::new(
+                        (x * scale) as i32,
+                        (y * scale) as i32,
+                        scale,
+                        scale,
+                    ),
+                );
+            }
         }
     }
 
@@ -458,6 +482,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                             let changed = self.try_eyedrop(pt, state);
                             return Action::redraw_if(changed).and_stop();
                         }
+                        Tool::Lasso => {
+                            let changed = self.try_lasso(pt, state);
+                            return Action::redraw_if(changed).and_stop();
+                        }
                         Tool::Line | Tool::Oval | Tool::Rectangle => {
                             self.drag_from_to = Some(ImageCanvasDrag {
                                 from_selection: Point::new(0, 0),
@@ -486,28 +514,19 @@ impl GuiElement<EditorState> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect =
-                                state.selection().map(|(ref img, pt)| {
-                                    Rect::new(
-                                        pt.x(),
-                                        pt.y(),
-                                        img.width(),
-                                        img.height(),
-                                    )
-                                });
+                            let rect = state.selection_rect();
                             if let Some(rect) = rect {
                                 let screen_topleft = self.top_left
                                     + rect.top_left()
                                         * self.scale(state) as i32;
                                 let scale = self.scale(state);
-                                if !Rect::new(
+                                let screen_rect = Rect::new(
                                     screen_topleft.x(),
                                     screen_topleft.y(),
                                     rect.width() * scale,
                                     rect.height() * scale,
-                                )
-                                .contains_point(pt)
-                                {
+                                );
+                                if !screen_rect.contains_point(pt) {
                                     state.mutation().unselect();
                                     return Action::redraw().and_stop();
                                 } else {
@@ -538,6 +557,16 @@ impl GuiElement<EditorState> for ImageCanvas {
             }
             &Event::MouseUp => {
                 match state.tool() {
+                    Tool::Lasso => {
+                        if !self.lasso_points.is_empty() {
+                            if state.selection().is_none() {
+                                state.mutation().lasso(&self.lasso_points);
+                                self.selection_animation_counter = 0;
+                            }
+                            self.lasso_points.clear();
+                            return Action::redraw().and_continue();
+                        }
+                    }
                     Tool::Line => {
                         let changed = self.try_draw_shape(Shape::Line, state);
                         return Action::redraw_if(changed).and_continue();
@@ -565,6 +594,10 @@ impl GuiElement<EditorState> for ImageCanvas {
                 self.drag_from_to = None;
             }
             &Event::MouseDrag(pt) => match state.tool() {
+                Tool::Lasso => {
+                    let changed = self.try_lasso(pt, state);
+                    return Action::redraw_if(changed).and_continue();
+                }
                 Tool::Line | Tool::Oval | Tool::Rectangle => {
                     if let Some(ref mut drag) = self.drag_from_to {
                         drag.to_pixel = pt;

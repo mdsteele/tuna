@@ -41,11 +41,12 @@ impl Toolbox {
             Toolbox::picker(2, 26, Tool::Watercolor, Keycode::W),
             Toolbox::picker(26, 26, Tool::Checkerboard, Keycode::H),
             Toolbox::picker(50, 26, Tool::PaletteSwap, Keycode::X),
-            Toolbox::picker(2, 50, Tool::Line, Keycode::L),
+            Toolbox::picker(2, 50, Tool::Line, Keycode::I),
             Toolbox::picker(26, 50, Tool::Rectangle, Keycode::R),
             Toolbox::picker(50, 50, Tool::Oval, Keycode::O),
             Toolbox::picker(2, 74, Tool::Eyedropper, Keycode::Y),
             Toolbox::picker(26, 74, Tool::Select, Keycode::S),
+            Toolbox::picker(50, 74, Tool::Lasso, Keycode::L),
         ];
         Toolbox {
             element: SubrectElement::new(
@@ -106,6 +107,7 @@ impl ToolPicker {
         let icon = match tool {
             Tool::Checkerboard => ToolIcon::Checkerboard,
             Tool::Eyedropper => ToolIcon::Eyedropper,
+            Tool::Lasso => ToolIcon::Lasso,
             Tool::Line => ToolIcon::Line,
             Tool::Oval => ToolIcon::Oval,
             Tool::PaintBucket => ToolIcon::PaintBucket,

@@ -32,6 +32,7 @@ use std::rc::Rc;
 pub enum Tool {
     Checkerboard,
     Eyedropper,
+    Lasso,
     Line,
     Oval,
     PaintBucket,
@@ -352,6 +353,12 @@ impl EditorState {
             Some((ref image, position)) => Some((&image, position)),
             None => None,
         }
+    }
+
+    pub fn selection_rect(&self) -> Option<Rect> {
+        self.current.selection.as_ref().map(|&(ref img, pt)| {
+            Rect::new(pt.x(), pt.y(), img.width(), img.height())
+        })
     }
 
     fn unselect_if_necessary(&mut self) {
@@ -886,6 +893,27 @@ impl<'a> Mutation<'a> {
         if let Data::AHI(ref mut ahi) = self.state.current.data {
             Rc::make_mut(&mut ahi.images[ahi.image_index]).set_tag(tag);
         }
+    }
+
+    pub fn lasso(&mut self, vertices: &[(u32, u32)]) {
+        self.unselect();
+        let min_x = vertices.iter().map(|&(x, _)| x).min().unwrap_or(0);
+        let max_x = vertices.iter().map(|&(x, _)| x + 1).max().unwrap_or(0);
+        let min_y = vertices.iter().map(|&(_, y)| y).min().unwrap_or(0);
+        let max_y = vertices.iter().map(|&(_, y)| y + 1).max().unwrap_or(0);
+        let mut selected = Image::new(max_x - min_x, max_y - min_y);
+        let image = self.image();
+        for row in min_y..max_y {
+            for col in min_x..max_x {
+                if vertices.contains(&(col, row)) {
+                    selected[(col - min_x, row - min_y)] = image[(col, row)];
+                    image[(col, row)] = Color::C0;
+                }
+            }
+        }
+        self.state.current.selection =
+            Some((Rc::new(selected), Point::new(min_x as i32, min_y as i32)));
+        self.state.tool = Tool::Select;
     }
 
     pub fn select(&mut self, rect: &Rect) {

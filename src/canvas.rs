@@ -277,6 +277,7 @@ pub enum ToolIcon {
     PaletteSwap,
     PaletteReplace,
     Watercolor,
+    Lasso,
     ArrowLeft,
     ArrowRight,
 }
