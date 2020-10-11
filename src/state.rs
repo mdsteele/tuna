@@ -422,7 +422,9 @@ impl EditorState {
             Data::AHI(ref ahi) => {
                 let images: Vec<Image> =
                     ahi.images.iter().map(|rc| rc.deref().clone()).collect();
-                let collection = Collection { images, palettes: vec![] };
+                let palettes: Vec<Palette> =
+                    ahi.palettes.iter().map(|rc| rc.deref().clone()).collect();
+                let collection = Collection { images, palettes };
                 collection.write(&mut file)?;
             }
             Data::AHF(ref ahf) => {
