@@ -278,6 +278,12 @@ pub enum ToolIcon {
     PaletteReplace,
     Watercolor,
     Lasso,
+    MirrorNone,
+    MirrorHorz,
+    MirrorVert,
+    MirrorBoth,
+    MirrorRot2,
+    MirrorRot4,
     ArrowLeft,
     ArrowRight,
 }

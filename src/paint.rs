@@ -150,8 +150,7 @@ impl ImageCanvas {
 
     fn try_pencil(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(position) = self.mouse_to_row_col(mouse, state) {
-            let color = state.color();
-            state.persistent_mutation().image()[position] = color;
+            state.persistent_mutation().color_pixel(position);
             true
         } else {
             false
@@ -167,8 +166,7 @@ impl ImageCanvas {
     fn try_watercolor(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(position) = self.mouse_to_row_col(mouse, state) {
             if self.watercolor_parity == (position.0 + position.1) % 2 {
-                let color = state.color();
-                state.persistent_mutation().image()[position] = color;
+                state.persistent_mutation().color_pixel(position);
                 return true;
             }
         }
@@ -201,15 +199,14 @@ impl ImageCanvas {
     ) -> bool {
         if let Some(((col1, row1), (col2, row2))) = self.dragged_points(state)
         {
-            let color = state.color();
+            let (width, height) = state.image_size();
             let mut mutation = state.mutation();
-            let image = mutation.image();
             for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
                 if x >= 0 && y >= 0 {
                     let x = x as u32;
                     let y = y as u32;
-                    if x < image.width() && y < image.height() {
-                        image[(x, y)] = color;
+                    if x < width && y < height {
+                        mutation.color_pixel((x, y));
                     }
                 }
             }
@@ -400,16 +397,27 @@ impl GuiElement<EditorState> for ImageCanvas {
             if let Some(((col1, row1), (col2, row2))) =
                 self.dragged_points(state)
             {
+                let (width, height) = state.image_size();
                 for (x, y) in bresenham_shape(shape, col1, row1, col2, row2) {
-                    canvas.draw_rect(
-                        (192, 64, 192, 255),
-                        Rect::new(
-                            x * (scale as i32),
-                            y * (scale as i32),
-                            scale,
-                            scale,
-                        ),
-                    );
+                    if x >= 0
+                        && x <= (width as i32)
+                        && y >= 0
+                        && y < (height as i32)
+                    {
+                        for (col, row) in
+                            state.mirror_positions((x as u32, y as u32))
+                        {
+                            canvas.draw_rect(
+                                (192, 64, 192, 255),
+                                Rect::new(
+                                    (col * scale) as i32,
+                                    (row * scale) as i32,
+                                    scale,
+                                    scale,
+                                ),
+                            );
+                        }
+                    }
                 }
             }
         } else if let Some(rect) = self.dragged_rect(state) {

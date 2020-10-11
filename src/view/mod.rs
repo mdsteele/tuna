@@ -19,6 +19,7 @@
 
 mod editor;
 mod metadata;
+mod mirrors;
 mod palette;
 mod scrollbar;
 mod textbox;

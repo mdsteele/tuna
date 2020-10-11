@@ -44,6 +44,16 @@ pub enum Tool {
     Watercolor,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Mirror {
+    None,
+    Horz,
+    Vert,
+    Both,
+    Rot2,
+    Rot4,
+}
+
 #[derive(Clone, Eq, PartialEq)]
 pub enum Mode {
     Edit,
@@ -119,6 +129,7 @@ pub struct EditorState {
     clipboard: Option<(Rc<Image>, Point)>,
     tool: Tool,
     prev_tool: Tool,
+    mirror: Mirror,
     persistent_mutation_active: bool,
     test_sentence: String,
 }
@@ -139,6 +150,7 @@ impl EditorState {
             clipboard: None,
             tool: Tool::Pencil,
             prev_tool: Tool::Pencil,
+            mirror: Mirror::None,
             persistent_mutation_active: false,
             test_sentence: DEFAULT_TEST_SENTENCE.to_string(),
         }
@@ -178,6 +190,69 @@ impl EditorState {
             self.prev_tool = self.tool;
             self.tool = tool;
         }
+    }
+
+    pub fn mirror(&self) -> Mirror {
+        self.mirror
+    }
+
+    pub fn set_mirror(&mut self, mirror: Mirror) {
+        self.mirror = mirror;
+    }
+
+    pub fn mirror_positions(&self, (x, y): (u32, u32)) -> Vec<(u32, u32)> {
+        let (width, height) = self.image_size();
+        debug_assert!(x < width);
+        debug_assert!(y < height);
+        let mirror = self.mirror();
+        let mut positions = vec![(x, y)];
+        if mirror == Mirror::Horz || mirror == Mirror::Both {
+            positions.push((width - x - 1, y));
+        }
+        if mirror == Mirror::Vert || mirror == Mirror::Both {
+            positions.push((x, height - y - 1));
+        }
+        if mirror == Mirror::Both
+            || mirror == Mirror::Rot2
+            || mirror == Mirror::Rot4
+        {
+            positions.push((width - x - 1, height - y - 1));
+        }
+        if mirror == Mirror::Rot4 {
+            let mut x1 = (height - y - 1) as i32;
+            let mut y1 = x as i32;
+            let mut x2 = y as i32;
+            let mut y2 = (width - x - 1) as i32;
+            if width > height {
+                let diff = ((width - height) / 2) as i32;
+                x1 += diff;
+                x2 += diff;
+                y1 -= diff;
+                y2 -= diff;
+            }
+            if height > width {
+                let diff = ((height - width) / 2) as i32;
+                x1 -= diff;
+                x2 -= diff;
+                y1 += diff;
+                y2 += diff;
+            }
+            if x1 >= 0
+                && (x1 as u32) < width
+                && y1 >= 0
+                && (y1 as u32) < height
+            {
+                positions.push((x1 as u32, y1 as u32));
+            }
+            if x2 >= 0
+                && (x2 as u32) < width
+                && y2 >= 0
+                && (y2 as u32) < height
+            {
+                positions.push((x2 as u32, y2 as u32));
+            }
+        }
+        positions
     }
 
     pub fn test_sentence(&self) -> &String {
@@ -740,6 +815,15 @@ impl<'a> Mutation<'a> {
                 Some(chr) => ahf.font[chr].image_mut(),
                 None => ahf.font.default_glyph_mut().image_mut(),
             },
+        }
+    }
+
+    pub fn color_pixel(&mut self, position: (u32, u32)) {
+        let color = self.state.color();
+        let positions = self.state.mirror_positions(position);
+        let image = self.image();
+        for pos in positions {
+            image[pos] = color;
         }
     }
 

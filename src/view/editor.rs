@@ -18,6 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 use super::metadata::MetadataView;
+use super::mirrors::Mirrors;
 use super::palette::PaletteView;
 use super::scrollbar::ImagesScrollbar;
 use super::textbox::ModalTextBox;
@@ -45,8 +46,9 @@ impl EditorView {
         let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
             Box::new(UnsavedIndicator::new(4, 11)),
             Box::new(ModalTextBox::new(20, 10)),
-            Box::new(PaletteView::new(3, 144)),
+            Box::new(PaletteView::new(3, 188)),
             Box::new(Toolbox::new(3, 34)),
+            Box::new(Mirrors::new(3, 134)),
             Box::new(ImagesScrollbar::new(440, 34)),
             Box::new(ImageCanvas::new(80, 36, 256)),
             Box::new(ImageCanvas::new(348, 36, 64)),
