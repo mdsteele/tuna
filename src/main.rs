@@ -19,7 +19,6 @@
 
 // TODO:
 // - Movable cursor for text box
-// - Better tab completion for filenames
 // - Windowed instead of fullscreen
 // - Allow editing palettes
 // - Allow adding and removing palettes

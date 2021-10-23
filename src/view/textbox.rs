@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 
 //===========================================================================//
 
-pub struct TextBox {}
+struct TextBox {}
 
 impl TextBox {
     pub fn new() -> TextBox {
@@ -77,28 +77,40 @@ impl GuiElement<String> for TextBox {
 }
 
 fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
-    let dir = if path.is_dir() {
+    let dir: &Path = if path.is_dir() {
         path
     } else {
-        path.parent().ok_or(io::Error::new(io::ErrorKind::Other, ""))?
+        path.parent().ok_or_else(|| io::Error::new(io::ErrorKind::Other, ""))?
     };
-    let prefix =
+    let prefix: &str =
         path.file_name().map(OsStr::to_str).unwrap_or(None).unwrap_or("");
-    let mut paths = Vec::new();
+
+    let mut file_names = Vec::<String>::new();
     for entry_result in dir.read_dir()? {
         let entry = entry_result?;
-        if entry.file_name().to_str().unwrap_or("").starts_with(prefix) {
-            paths.push(entry.path());
+        let file_name = entry.file_name().to_str().unwrap_or("").to_string();
+        if file_name.starts_with(prefix) {
+            file_names.push(file_name);
         }
     }
-    if paths.is_empty() {
-        Err(io::Error::new(io::ErrorKind::Other, ""))
-    } else {
-        let mut completed = paths.pop().unwrap();
-        if completed.is_dir() {
-            completed.push("");
+
+    if let Some(first) = file_names.pop() {
+        let mut completed = String::new();
+        for chr in first.chars() {
+            let mut candidate = completed.clone();
+            candidate.push(chr);
+            if !file_names.iter().all(|name| name.starts_with(&candidate)) {
+                break;
+            }
+            completed = candidate;
         }
-        Ok(completed)
+        let mut completed_path = dir.join(completed);
+        if completed_path.is_dir() {
+            completed_path.push("");
+        }
+        Ok(completed_path)
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, ""))
     }
 }
 
