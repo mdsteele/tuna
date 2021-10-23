@@ -334,7 +334,7 @@ impl GuiElement<EditorState> for ImageCanvas {
     fn draw(
         &self,
         state: &EditorState,
-        _resources: &Resources,
+        resources: &Resources,
         canvas: &mut Canvas,
     ) {
         let scale = self.scale(state);
@@ -428,6 +428,12 @@ impl GuiElement<EditorState> for ImageCanvas {
                 rect.height() * scale,
             );
             draw_marquee(&mut canvas, marquee_rect, 0);
+            canvas.draw_string(
+                resources.font(),
+                marquee_rect.x() + 1,
+                marquee_rect.y() + 1,
+                &format!("{}x{}", rect.width(), rect.height()),
+            );
         } else if state.tool() == Tool::Lasso {
             for &(x, y) in self.lasso_points.iter() {
                 canvas.draw_rect(
