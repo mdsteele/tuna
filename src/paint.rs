@@ -20,7 +20,7 @@
 use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::{Event, Keycode};
-use crate::state::{EditorState, Mode, Tool};
+use crate::state::{EditorState, Tool};
 use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 use std::cmp;
@@ -330,7 +330,7 @@ impl ImageCanvas {
     }
 }
 
-impl GuiElement<EditorState> for ImageCanvas {
+impl GuiElement<EditorState, ()> for ImageCanvas {
     fn draw(
         &self,
         state: &EditorState,
@@ -449,14 +449,11 @@ impl GuiElement<EditorState> for ImageCanvas {
         }
     }
 
-    fn handle_event(
+    fn on_event(
         &mut self,
         event: &Event,
         state: &mut EditorState,
-    ) -> Action {
-        if state.mode() != &Mode::Edit {
-            return Action::ignore().and_continue();
-        }
+    ) -> Action<()> {
         match event {
             &Event::ClockTick => {
                 if state.selection().is_some() {
@@ -464,9 +461,9 @@ impl GuiElement<EditorState> for ImageCanvas {
                         self.selection_animation_counter + 1,
                         MARQUEE_ANIMATION_MODULUS,
                     );
-                    return Action::redraw().and_continue();
+                    return Action::redraw();
                 } else {
-                    return Action::ignore().and_continue();
+                    return Action::ignore();
                 }
             }
             &Event::KeyDown(Keycode::Backspace, _) => {
@@ -474,7 +471,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                     state.mutation().delete_selection();
                     return Action::redraw().and_stop();
                 } else {
-                    return Action::ignore().and_continue();
+                    return Action::ignore();
                 }
             }
             &Event::KeyDown(Keycode::Escape, _) => {
@@ -482,7 +479,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                     state.mutation().unselect();
                     return Action::redraw().and_stop();
                 } else {
-                    return Action::ignore().and_continue();
+                    return Action::ignore();
                 }
             }
             &Event::MouseDown(pt) => {
@@ -578,20 +575,20 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 self.selection_animation_counter = 0;
                             }
                             self.lasso_points.clear();
-                            return Action::redraw().and_continue();
+                            return Action::redraw();
                         }
                     }
                     Tool::Line => {
                         let changed = self.try_draw_shape(Shape::Line, state);
-                        return Action::redraw_if(changed).and_continue();
+                        return Action::redraw_if(changed);
                     }
                     Tool::Oval => {
                         let changed = self.try_draw_shape(Shape::Oval, state);
-                        return Action::redraw_if(changed).and_continue();
+                        return Action::redraw_if(changed);
                     }
                     Tool::Rectangle => {
                         let changed = self.try_draw_shape(Shape::Rect, state);
-                        return Action::redraw_if(changed).and_continue();
+                        return Action::redraw_if(changed);
                     }
                     Tool::Select => {
                         if state.selection().is_none() {
@@ -599,7 +596,7 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 state.mutation().select(&rect);
                                 self.drag_from_to = None;
                                 self.selection_animation_counter = 0;
-                                return Action::redraw().and_continue();
+                                return Action::redraw();
                             }
                         }
                     }
@@ -610,17 +607,17 @@ impl GuiElement<EditorState> for ImageCanvas {
             &Event::MouseDrag(pt) => match state.tool() {
                 Tool::Lasso => {
                     let changed = self.try_lasso(pt, state);
-                    return Action::redraw_if(changed).and_continue();
+                    return Action::redraw_if(changed);
                 }
                 Tool::Line | Tool::Oval | Tool::Rectangle => {
                     if let Some(ref mut drag) = self.drag_from_to {
                         drag.to_pixel = pt;
-                        return Action::redraw().and_continue();
+                        return Action::redraw();
                     }
                 }
                 Tool::Pencil => {
                     let changed = self.try_pencil(pt, state);
-                    return Action::redraw_if(changed).and_continue();
+                    return Action::redraw_if(changed);
                 }
                 Tool::Select => {
                     let scale = self.scale(state) as i32;
@@ -633,18 +630,18 @@ impl GuiElement<EditorState> for ImageCanvas {
                                 .persistent_mutation()
                                 .reposition_selection(position);
                         }
-                        return Action::redraw().and_continue();
+                        return Action::redraw();
                     }
                 }
                 Tool::Watercolor => {
                     let changed = self.try_watercolor(pt, state);
-                    return Action::redraw_if(changed).and_continue();
+                    return Action::redraw_if(changed);
                 }
                 _ => {}
             },
             _ => {}
         }
-        return Action::ignore().and_continue();
+        return Action::ignore();
     }
 }
 

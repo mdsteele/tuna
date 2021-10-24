@@ -35,7 +35,7 @@ impl TileView {
     }
 }
 
-impl GuiElement<EditorState> for TileView {
+impl GuiElement<EditorState, ()> for TileView {
     fn draw(
         &self,
         state: &EditorState,
@@ -79,8 +79,8 @@ impl GuiElement<EditorState> for TileView {
         }
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
-        Action::ignore().and_continue()
+    fn on_event(&mut self, _: &Event, _: &mut EditorState) -> Action<()> {
+        Action::ignore()
     }
 }
 

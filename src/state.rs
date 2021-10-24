@@ -17,7 +17,6 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use super::util;
 use ahi::{Collection, Color, Font, Glyph, Image, Palette};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
@@ -52,20 +51,6 @@ pub enum Mirror {
     Both,
     Rot2,
     Rot4,
-}
-
-#[derive(Clone, Eq, PartialEq)]
-pub enum Mode {
-    Edit,
-    Goto(String),
-    LoadFile(String),
-    NewGlyph(String),
-    Resize(String),
-    SaveAs(String),
-    SetMetadata(String),
-    SetMetrics(String),
-    SetTag(String),
-    TestSentence,
 }
 
 //===========================================================================//
@@ -120,7 +105,6 @@ struct Snapshot {
 //===========================================================================//
 
 pub struct EditorState {
-    mode: Mode,
     color: Color,
     filepath: String,
     current: Snapshot,
@@ -137,7 +121,6 @@ pub struct EditorState {
 impl EditorState {
     pub fn new(filepath: String, collection: Collection) -> EditorState {
         EditorState {
-            mode: Mode::Edit,
             color: Color::C1,
             filepath,
             current: Snapshot {
@@ -164,12 +147,8 @@ impl EditorState {
         &self.filepath
     }
 
-    pub fn mode(&self) -> &Mode {
-        &self.mode
-    }
-
-    pub fn mode_mut(&mut self) -> &mut Mode {
-        &mut self.mode
+    pub fn swap_filepath(&mut self, path: String) -> String {
+        mem::replace(&mut self.filepath, path)
     }
 
     pub fn color(&self) -> Color {
@@ -259,8 +238,8 @@ impl EditorState {
         &self.test_sentence
     }
 
-    pub fn test_sentence_mut(&mut self) -> &mut String {
-        &mut self.test_sentence
+    pub fn set_test_sentence(&mut self, text: String) {
+        self.test_sentence = text;
     }
 
     pub fn eyedrop_at(&mut self, position: (u32, u32)) {
@@ -351,6 +330,32 @@ impl EditorState {
         }
     }
 
+    pub fn go_to(&mut self, text: &str) -> bool {
+        match self.current.data {
+            Data::AHI(ref mut ahi) => match text.parse::<usize>() {
+                Ok(index) if index < ahi.images.len() => {
+                    ahi.image_index = index;
+                    true
+                }
+                _ => false,
+            },
+            Data::AHF(ref mut ahf) => {
+                if text == "def" {
+                    ahf.current_char = None;
+                    true
+                } else {
+                    let chars: Vec<char> = text.chars().collect();
+                    if chars.len() == 1 {
+                        ahf.current_char = Some(chars[0]);
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
+        }
+    }
+
     pub fn image_name(&self) -> String {
         match self.current.data {
             Data::AHI(ref ahi) => format!("{}", ahi.image_index),
@@ -436,7 +441,7 @@ impl EditorState {
         })
     }
 
-    fn unselect_if_necessary(&mut self) {
+    pub fn unselect_if_necessary(&mut self) {
         self.reset_persistent_mutation();
         if self.selection().is_some() {
             self.mutation().unselect();
@@ -523,264 +528,15 @@ impl EditorState {
         Ok(())
     }
 
-    pub fn begin_new_image(&mut self) -> bool {
-        match self.current.data {
-            Data::AHI(_) => self.mutation().add_new_image('_'),
-            Data::AHF(_) => {
-                if self.mode == Mode::Edit {
-                    self.unselect_if_necessary();
-                    self.mode = Mode::NewGlyph(String::new());
-                    true
-                } else {
-                    false
-                }
-            }
-        }
+    pub fn load_collection(&mut self, path: String, collection: Collection) {
+        self.load_data(path, Data::from_collection(collection));
     }
 
-    pub fn begin_goto(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::Goto(String::new());
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_load_file(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::LoadFile(self.filepath.clone());
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_resize(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::Resize(format!(
-                "{}x{}",
-                self.image().width(),
-                self.image().height()
-            ));
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_save_as(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::SaveAs(self.filepath.clone());
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_set_metadata(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::SetMetadata(
-                self.image()
-                    .metadata()
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
-            );
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_set_metrics(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            if let Some((bl, le, re)) = self.image_metrics() {
-                self.unselect_if_necessary();
-                self.mode = Mode::SetMetrics(format!("{}/{}/{}", bl, le, re));
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_set_tag(&mut self) -> bool {
-        if self.mode == Mode::Edit {
-            self.unselect_if_necessary();
-            self.mode = Mode::SetTag(self.image().tag().to_string());
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn begin_set_test_sentence(&mut self) -> bool {
-        if self.mode == Mode::Edit && self.font().is_some() {
-            self.mode = Mode::TestSentence;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn mode_cancel(&mut self) -> bool {
-        match self.mode {
-            Mode::Edit => false,
-            _ => {
-                self.mode = Mode::Edit;
-                true
-            }
-        }
-    }
-
-    pub fn mode_perform(&mut self) -> bool {
-        match self.mode.clone() {
-            Mode::Edit => false,
-            Mode::Goto(ref text) => match self.current.data {
-                Data::AHI(ref mut ahi) => match text.parse::<usize>() {
-                    Ok(index) if index < ahi.images.len() => {
-                        ahi.image_index = index;
-                        self.mode = Mode::Edit;
-                        true
-                    }
-                    _ => false,
-                },
-                Data::AHF(ref mut ahf) => {
-                    if text == "def" {
-                        ahf.current_char = None;
-                        self.mode = Mode::Edit;
-                        true
-                    } else {
-                        let chars: Vec<char> = text.chars().collect();
-                        if chars.len() == 1 {
-                            ahf.current_char = Some(chars[0]);
-                            self.mode = Mode::Edit;
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                }
-            },
-            Mode::LoadFile(path) => match util::load_ahi_from_file(&path) {
-                Ok(collection) => {
-                    let data = Data::from_collection(collection);
-                    self.load_data(path, data);
-                    true
-                }
-                Err(_) => match util::load_ahf_from_file(&path) {
-                    Ok(font) => {
-                        let data =
-                            Data::AHF(AhfData { current_char: None, font });
-                        self.load_data(path, data);
-                        true
-                    }
-                    Err(_) => false,
-                },
-            },
-            Mode::NewGlyph(text) => {
-                let chars: Vec<char> = text.chars().collect();
-                if chars.len() == 1 && self.mutation().add_new_image(chars[0])
-                {
-                    self.mode = Mode::Edit;
-                    true
-                } else {
-                    false
-                }
-            }
-            Mode::Resize(text) => {
-                let pieces: Vec<&str> = text.split('x').collect();
-                if pieces.len() != 2 {
-                    return false;
-                }
-                let new_width = match pieces[0].parse::<u32>() {
-                    Ok(width) => width,
-                    Err(_) => return false,
-                };
-                let new_height = match pieces[1].parse::<u32>() {
-                    Ok(height) => height,
-                    Err(_) => return false,
-                };
-                self.mutation().resize_images(new_width, new_height);
-                self.mode = Mode::Edit;
-                true
-            }
-            Mode::SaveAs(mut path) => {
-                mem::swap(&mut path, &mut self.filepath);
-                match self.save_to_file() {
-                    Ok(()) => {
-                        self.mode = Mode::Edit;
-                        true
-                    }
-                    Err(_) => {
-                        mem::swap(&mut path, &mut self.filepath);
-                        false
-                    }
-                }
-            }
-            Mode::SetMetadata(text) => {
-                let result = if text.is_empty() {
-                    Ok(vec![])
-                } else {
-                    text.split(",").map(|s| s.parse::<i16>()).collect()
-                };
-                match result {
-                    Ok(metadata) => {
-                        self.mutation().set_metadata(metadata);
-                        self.mode = Mode::Edit;
-                        true
-                    }
-                    Err(_) => false,
-                }
-            }
-            Mode::SetMetrics(text) => {
-                let pieces: Vec<&str> = text.split('/').collect();
-                if pieces.len() != 3 {
-                    return false;
-                }
-                let new_baseline = match pieces[0].parse::<i32>() {
-                    Ok(baseline) => baseline,
-                    Err(_) => return false,
-                };
-                let new_left_edge = match pieces[1].parse::<i32>() {
-                    Ok(left_edge) => left_edge,
-                    Err(_) => return false,
-                };
-                let new_right_edge = match pieces[2].parse::<i32>() {
-                    Ok(right_edge) => right_edge,
-                    Err(_) => return false,
-                };
-                self.mutation().set_metrics(
-                    new_baseline,
-                    new_left_edge,
-                    new_right_edge,
-                );
-                self.mode = Mode::Edit;
-                true
-            }
-            Mode::SetTag(text) => {
-                self.mutation().set_tag(text);
-                self.mode = Mode::Edit;
-                true
-            }
-            Mode::TestSentence => {
-                self.mode = Mode::Edit;
-                true
-            }
-        }
+    pub fn load_font(&mut self, path: String, font: Font) {
+        self.load_data(path, Data::AHF(AhfData { current_char: None, font }));
     }
 
     fn load_data(&mut self, path: String, data: Data) {
-        self.mode = Mode::Edit;
         self.filepath = path;
         self.current = Snapshot { data, selection: None, unsaved: false };
         self.undo_stack.clear();
@@ -827,7 +583,7 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    fn add_new_image(&mut self, chr: char) -> bool {
+    pub fn add_new_image(&mut self, chr: char) -> bool {
         self.unselect();
         let (width, height) = self.state.image_size();
         match self.state.current.data {
@@ -950,13 +706,13 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    fn set_metadata(&mut self, data: Vec<i16>) {
+    pub fn set_metadata(&mut self, data: Vec<i16>) {
         if let Data::AHI(ref mut ahi) = self.state.current.data {
             Rc::make_mut(&mut ahi.images[ahi.image_index]).set_metadata(data);
         }
     }
 
-    fn set_metrics(
+    pub fn set_metrics(
         &mut self,
         new_baseline: i32,
         new_left_edge: i32,
@@ -973,7 +729,7 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    fn set_tag(&mut self, tag: String) {
+    pub fn set_tag(&mut self, tag: String) {
         if let Data::AHI(ref mut ahi) = self.state.current.data {
             Rc::make_mut(&mut ahi.images[ahi.image_index]).set_tag(tag);
         }

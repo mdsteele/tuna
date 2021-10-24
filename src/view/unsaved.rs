@@ -35,7 +35,7 @@ impl UnsavedIndicator {
     }
 }
 
-impl GuiElement<EditorState> for UnsavedIndicator {
+impl GuiElement<EditorState, ()> for UnsavedIndicator {
     fn draw(
         &self,
         state: &EditorState,
@@ -47,8 +47,8 @@ impl GuiElement<EditorState> for UnsavedIndicator {
         }
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
-        Action::ignore().and_continue()
+    fn on_event(&mut self, _: &Event, _: &mut EditorState) -> Action<()> {
+        Action::ignore()
     }
 }
 

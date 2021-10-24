@@ -18,7 +18,6 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Movable cursor for text box
 // - Windowed instead of fullscreen
 // - Allow editing palettes
 // - Allow adding and removing palettes
@@ -47,7 +46,7 @@ use sdl2::video::Window;
 
 const FRAME_DELAY_MILLIS: u32 = 100;
 
-fn render_screen<E: GuiElement<EditorState>>(
+fn render_screen<E: GuiElement<EditorState, ()>>(
     renderer: &mut SdlCanvas<Window>,
     resources: &Resources,
     state: &EditorState,
@@ -136,7 +135,7 @@ fn main() {
         };
         let action = match event {
             Event::Quit => return,
-            event => gui.handle_event(&event, &mut state),
+            event => gui.on_event(&event, &mut state),
         };
         if action.should_redraw() {
             render_screen(&mut renderer, &resources, &state, &gui);

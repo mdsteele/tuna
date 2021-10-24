@@ -27,12 +27,12 @@ use sdl2::rect::{Point, Rect};
 //===========================================================================//
 
 pub struct ImagesScrollbar {
-    element: SubrectElement<AggregateElement<EditorState>>,
+    element: SubrectElement<AggregateElement<EditorState, ()>>,
 }
 
 impl ImagesScrollbar {
     pub fn new(left: i32, top: i32) -> ImagesScrollbar {
-        let elements: Vec<Box<dyn GuiElement<EditorState>>> = vec![
+        let elements: Vec<Box<dyn GuiElement<EditorState, ()>>> = vec![
             ImagesScrollbar::arrow_button(2, -1, Keycode::Up),
             ImagesScrollbar::picker(20, -2),
             ImagesScrollbar::picker(58, -1),
@@ -54,14 +54,14 @@ impl ImagesScrollbar {
         y: i32,
         delta: i32,
         key: Keycode,
-    ) -> Box<dyn GuiElement<EditorState>> {
+    ) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
             NextPrevImage::new(delta, key),
             Rect::new(2, y, 32, 16),
         ))
     }
 
-    fn picker(y: i32, delta: i32) -> Box<dyn GuiElement<EditorState>> {
+    fn picker(y: i32, delta: i32) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
             ImagePicker::new(delta),
             Rect::new(1, y, 36, 36),
@@ -69,7 +69,7 @@ impl ImagesScrollbar {
     }
 }
 
-impl GuiElement<EditorState> for ImagesScrollbar {
+impl GuiElement<EditorState, ()> for ImagesScrollbar {
     fn draw(
         &self,
         state: &EditorState,
@@ -80,12 +80,12 @@ impl GuiElement<EditorState> for ImagesScrollbar {
         self.element.draw(state, resources, canvas);
     }
 
-    fn handle_event(
+    fn on_event(
         &mut self,
         event: &Event,
         state: &mut EditorState,
-    ) -> Action {
-        self.element.handle_event(event, state)
+    ) -> Action<()> {
+        self.element.on_event(event, state)
     }
 }
 
@@ -110,7 +110,7 @@ impl ImagePicker {
     }
 }
 
-impl GuiElement<EditorState> for ImagePicker {
+impl GuiElement<EditorState, ()> for ImagePicker {
     fn draw(
         &self,
         state: &EditorState,
@@ -131,11 +131,11 @@ impl GuiElement<EditorState> for ImagePicker {
         canvas.draw_rect(color, rect);
     }
 
-    fn handle_event(
+    fn on_event(
         &mut self,
         event: &Event,
         state: &mut EditorState,
-    ) -> Action {
+    ) -> Action<()> {
         match event {
             &Event::MouseDown(_) => {
                 if let Some(index) = self.index(state) {
@@ -145,7 +145,7 @@ impl GuiElement<EditorState> for ImagePicker {
                     Action::ignore().and_stop()
                 }
             }
-            _ => Action::ignore().and_continue(),
+            _ => Action::ignore(),
         }
     }
 }
@@ -162,7 +162,7 @@ impl NextPrevImage {
         NextPrevImage { delta, key }
     }
 
-    fn increment(&self, state: &mut EditorState) -> Action {
+    fn increment(&self, state: &mut EditorState) -> Action<()> {
         let new_index = mod_floor(
             (state.image_index() as i32) + self.delta,
             state.num_images() as i32,
@@ -172,7 +172,7 @@ impl NextPrevImage {
     }
 }
 
-impl GuiElement<EditorState> for NextPrevImage {
+impl GuiElement<EditorState, ()> for NextPrevImage {
     fn draw(
         &self,
         _: &EditorState,
@@ -187,11 +187,11 @@ impl GuiElement<EditorState> for NextPrevImage {
         canvas.draw_sprite(icon, Point::new(0, 0));
     }
 
-    fn handle_event(
+    fn on_event(
         &mut self,
         event: &Event,
         state: &mut EditorState,
-    ) -> Action {
+    ) -> Action<()> {
         match event {
             &Event::MouseDown(_) => {
                 return self.increment(state);
@@ -203,7 +203,7 @@ impl GuiElement<EditorState> for NextPrevImage {
             }
             _ => {}
         }
-        Action::ignore().and_continue()
+        Action::ignore()
     }
 }
 

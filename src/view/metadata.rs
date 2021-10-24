@@ -35,7 +35,7 @@ impl MetadataView {
     }
 }
 
-impl GuiElement<EditorState> for MetadataView {
+impl GuiElement<EditorState, ()> for MetadataView {
     fn draw(
         &self,
         state: &EditorState,
@@ -71,8 +71,8 @@ impl GuiElement<EditorState> for MetadataView {
         );
     }
 
-    fn handle_event(&mut self, _: &Event, _: &mut EditorState) -> Action {
-        Action::ignore().and_continue()
+    fn on_event(&mut self, _: &Event, _: &mut EditorState) -> Action<()> {
+        Action::ignore()
     }
 }
 

@@ -26,7 +26,7 @@ use sdl2::rect::{Point, Rect};
 //===========================================================================//
 
 pub struct Mirrors {
-    element: SubrectElement<AggregateElement<Mirror>>,
+    element: SubrectElement<AggregateElement<Mirror, ()>>,
 }
 
 impl Mirrors {
@@ -34,7 +34,7 @@ impl Mirrors {
     const HEIGHT: u32 = 48;
 
     pub fn new(left: i32, top: i32) -> Mirrors {
-        let elements: Vec<Box<dyn GuiElement<Mirror>>> = vec![
+        let elements: Vec<Box<dyn GuiElement<Mirror, ()>>> = vec![
             Mirrors::picker(2, 2, Mirror::None),
             Mirrors::picker(26, 2, Mirror::Horz),
             Mirrors::picker(50, 2, Mirror::Rot2),
@@ -50,7 +50,11 @@ impl Mirrors {
         }
     }
 
-    fn picker(x: i32, y: i32, mirror: Mirror) -> Box<dyn GuiElement<Mirror>> {
+    fn picker(
+        x: i32,
+        y: i32,
+        mirror: Mirror,
+    ) -> Box<dyn GuiElement<Mirror, ()>> {
         Box::new(SubrectElement::new(
             MirrorPicker::new(mirror),
             Rect::new(x, y, 20, 20),
@@ -58,7 +62,7 @@ impl Mirrors {
     }
 }
 
-impl GuiElement<EditorState> for Mirrors {
+impl GuiElement<EditorState, ()> for Mirrors {
     fn draw(
         &self,
         state: &EditorState,
@@ -69,13 +73,13 @@ impl GuiElement<EditorState> for Mirrors {
         self.element.draw(&state.mirror(), resources, canvas);
     }
 
-    fn handle_event(
+    fn on_event(
         &mut self,
         event: &Event,
         state: &mut EditorState,
-    ) -> Action {
+    ) -> Action<()> {
         let mut new_mirror = state.mirror();
-        let action = self.element.handle_event(event, &mut new_mirror);
+        let action = self.element.on_event(event, &mut new_mirror);
         if new_mirror != state.mirror() {
             state.set_mirror(new_mirror);
         }
@@ -104,7 +108,7 @@ impl MirrorPicker {
     }
 }
 
-impl GuiElement<Mirror> for MirrorPicker {
+impl GuiElement<Mirror, ()> for MirrorPicker {
     fn draw(
         &self,
         mirror: &Mirror,
@@ -119,7 +123,7 @@ impl GuiElement<Mirror> for MirrorPicker {
         canvas.draw_sprite(resources.tool_icon(self.icon), Point::new(2, 2));
     }
 
-    fn handle_event(&mut self, event: &Event, mirror: &mut Mirror) -> Action {
+    fn on_event(&mut self, event: &Event, mirror: &mut Mirror) -> Action<()> {
         match event {
             &Event::MouseDown(_) => {
                 *mirror = self.mirror;
@@ -127,7 +131,7 @@ impl GuiElement<Mirror> for MirrorPicker {
             }
             _ => {}
         }
-        Action::ignore().and_continue()
+        Action::ignore()
     }
 }
 
