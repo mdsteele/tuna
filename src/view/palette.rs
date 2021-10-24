@@ -40,12 +40,21 @@ impl PaletteView {
                 -1,
                 Keycode::Left,
             ),
+            PaletteView::add_palette_button(
+                NextPrevPalette::WIDTH as i32,
+                ColorPalette::HEIGHT as i32,
+            ),
+            PaletteView::delete_palette_button(
+                2 * (NextPrevPalette::WIDTH as i32),
+                ColorPalette::HEIGHT as i32,
+            ),
             PaletteView::arrow(
                 3 * (NextPrevPalette::WIDTH as i32),
                 ColorPalette::HEIGHT as i32,
                 1,
                 Keycode::Right,
             ),
+            Box::new(PaletteInfoView::new(0, (ColorPalette::HEIGHT + NextPrevPalette::HEIGHT) as i32)),
         ];
         PaletteView {
             element: SubrectElement::new(
@@ -54,7 +63,7 @@ impl PaletteView {
                     left,
                     top,
                     ColorPalette::WIDTH,
-                    ColorPalette::HEIGHT + NextPrevPalette::HEIGHT,
+                    ColorPalette::HEIGHT + NextPrevPalette::HEIGHT + PaletteInfoView::HEIGHT,
                 ),
             ),
         }
@@ -68,6 +77,36 @@ impl PaletteView {
     ) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
             NextPrevPalette::new(delta, key),
+            Rect::new(
+                x,
+                y,
+                NextPrevPalette::WIDTH as u32,
+                NextPrevPalette::HEIGHT as u32,
+            ),
+        ))
+    }
+
+    fn add_palette_button(
+        x: i32,
+        y: i32,
+    ) -> Box<dyn GuiElement<EditorState, ()>> {
+        Box::new(SubrectElement::new(
+            AddPalettteButton::new(),
+            Rect::new(
+                x,
+                y,
+                NextPrevPalette::WIDTH as u32,
+                NextPrevPalette::HEIGHT as u32,
+            ),
+        ))
+    }
+
+    fn delete_palette_button(
+        x: i32,
+        y: i32,
+    ) -> Box<dyn GuiElement<EditorState, ()>> {
+        Box::new(SubrectElement::new(
+            DeletePalettteButton::new(),
             Rect::new(
                 x,
                 y,
@@ -256,7 +295,7 @@ impl NextPrevPalette {
 
     fn increment(&self, state: &mut EditorState) -> Action<()> {
         let new_index = ((state.palette_index() as i32) + self.delta)
-            .rem_euclid(state.num_palettes() as i32);
+            .rem_euclid((state.num_palettes() as i32) + 1);
         state.set_palette_index(new_index as usize);
         Action::redraw().and_stop()
     }
@@ -265,16 +304,18 @@ impl NextPrevPalette {
 impl GuiElement<EditorState, ()> for NextPrevPalette {
     fn draw(
         &self,
-        _: &EditorState,
+        state: &EditorState,
         resources: &Resources,
         canvas: &mut Canvas,
     ) {
-        let icon = if self.delta > 0 {
-            resources.tool_icon(ToolIcon::ArrowRight)
-        } else {
-            resources.tool_icon(ToolIcon::ArrowLeft)
-        };
-        canvas.draw_sprite(icon, Point::new(1, 1));
+        if state.num_palettes() > 0 {
+            let icon = if self.delta > 0 {
+                resources.tool_icon(ToolIcon::ArrowRight)
+            } else {
+                resources.tool_icon(ToolIcon::ArrowLeft)
+            };
+            canvas.draw_sprite(icon, Point::new(1, 1));
+        }
     }
 
     fn on_event(
@@ -293,6 +334,126 @@ impl GuiElement<EditorState, ()> for NextPrevPalette {
             }
             _ => {}
         }
+        Action::ignore()
+    }
+}
+
+//===========================================================================//
+
+struct AddPalettteButton {}
+
+impl AddPalettteButton {
+    fn new() -> AddPalettteButton {
+        AddPalettteButton {}
+    }
+}
+
+impl GuiElement<EditorState, ()> for AddPalettteButton {
+    fn draw(
+        &self,
+        _: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        let icon = resources.tool_icon(ToolIcon::AddPalette);
+        canvas.draw_sprite(icon, Point::new(1, 1));
+    }
+
+    fn on_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action<()> {
+        match event {
+            &Event::MouseDown(_) => {
+                state.mutation().add_new_palette();
+                Action::redraw().and_stop()
+            }
+            _ => Action::ignore(),
+        }
+    }
+}
+
+//===========================================================================//
+
+struct DeletePalettteButton {}
+
+impl DeletePalettteButton {
+    fn new() -> DeletePalettteButton {
+        DeletePalettteButton {}
+    }
+}
+
+impl GuiElement<EditorState, ()> for DeletePalettteButton {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        if state.palette_index() < state.num_palettes() {
+            let icon = resources.tool_icon(ToolIcon::DeletePalette);
+            canvas.draw_sprite(icon, Point::new(1, 1));
+        }
+    }
+
+    fn on_event(
+        &mut self,
+        event: &Event,
+        state: &mut EditorState,
+    ) -> Action<()> {
+        match event {
+            &Event::MouseDown(_) => {
+                state.mutation().delete_palette();
+                Action::redraw().and_stop()
+            }
+            _ => Action::ignore(),
+        }
+    }
+}
+
+//===========================================================================//
+
+pub struct PaletteInfoView {
+    left: i32,
+    top: i32,
+}
+
+impl PaletteInfoView {
+    const HEIGHT: u32 = 18;
+
+    fn new(left: i32, top: i32) -> PaletteInfoView {
+        PaletteInfoView { left, top }
+    }
+}
+
+impl GuiElement<EditorState, ()> for PaletteInfoView {
+    fn draw(
+        &self,
+        state: &EditorState,
+        resources: &Resources,
+        canvas: &mut Canvas,
+    ) {
+        let palette_index = state.palette_index();
+        let num_palettes = state.num_palettes();
+        if palette_index < num_palettes {
+            canvas.draw_string(
+                resources.font(),
+                self.left + 26,
+                self.top + 2,
+                &format!("{}/{}", palette_index, num_palettes),
+            );
+        } else {
+            canvas.draw_string(
+                resources.font(),
+                self.left + 13,
+                self.top + 2,
+                &format!("def/{}", num_palettes),
+            );
+        }
+    }
+
+    fn on_event(&mut self, _: &Event, _: &mut EditorState) -> Action<()> {
         Action::ignore()
     }
 }

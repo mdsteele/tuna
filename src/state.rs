@@ -255,7 +255,7 @@ impl EditorState {
 
     pub fn num_palettes(&self) -> usize {
         match self.current.data {
-            Data::AHI(ref ahi) => 1 + ahi.palettes.len(),
+            Data::AHI(ref ahi) => ahi.palettes.len(),
             Data::AHF(_) => 1,
         }
     }
@@ -580,6 +580,44 @@ impl<'a> Mutation<'a> {
         let image = self.image();
         for pos in positions {
             image[pos] = color;
+        }
+    }
+
+    pub fn add_new_palette(&mut self) -> bool {
+        self.unselect();
+        let new_palette = self.state.palette().clone();
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                if ahi.palette_index < ahi.palettes.len() {
+                    ahi.palette_index += 1;
+                } else {
+                    ahi.palette_index = 0;
+                }
+                let rc = Rc::new(new_palette);
+                ahi.palettes.insert(ahi.palette_index, rc);
+                true
+            }
+            Data::AHF(_) => false,
+        }
+    }
+
+    pub fn delete_palette(&mut self) -> bool {
+        self.unselect();
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                if ahi.palette_index < ahi.palettes.len() {
+                    ahi.palettes.remove(ahi.palette_index);
+                    if ahi.palette_index > 0 {
+                        ahi.palette_index -= 1;
+                    } else {
+                        ahi.palette_index = ahi.palettes.len();
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            Data::AHF(_) => false,
         }
     }
 

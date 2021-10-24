@@ -20,10 +20,10 @@
 // TODO:
 // - Windowed instead of fullscreen
 // - Allow editing palettes
-// - Allow adding and removing palettes
 // - Finish lasso tool
 // - Limited region redraws
 // - Zoom/scroll
+// - Show possible tab completion matches for text box
 
 mod canvas;
 mod element;

@@ -286,6 +286,8 @@ pub enum ToolIcon {
     MirrorRot4,
     ArrowLeft,
     ArrowRight,
+    AddPalette,
+    DeletePalette,
 }
 
 //===========================================================================//
