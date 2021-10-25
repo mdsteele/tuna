@@ -26,7 +26,7 @@ use sdl2::rect::Rect;
 use std::cmp;
 use std::ffi::OsStr;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 //===========================================================================//
 
@@ -52,6 +52,15 @@ pub enum Mode {
     TestSentence,
 }
 
+impl Mode {
+    fn is_file_picker(self) -> bool {
+        match self {
+            Mode::LoadFile | Mode::SaveAs => true,
+            _ => false,
+        }
+    }
+}
+
 //===========================================================================//
 
 struct TextBox {
@@ -72,6 +81,7 @@ impl TextBox {
     pub fn set_text(&mut self, text: String) {
         self.byte_index = text.len();
         self.text = text;
+        self.cursor_blink = 0;
     }
 }
 
@@ -113,20 +123,6 @@ impl GuiElement<(), ()> for TextBox {
                     Action::redraw().and_stop()
                 } else {
                     Action::ignore()
-                }
-            }
-            &Event::KeyDown(Keycode::Tab, _) => {
-                match tab_complete_path(Path::new(&self.text)) {
-                    Ok(path) => match path.into_os_string().into_string() {
-                        Ok(string) => {
-                            self.text = string;
-                            self.byte_index = self.text.len();
-                            self.cursor_blink = 0;
-                            Action::redraw().and_stop()
-                        }
-                        Err(_) => Action::ignore().and_stop(),
-                    },
-                    Err(_) => Action::ignore().and_stop(),
                 }
             }
             &Event::KeyDown(Keycode::Up, _) => {
@@ -185,45 +181,6 @@ impl GuiElement<(), ()> for TextBox {
     }
 }
 
-fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
-    let dir: &Path = if path.is_dir() {
-        path
-    } else {
-        path.parent()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, ""))?
-    };
-    let prefix: &str =
-        path.file_name().map(OsStr::to_str).unwrap_or(None).unwrap_or("");
-
-    let mut file_names = Vec::<String>::new();
-    for entry_result in dir.read_dir()? {
-        let entry = entry_result?;
-        let file_name = entry.file_name().to_str().unwrap_or("").to_string();
-        if file_name.starts_with(prefix) {
-            file_names.push(file_name);
-        }
-    }
-
-    if let Some(first) = file_names.pop() {
-        let mut completed = String::new();
-        for chr in first.chars() {
-            let mut candidate = completed.clone();
-            candidate.push(chr);
-            if !file_names.iter().all(|name| name.starts_with(&candidate)) {
-                break;
-            }
-            completed = candidate;
-        }
-        let mut completed_path = dir.join(completed);
-        if completed_path.is_dir() {
-            completed_path.push("");
-        }
-        Ok(completed_path)
-    } else {
-        Err(io::Error::new(io::ErrorKind::Other, ""))
-    }
-}
-
 //===========================================================================//
 
 struct RgbaSwatch {
@@ -249,7 +206,7 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaSwatch {
         if a > 0 {
             canvas.fill_rect(self.rgba, inner);
         }
-        canvas.draw_rect((128, 128, 128, 255), shrink(rect, 1));
+        canvas.draw_rect((255, 255, 255, 255), shrink(rect, 1));
     }
 
     fn on_event(
@@ -384,7 +341,7 @@ impl RgbaPanel {
 impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
     fn draw(&self, state: &(), resources: &Resources, canvas: &mut Canvas) {
         let rect = canvas.rect();
-        canvas.fill_rect((64, 64, 64, 255), rect);
+        canvas.fill_rect((128, 128, 128, 255), rect);
         canvas.draw_rect((255, 255, 255, 255), rect);
         self.swatches.draw(state, resources, canvas);
     }
@@ -400,12 +357,63 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
 
 //===========================================================================//
 
+struct MatchesPanel {
+    left: i32,
+    top: i32,
+    matches: Vec<String>,
+}
+
+impl MatchesPanel {
+    fn new(left: i32, top: i32) -> MatchesPanel {
+        MatchesPanel { left, top, matches: Vec::new() }
+    }
+
+    fn set_matches(&mut self, matches: Vec<String>) {
+        self.matches = matches;
+    }
+
+    fn clear_matches(&mut self) {
+        self.matches.clear();
+    }
+}
+
+impl GuiElement<(), ()> for MatchesPanel {
+    fn draw(&self, _: &(), resources: &Resources, canvas: &mut Canvas) {
+        if !self.matches.is_empty() {
+            let rect = Rect::new(
+                self.left,
+                self.top,
+                360,
+                4 + 14 * (self.matches.len() as u32),
+            );
+            canvas.fill_rect((128, 128, 128, 255), rect);
+            canvas.draw_rect((255, 255, 255, 255), rect);
+            let font = resources.font();
+            for (row, string) in self.matches.iter().enumerate() {
+                canvas.draw_string(
+                    font,
+                    self.left + 4,
+                    self.top + 4 + 14 * (row as i32),
+                    string,
+                );
+            }
+        }
+    }
+
+    fn on_event(&mut self, _: &Event, _: &mut ()) -> Action<()> {
+        Action::ignore()
+    }
+}
+
+//===========================================================================//
+
 pub struct ModalTextBox {
     left: i32,
     top: i32,
     mode: Mode,
     textbox: SubrectElement<TextBox>,
     rgba_panel: SubrectElement<RgbaPanel>,
+    matches_panel: MatchesPanel,
 }
 
 impl ModalTextBox {
@@ -432,6 +440,7 @@ impl ModalTextBox {
                     RgbaPanel::HEIGHT,
                 ),
             ),
+            matches_panel: MatchesPanel::new(left + LABEL_WIDTH, top + 20),
         }
     }
 
@@ -442,11 +451,28 @@ impl ModalTextBox {
     pub fn set_mode(&mut self, mode: Mode, text: String) {
         self.mode = mode;
         self.textbox.inner_mut().set_text(text);
+        self.matches_panel.clear_matches();
     }
 
     pub fn clear_mode(&mut self) {
         self.mode = Mode::Edit;
         self.textbox.inner_mut().set_text(String::new());
+        self.matches_panel.clear_matches();
+    }
+
+    fn tab_complete(&mut self) -> bool {
+        match tab_complete_path(self.textbox.inner().text()) {
+            Ok((path, matches)) => {
+                self.textbox.inner_mut().set_text(path);
+                if matches.len() > 1 {
+                    self.matches_panel.set_matches(matches);
+                } else {
+                    self.matches_panel.clear_matches();
+                }
+                true
+            }
+            Err(_) => false,
+        }
     }
 }
 
@@ -469,6 +495,8 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             self.textbox.draw(&(), resources, canvas);
             if let Mode::SetColor(_) = self.mode {
                 self.rgba_panel.draw(&(), resources, canvas);
+            } else if self.mode.is_file_picker() {
+                self.matches_panel.draw(&(), resources, canvas);
             }
         }
         let label = match self.mode {
@@ -511,6 +539,10 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
                 let text = self.textbox.inner().text().to_string();
                 Action::redraw().and_return((self.mode, text))
             }
+            &Event::KeyDown(Keycode::Tab, _) => Action::redraw_if(
+                self.mode.is_file_picker() && self.tab_complete(),
+            )
+            .and_stop(),
             _ => Action::ignore(),
         };
         if !action.should_stop() {
@@ -545,6 +577,53 @@ fn shrink(rect: Rect, by: i32) -> Rect {
         cmp::max((rect.width() as i32) - 2 * by, 0) as u32,
         cmp::max((rect.height() as i32) - 2 * by, 0) as u32,
     )
+}
+
+fn tab_complete_path(path_string: &str) -> io::Result<(String, Vec<String>)> {
+    let path = Path::new(path_string);
+    let (dir, prefix): (&Path, &str) = if path_string.ends_with('/') {
+        (path, "")
+    } else {
+        (
+            path.parent()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, ""))?,
+            path.file_name().map(OsStr::to_str).unwrap_or(None).unwrap_or(""),
+        )
+    };
+
+    let mut file_names = Vec::<String>::new();
+    for entry_result in dir.read_dir()? {
+        let entry = entry_result?;
+        let file_name = entry.file_name().to_str().unwrap_or("").to_string();
+        if file_name.starts_with(prefix) {
+            file_names.push(file_name);
+        }
+    }
+
+    if let Some(first) = file_names.first() {
+        let mut completed = String::new();
+        for chr in first.chars() {
+            let mut candidate = completed.clone();
+            candidate.push(chr);
+            if !file_names.iter().all(|name| name.starts_with(&candidate)) {
+                break;
+            }
+            completed = candidate;
+        }
+        let mut completed_path = dir.join(completed);
+        if completed_path.is_dir() {
+            completed_path.push("");
+        }
+        Ok((
+            completed_path
+                .into_os_string()
+                .into_string()
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))?,
+            file_names,
+        ))
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, ""))
+    }
 }
 
 //===========================================================================//
