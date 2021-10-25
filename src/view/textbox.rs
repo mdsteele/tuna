@@ -18,9 +18,10 @@
 // +--------------------------------------------------------------------------+
 
 use crate::canvas::{Canvas, Resources};
-use crate::element::{Action, GuiElement, SubrectElement};
+use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{Event, Keycode};
 use crate::state::EditorState;
+use ahi::Color;
 use sdl2::rect::Rect;
 use std::cmp;
 use std::ffi::OsStr;
@@ -32,6 +33,8 @@ use std::path::{Path, PathBuf};
 const CURSOR_ON_FRAMES: u32 = 3;
 const CURSOR_OFF_FRAMES: u32 = 3;
 
+const LABEL_WIDTH: i32 = 50;
+
 //===========================================================================//
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -42,6 +45,7 @@ pub enum Mode {
     NewGlyph,
     Resize,
     SaveAs,
+    SetColor(Color),
     SetMetadata,
     SetMetrics,
     SetTag,
@@ -222,13 +226,186 @@ fn tab_complete_path(path: &Path) -> io::Result<PathBuf> {
 
 //===========================================================================//
 
-const LABEL_WIDTH: i32 = 50;
+struct RgbaSwatch {
+    rgba: (u8, u8, u8, u8),
+}
+
+impl RgbaSwatch {
+    fn new(rgba: (u8, u8, u8, u8)) -> RgbaSwatch {
+        RgbaSwatch { rgba }
+    }
+}
+
+impl GuiElement<(), (u8, u8, u8, u8)> for RgbaSwatch {
+    fn draw(&self, _: &(), _: &Resources, canvas: &mut Canvas) {
+        let rect = canvas.rect();
+        let inner = shrink(rect, 2);
+        let a = self.rgba.3;
+        if a < u8::MAX {
+            canvas.draw_rect((0, 0, 0, 255), inner);
+            canvas.draw_rect((0, 0, 0, 255), shrink(inner, 2));
+            canvas.draw_rect((0, 0, 0, 255), shrink(inner, 4));
+        }
+        if a > 0 {
+            canvas.fill_rect(self.rgba, inner);
+        }
+        canvas.draw_rect((128, 128, 128, 255), shrink(rect, 1));
+    }
+
+    fn on_event(
+        &mut self,
+        event: &Event,
+        _: &mut (),
+    ) -> Action<(u8, u8, u8, u8)> {
+        match event {
+            &Event::MouseDown(_) => Action::redraw().and_return(self.rgba),
+            _ => Action::ignore(),
+        }
+    }
+}
+
+//===========================================================================//
+
+struct RgbaPanel {
+    swatches: AggregateElement<(), (u8, u8, u8, u8)>,
+}
+
+impl RgbaPanel {
+    const SWATCH_SIZE: i32 = 18;
+    const MARGIN: i32 = 6;
+    const NUM_COLS: i32 = 16;
+    const NUM_ROWS: i32 = 6;
+    const WIDTH: u32 = (RgbaPanel::SWATCH_SIZE * RgbaPanel::NUM_COLS
+        + RgbaPanel::MARGIN * 2) as u32;
+    const HEIGHT: u32 = (RgbaPanel::SWATCH_SIZE * RgbaPanel::NUM_ROWS
+        + RgbaPanel::MARGIN * 2) as u32;
+
+    fn new() -> RgbaPanel {
+        let elements: Vec<Box<dyn GuiElement<(), (u8, u8, u8, u8)>>> = vec![
+            // Default palette:
+            RgbaPanel::swatch(0, 0, (0, 0, 0, 0)),
+            RgbaPanel::swatch(1, 0, (0, 0, 0, 255)),
+            RgbaPanel::swatch(2, 0, (127, 0, 0, 255)),
+            RgbaPanel::swatch(3, 0, (255, 0, 0, 255)),
+            RgbaPanel::swatch(4, 0, (0, 127, 0, 255)),
+            RgbaPanel::swatch(5, 0, (0, 255, 0, 255)),
+            RgbaPanel::swatch(6, 0, (127, 127, 0, 255)),
+            RgbaPanel::swatch(7, 0, (255, 255, 0, 255)),
+            RgbaPanel::swatch(8, 0, (0, 0, 127, 255)),
+            RgbaPanel::swatch(9, 0, (0, 0, 255, 255)),
+            RgbaPanel::swatch(10, 0, (127, 0, 127, 255)),
+            RgbaPanel::swatch(11, 0, (255, 0, 255, 255)),
+            RgbaPanel::swatch(12, 0, (0, 127, 127, 255)),
+            RgbaPanel::swatch(13, 0, (0, 255, 255, 255)),
+            RgbaPanel::swatch(14, 0, (127, 127, 127, 255)),
+            RgbaPanel::swatch(15, 0, (255, 255, 255, 255)),
+            // NES palette:
+            RgbaPanel::swatch(0, 2, (84, 84, 84, 255)),
+            RgbaPanel::swatch(1, 2, (0, 30, 116, 255)),
+            RgbaPanel::swatch(2, 2, (8, 16, 144, 255)),
+            RgbaPanel::swatch(3, 2, (48, 0, 136, 255)),
+            RgbaPanel::swatch(4, 2, (68, 0, 100, 255)),
+            RgbaPanel::swatch(5, 2, (92, 0, 48, 255)),
+            RgbaPanel::swatch(6, 2, (84, 4, 0, 255)),
+            RgbaPanel::swatch(7, 2, (60, 24, 0, 255)),
+            RgbaPanel::swatch(8, 2, (32, 42, 0, 255)),
+            RgbaPanel::swatch(9, 2, (8, 58, 0, 255)),
+            RgbaPanel::swatch(10, 2, (0, 64, 0, 255)),
+            RgbaPanel::swatch(11, 2, (0, 60, 0, 255)),
+            RgbaPanel::swatch(12, 2, (0, 50, 60, 255)),
+            RgbaPanel::swatch(0, 3, (152, 150, 152, 255)),
+            RgbaPanel::swatch(1, 3, (8, 76, 196, 255)),
+            RgbaPanel::swatch(2, 3, (48, 50, 236, 255)),
+            RgbaPanel::swatch(3, 3, (92, 30, 228, 255)),
+            RgbaPanel::swatch(4, 3, (136, 20, 176, 255)),
+            RgbaPanel::swatch(5, 3, (160, 20, 100, 255)),
+            RgbaPanel::swatch(6, 3, (152, 34, 32, 255)),
+            RgbaPanel::swatch(7, 3, (120, 60, 0, 255)),
+            RgbaPanel::swatch(8, 3, (84, 90, 0, 255)),
+            RgbaPanel::swatch(9, 3, (40, 114, 0, 255)),
+            RgbaPanel::swatch(10, 3, (8, 124, 0, 255)),
+            RgbaPanel::swatch(11, 3, (0, 118, 40, 255)),
+            RgbaPanel::swatch(12, 3, (0, 102, 120, 255)),
+            RgbaPanel::swatch(13, 3, (0, 0, 0, 255)),
+            RgbaPanel::swatch(0, 4, (236, 238, 236, 255)),
+            RgbaPanel::swatch(1, 4, (76, 154, 236, 255)),
+            RgbaPanel::swatch(2, 4, (120, 124, 236, 255)),
+            RgbaPanel::swatch(3, 4, (176, 98, 236, 255)),
+            RgbaPanel::swatch(4, 4, (228, 84, 236, 255)),
+            RgbaPanel::swatch(5, 4, (236, 88, 180, 255)),
+            RgbaPanel::swatch(6, 4, (236, 106, 100, 255)),
+            RgbaPanel::swatch(7, 4, (212, 136, 32, 255)),
+            RgbaPanel::swatch(8, 4, (160, 170, 0, 255)),
+            RgbaPanel::swatch(9, 4, (116, 196, 0, 255)),
+            RgbaPanel::swatch(10, 4, (76, 208, 32, 255)),
+            RgbaPanel::swatch(11, 4, (56, 204, 108, 255)),
+            RgbaPanel::swatch(12, 4, (56, 180, 204, 255)),
+            RgbaPanel::swatch(13, 4, (60, 60, 60, 255)),
+            RgbaPanel::swatch(1, 5, (168, 204, 236, 255)),
+            RgbaPanel::swatch(2, 5, (188, 188, 236, 255)),
+            RgbaPanel::swatch(3, 5, (212, 178, 236, 255)),
+            RgbaPanel::swatch(4, 5, (236, 174, 236, 255)),
+            RgbaPanel::swatch(5, 5, (236, 174, 212, 255)),
+            RgbaPanel::swatch(6, 5, (236, 180, 176, 255)),
+            RgbaPanel::swatch(7, 5, (228, 196, 144, 255)),
+            RgbaPanel::swatch(8, 5, (204, 210, 120, 255)),
+            RgbaPanel::swatch(9, 5, (180, 222, 120, 255)),
+            RgbaPanel::swatch(10, 5, (168, 226, 144, 255)),
+            RgbaPanel::swatch(11, 5, (152, 226, 180, 255)),
+            RgbaPanel::swatch(12, 5, (160, 214, 228, 255)),
+            RgbaPanel::swatch(13, 5, (160, 162, 160, 255)),
+            // Game Boy palette:
+            RgbaPanel::swatch(15, 2, (208, 224, 64, 255)),
+            RgbaPanel::swatch(15, 3, (160, 168, 48, 255)),
+            RgbaPanel::swatch(15, 4, (96, 112, 40, 255)),
+            RgbaPanel::swatch(15, 5, (56, 72, 40, 255)),
+        ];
+        RgbaPanel { swatches: AggregateElement::new(elements) }
+    }
+
+    fn swatch(
+        col: i32,
+        row: i32,
+        rgba: (u8, u8, u8, u8),
+    ) -> Box<dyn GuiElement<(), (u8, u8, u8, u8)>> {
+        let left = RgbaPanel::MARGIN + RgbaPanel::SWATCH_SIZE * col;
+        let top = RgbaPanel::MARGIN + RgbaPanel::SWATCH_SIZE * row;
+        Box::new(SubrectElement::new(
+            RgbaSwatch::new(rgba),
+            Rect::new(
+                left,
+                top,
+                RgbaPanel::SWATCH_SIZE as u32,
+                RgbaPanel::SWATCH_SIZE as u32,
+            ),
+        ))
+    }
+}
+impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
+    fn draw(&self, state: &(), resources: &Resources, canvas: &mut Canvas) {
+        let rect = canvas.rect();
+        canvas.fill_rect((64, 64, 64, 255), rect);
+        canvas.draw_rect((255, 255, 255, 255), rect);
+        self.swatches.draw(state, resources, canvas);
+    }
+
+    fn on_event(
+        &mut self,
+        event: &Event,
+        state: &mut (),
+    ) -> Action<(u8, u8, u8, u8)> {
+        self.swatches.on_event(event, state)
+    }
+}
+
+//===========================================================================//
 
 pub struct ModalTextBox {
     left: i32,
     top: i32,
     mode: Mode,
-    element: SubrectElement<TextBox>,
+    textbox: SubrectElement<TextBox>,
+    rgba_panel: SubrectElement<RgbaPanel>,
 }
 
 impl ModalTextBox {
@@ -237,13 +414,22 @@ impl ModalTextBox {
             left,
             top,
             mode: Mode::Edit,
-            element: SubrectElement::new(
+            textbox: SubrectElement::new(
                 TextBox::new(),
                 Rect::new(
                     left + LABEL_WIDTH,
                     top,
                     (440 - LABEL_WIDTH) as u32,
                     18,
+                ),
+            ),
+            rgba_panel: SubrectElement::new(
+                RgbaPanel::new(),
+                Rect::new(
+                    left + LABEL_WIDTH,
+                    top + 20,
+                    RgbaPanel::WIDTH,
+                    RgbaPanel::HEIGHT,
                 ),
             ),
         }
@@ -255,12 +441,12 @@ impl ModalTextBox {
 
     pub fn set_mode(&mut self, mode: Mode, text: String) {
         self.mode = mode;
-        self.element.inner_mut().set_text(text);
+        self.textbox.inner_mut().set_text(text);
     }
 
     pub fn clear_mode(&mut self) {
         self.mode = Mode::Edit;
-        self.element.inner_mut().set_text(String::new());
+        self.textbox.inner_mut().set_text(String::new());
     }
 }
 
@@ -280,7 +466,10 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
                 state.filepath(),
             );
         } else {
-            self.element.draw(&(), resources, canvas);
+            self.textbox.draw(&(), resources, canvas);
+            if let Mode::SetColor(_) = self.mode {
+                self.rgba_panel.draw(&(), resources, canvas);
+            }
         }
         let label = match self.mode {
             Mode::Edit => "Path:",
@@ -289,6 +478,7 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             Mode::NewGlyph => "Char:",
             Mode::Resize => "Size:",
             Mode::SaveAs => "Save:",
+            Mode::SetColor(_) => "Color:",
             Mode::SetMetadata => "Meta:",
             Mode::SetMetrics => "Metrics:",
             Mode::SetTag => "Tag:",
@@ -310,26 +500,51 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
         _: &mut EditorState,
     ) -> Action<(Mode, String)> {
         if self.mode == Mode::Edit {
-            Action::ignore()
-        } else {
-            match event {
-                &Event::KeyDown(Keycode::Escape, _) => {
-                    self.clear_mode();
-                    Action::redraw().and_stop()
+            return Action::ignore();
+        }
+        let mut action = match event {
+            &Event::KeyDown(Keycode::Escape, _) => {
+                self.clear_mode();
+                Action::redraw().and_stop()
+            }
+            &Event::KeyDown(Keycode::Return, _) => {
+                let text = self.textbox.inner().text().to_string();
+                Action::redraw().and_return((self.mode, text))
+            }
+            _ => Action::ignore(),
+        };
+        if !action.should_stop() {
+            let subaction = self.textbox.on_event(event, &mut ());
+            action.merge(subaction.but_no_value());
+        }
+        if !action.should_stop() {
+            if let Mode::SetColor(_) = self.mode {
+                let mut subaction = self.rgba_panel.on_event(event, &mut ());
+                if let Some((r, g, b, a)) = subaction.take_value() {
+                    let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
+                    action
+                        .merge(Action::redraw().and_return((self.mode, text)));
+                } else {
+                    action.merge(subaction.but_no_value());
                 }
-                &Event::KeyDown(Keycode::Return, _) => Action::redraw()
-                    .and_return((
-                        self.mode,
-                        self.element.inner().text().to_string(),
-                    )),
-                _ => self
-                    .element
-                    .on_event(event, &mut ())
-                    .but_no_value()
-                    .and_stop(),
             }
         }
+        if !action.should_stop() {
+            action = action.and_stop();
+        }
+        action
     }
+}
+
+//===========================================================================//
+
+fn shrink(rect: Rect, by: i32) -> Rect {
+    Rect::new(
+        rect.x() + by,
+        rect.y() + by,
+        cmp::max((rect.width() as i32) - 2 * by, 0) as u32,
+        cmp::max((rect.height() as i32) - 2 * by, 0) as u32,
+    )
 }
 
 //===========================================================================//

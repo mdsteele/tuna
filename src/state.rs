@@ -621,6 +621,28 @@ impl<'a> Mutation<'a> {
         }
     }
 
+    pub fn set_palette_color(
+        &mut self,
+        color: Color,
+        rgba: (u8, u8, u8, u8),
+    ) -> bool {
+        self.unselect();
+        match self.state.current.data {
+            Data::AHI(ref mut ahi) => {
+                if ahi.palette_index < ahi.palettes.len() {
+                    let mut palette =
+                        Palette::clone(&ahi.palettes[ahi.palette_index]);
+                    palette[color] = rgba;
+                    ahi.palettes[ahi.palette_index] = Rc::new(palette);
+                    true
+                } else {
+                    false
+                }
+            }
+            Data::AHF(_) => false,
+        }
+    }
+
     pub fn add_new_image(&mut self, chr: char) -> bool {
         self.unselect();
         let (width, height) = self.state.image_size();

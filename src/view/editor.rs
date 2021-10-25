@@ -19,7 +19,7 @@
 
 use super::metadata::MetadataView;
 use super::mirrors::Mirrors;
-use super::palette::PaletteView;
+use super::palette::{PaletteAction, PaletteView};
 use super::scrollbar::ImagesScrollbar;
 use super::textbox::{ModalTextBox, Mode};
 use super::tiles::TileView;
@@ -31,12 +31,14 @@ use crate::event::{Event, Keycode, COMMAND, SHIFT};
 use crate::paint::ImageCanvas;
 use crate::state::EditorState;
 use crate::util;
+use ahi::Color;
 use sdl2::rect::{Point, Rect};
 
 //===========================================================================//
 
 pub struct EditorView {
     aggregate: AggregateElement<EditorState, ()>,
+    palette: PaletteView,
     textbox: ModalTextBox,
 }
 
@@ -47,7 +49,6 @@ impl EditorView {
     pub fn new(offset: Point) -> SubrectElement<EditorView> {
         let elements: Vec<Box<dyn GuiElement<EditorState, ()>>> = vec![
             Box::new(UnsavedIndicator::new(4, 11)),
-            Box::new(PaletteView::new(3, 188)),
             Box::new(Toolbox::new(3, 34)),
             Box::new(Mirrors::new(3, 134)),
             Box::new(ImagesScrollbar::new(440, 34)),
@@ -59,6 +60,7 @@ impl EditorView {
         SubrectElement::new(
             EditorView {
                 aggregate: AggregateElement::new(elements),
+                palette: PaletteView::new(3, 188),
                 textbox: ModalTextBox::new(20, 10),
             },
             Rect::new(
@@ -81,6 +83,22 @@ impl EditorView {
             }
         } else {
             state.mutation().add_new_image('_')
+        }
+    }
+
+    fn begin_set_color(
+        &mut self,
+        state: &mut EditorState,
+        color: Color,
+    ) -> bool {
+        if state.palette_index() < state.num_palettes() {
+            state.unselect_if_necessary();
+            let (r, g, b, a) = state.palette()[color];
+            let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
+            self.textbox.set_mode(Mode::SetColor(color), text);
+            true
+        } else {
+            false
         }
     }
 
@@ -243,6 +261,47 @@ impl EditorView {
                     }
                 }
             }
+            Mode::SetColor(color) => {
+                let rgba = match (text.len(), u32::from_str_radix(&text, 16)) {
+                    (0, _) => (0, 0, 0, 0),
+                    (1, Ok(v)) => {
+                        let gray = (0x11 * v) as u8;
+                        (gray, gray, gray, 255)
+                    }
+                    (2, Ok(v)) => {
+                        let gray = v as u8;
+                        (gray, gray, gray, 255)
+                    }
+                    (3, Ok(v)) => {
+                        let r = (0x11 * (0xf & (v >> 8))) as u8;
+                        let g = (0x11 * (0xf & (v >> 4))) as u8;
+                        let b = (0x11 * (0xf & v)) as u8;
+                        (r, g, b, 255)
+                    }
+                    (4, Ok(v)) => {
+                        let r = (0x11 * (0xf & (v >> 12))) as u8;
+                        let g = (0x11 * (0xf & (v >> 8))) as u8;
+                        let b = (0x11 * (0xf & (v >> 4))) as u8;
+                        let a = (0x11 * (0xf & v)) as u8;
+                        (r, g, b, a)
+                    }
+                    (6, Ok(v)) => {
+                        let r = (0xff & (v >> 16)) as u8;
+                        let g = (0xff & (v >> 8)) as u8;
+                        let b = (0xff & v) as u8;
+                        (r, g, b, 255)
+                    }
+                    (8, Ok(v)) => {
+                        let r = (0xff & (v >> 24)) as u8;
+                        let g = (0xff & (v >> 16)) as u8;
+                        let b = (0xff & (v >> 8)) as u8;
+                        let a = (0xff & v) as u8;
+                        (r, g, b, a)
+                    }
+                    _ => return false,
+                };
+                state.mutation().set_palette_color(color, rgba)
+            }
             Mode::SetMetadata => {
                 let result = if text.is_empty() {
                     Ok(vec![])
@@ -304,6 +363,7 @@ impl GuiElement<EditorState, ()> for EditorView {
         let rect = canvas.rect();
         canvas.draw_rect((127, 127, 127, 127), rect);
         self.aggregate.draw(state, resources, canvas);
+        self.palette.draw(state, resources, canvas);
         self.textbox.draw(state, resources, canvas);
     }
 
@@ -393,14 +453,29 @@ impl GuiElement<EditorState, ()> for EditorView {
                 Action::redraw().and_stop()
             }
             _ => {
-                let mut action = self.textbox.on_event(event, state);
-                if let Some((mode, text)) = action.take_value() {
-                    if self.mode_perform(state, mode, text) {
-                        self.textbox.clear_mode();
-                        action.also_redraw();
+                let mut action = Action::ignore();
+                {
+                    let mut subaction = self.textbox.on_event(event, state);
+                    if let Some((mode, text)) = subaction.take_value() {
+                        if self.mode_perform(state, mode, text) {
+                            self.textbox.clear_mode();
+                            subaction.also_redraw();
+                        }
                     }
+                    action.merge(subaction.but_no_value());
                 }
-                let mut action = action.but_no_value();
+                if !action.should_stop() {
+                    let mut subaction = self.palette.on_event(event, state);
+                    match subaction.take_value() {
+                        Some(PaletteAction::EditColor(color)) => {
+                            if self.begin_set_color(state, color) {
+                                subaction.also_redraw();
+                            }
+                        }
+                        None => {}
+                    }
+                    action.merge(subaction.but_no_value());
+                }
                 if !action.should_stop() {
                     action.merge(self.aggregate.on_event(event, state));
                 }

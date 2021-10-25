@@ -19,7 +19,6 @@
 
 // TODO:
 // - Windowed instead of fullscreen
-// - Allow editing palettes
 // - Finish lasso tool
 // - Limited region redraws
 // - Zoom/scroll
