@@ -39,6 +39,7 @@ use self::view::EditorView;
 use sdl2::rect::Point;
 use sdl2::render::Canvas as SdlCanvas;
 use sdl2::video::Window;
+use std::time::Instant;
 
 //===========================================================================//
 
@@ -91,8 +92,6 @@ fn main() {
     };
 
     let sdl_context = sdl2::init().unwrap();
-    let event_subsystem = sdl_context.event().unwrap();
-    let timer_subsystem = sdl_context.timer().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let ideal_width = EditorView::WIDTH;
@@ -116,20 +115,28 @@ fn main() {
     let mut gui = EditorView::new(gui_offset);
     render_screen(&mut renderer, &resources, &state, &gui);
 
-    Event::register_clock_ticks(&event_subsystem);
-    let _timer = timer_subsystem.add_timer(
-        FRAME_DELAY_MILLIS,
-        Box::new(|| {
-            Event::push_clock_tick(&event_subsystem);
-            FRAME_DELAY_MILLIS
-        }),
-    );
-
     let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut last_clock_tick = Instant::now();
     loop {
-        let event = match Event::from_sdl2(&event_pump.wait_event()) {
-            Some(event) => event,
-            None => continue,
+        let now = Instant::now();
+        let elapsed_millis = now
+            .duration_since(last_clock_tick)
+            .as_millis()
+            .min(u32::MAX as u128) as u32;
+        let opt_sdl_event = if elapsed_millis >= FRAME_DELAY_MILLIS {
+            None
+        } else {
+            event_pump.wait_event_timeout(FRAME_DELAY_MILLIS - elapsed_millis)
+        };
+        let event = match opt_sdl_event {
+            None => {
+                last_clock_tick = now;
+                Event::ClockTick
+            }
+            Some(sdl_event) => match Event::from_sdl2(&sdl_event) {
+                Some(event) => event,
+                None => continue,
+            },
         };
         let action = match event {
             Event::Quit => return,
