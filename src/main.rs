@@ -55,28 +55,6 @@ fn render_screen<E: GuiElement<EditorState, ()>>(
     renderer.present();
 }
 
-fn window_size(
-    (ideal_width, ideal_height): (u32, u32),
-    aspect_ratio: f64,
-) -> ((u32, u32), Point) {
-    let ideal_ratio = (ideal_width as f64) / (ideal_height as f64);
-    if aspect_ratio > ideal_ratio {
-        let actual_width =
-            (aspect_ratio * (ideal_height as f64)).round() as u32;
-        (
-            (actual_width, ideal_height),
-            Point::new(((actual_width - ideal_width) / 2) as i32, 0),
-        )
-    } else {
-        let actual_height =
-            ((ideal_width as f64) / aspect_ratio).round() as u32;
-        (
-            (ideal_width, actual_height),
-            Point::new(0, ((actual_height - ideal_height) / 2) as i32),
-        )
-    }
-}
-
 //===========================================================================//
 
 fn main() {
@@ -94,25 +72,20 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let ideal_width = EditorView::WIDTH;
-    let ideal_height = EditorView::HEIGHT;
+    let editor_width = EditorView::WIDTH;
+    let editor_height = EditorView::HEIGHT;
     let sdl_window = video_subsystem
-        .window("AHI Editor", ideal_width, ideal_height)
+        .window("AHI Editor", 2 * editor_width, 2 * editor_height)
         .position_centered()
-        .fullscreen_desktop()
         .build()
         .unwrap();
-    let (native_width, native_height) = sdl_window.size();
-    let aspect_ratio: f64 = (native_width as f64) / (native_height as f64);
-    let ((actual_width, actual_height), gui_offset) =
-        window_size((ideal_width, ideal_height), aspect_ratio);
     let mut renderer = sdl_window.into_canvas().build().unwrap();
-    renderer.set_logical_size(actual_width, actual_height).unwrap();
+    renderer.set_logical_size(editor_width, editor_height).unwrap();
     renderer.set_blend_mode(sdl2::render::BlendMode::Blend);
     let texture_creator = renderer.texture_creator();
     let resources = Resources::new(&texture_creator);
 
-    let mut gui = EditorView::new(gui_offset);
+    let mut gui = EditorView::new(Point::new(0, 0));
     render_screen(&mut renderer, &resources, &state, &gui);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
