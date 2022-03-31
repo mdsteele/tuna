@@ -377,6 +377,31 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 ),
             );
         }
+        if let Some(rect) = self.dragged_rect(state) {
+            let marquee_rect = Rect::new(
+                canvas_rect.x() + rect.x() * (scale as i32),
+                canvas_rect.y() + rect.y() * (scale as i32),
+                rect.width() * scale,
+                rect.height() * scale,
+            );
+            draw_marquee(canvas, marquee_rect, 0);
+            let size_string = format!("{}x{}", rect.width(), rect.height());
+            canvas.fill_rect(
+                (255, 255, 255, 255),
+                Rect::new(
+                    marquee_rect.x() + 1,
+                    marquee_rect.y() - 11,
+                    (resources.font().text_width(&size_string) + 1) as u32,
+                    10,
+                ),
+            );
+            canvas.draw_string(
+                resources.font(),
+                marquee_rect.x() + 2,
+                marquee_rect.y() - 11,
+                &size_string,
+            );
+        }
         let mut canvas = canvas.subcanvas(canvas_rect);
         if let Some((ref selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
@@ -420,20 +445,6 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     }
                 }
             }
-        } else if let Some(rect) = self.dragged_rect(state) {
-            let marquee_rect = Rect::new(
-                rect.x() * (scale as i32),
-                rect.y() * (scale as i32),
-                rect.width() * scale,
-                rect.height() * scale,
-            );
-            draw_marquee(&mut canvas, marquee_rect, 0);
-            canvas.draw_string(
-                resources.font(),
-                marquee_rect.x() + 1,
-                marquee_rect.y() + 1,
-                &format!("{}x{}", rect.width(), rect.height()),
-            );
         } else if state.tool() == Tool::Lasso {
             for &(x, y) in self.lasso_points.iter() {
                 canvas.draw_rect(
