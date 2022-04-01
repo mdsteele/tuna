@@ -378,28 +378,34 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             );
         }
         if let Some(rect) = self.dragged_rect(state) {
-            let marquee_rect = Rect::new(
-                canvas_rect.x() + rect.x() * (scale as i32),
-                canvas_rect.y() + rect.y() * (scale as i32),
-                rect.width() * scale,
-                rect.height() * scale,
+            let (topleft, label) = if let Some((_, to)) = state.selection() {
+                let from = self.drag_from_to.as_ref().unwrap().from_selection;
+                let delta_x = to.x() - from.x();
+                let delta_y = to.y() - from.y();
+                let label = format!("{},{}", delta_x.abs(), delta_y.abs());
+                (to, label)
+            } else {
+                let label = format!("{}x{}", rect.width(), rect.height());
+                (Point::new(rect.x(), rect.y()), label)
+            };
+            let topleft = Point::new(
+                canvas_rect.x() + (topleft.x() * (scale as i32)).max(0),
+                canvas_rect.y() + (topleft.y() * (scale as i32)).max(0),
             );
-            draw_marquee(canvas, marquee_rect, 0);
-            let size_string = format!("{}x{}", rect.width(), rect.height());
             canvas.fill_rect(
                 (255, 255, 255, 255),
                 Rect::new(
-                    marquee_rect.x() + 1,
-                    marquee_rect.y() - 11,
-                    (resources.font().text_width(&size_string) + 1) as u32,
+                    topleft.x() + 1,
+                    topleft.y() - 11,
+                    (resources.font().text_width(&label) + 1) as u32,
                     10,
                 ),
             );
             canvas.draw_string(
                 resources.font(),
-                marquee_rect.x() + 2,
-                marquee_rect.y() - 11,
-                &size_string,
+                topleft.x() + 2,
+                topleft.y() - 11,
+                &label,
             );
         }
         let mut canvas = canvas.subcanvas(canvas_rect);
@@ -445,6 +451,14 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     }
                 }
             }
+        } else if let Some(rect) = self.dragged_rect(state) {
+            let marquee_rect = Rect::new(
+                rect.x() * (scale as i32),
+                rect.y() * (scale as i32),
+                rect.width() * scale,
+                rect.height() * scale,
+            );
+            draw_marquee(&mut canvas, marquee_rect, 0);
         } else if state.tool() == Tool::Lasso {
             for &(x, y) in self.lasso_points.iter() {
                 canvas.draw_rect(
