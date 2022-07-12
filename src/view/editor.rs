@@ -112,6 +112,17 @@ impl EditorView {
         }
     }
 
+    fn begin_set_grid(&mut self, state: &mut EditorState) -> bool {
+        if self.textbox.mode() == Mode::Edit {
+            let (horz, vert) = state.grid();
+            let text = format!("{}x{}", horz, vert);
+            self.textbox.set_mode(Mode::SetGrid, text);
+            true
+        } else {
+            false
+        }
+    }
+
     fn begin_load_file(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
@@ -302,6 +313,22 @@ impl EditorView {
                 };
                 state.mutation().set_palette_color(color, rgba)
             }
+            Mode::SetGrid => {
+                let pieces: Vec<&str> = text.split('x').collect();
+                if pieces.len() != 2 {
+                    return false;
+                }
+                let new_horz = match pieces[0].parse::<u32>() {
+                    Ok(horz) => horz,
+                    Err(_) => return false,
+                };
+                let new_vert = match pieces[1].parse::<u32>() {
+                    Ok(vert) => vert,
+                    Err(_) => return false,
+                };
+                state.set_grid(new_horz, new_vert);
+                true
+            }
             Mode::SetMetadata => {
                 let result = if text.is_empty() {
                     Ok(vec![])
@@ -389,6 +416,9 @@ impl GuiElement<EditorState, ()> for EditorView {
             }
             &Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND => {
                 Action::redraw_if(self.begin_goto(state)).and_stop()
+            }
+            &Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND | SHIFT => {
+                Action::redraw_if(self.begin_set_grid(state)).and_stop()
             }
             &Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
                 state.mutation().flip_selection_horz();

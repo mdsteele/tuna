@@ -115,6 +115,7 @@ pub struct EditorState {
     prev_tool: Tool,
     mirror: Mirror,
     persistent_mutation_active: bool,
+    grid: (u32, u32),
     test_sentence: String,
 }
 
@@ -135,6 +136,7 @@ impl EditorState {
             prev_tool: Tool::Pencil,
             mirror: Mirror::None,
             persistent_mutation_active: false,
+            grid: (0, 0),
             test_sentence: DEFAULT_TEST_SENTENCE.to_string(),
         }
     }
@@ -157,6 +159,14 @@ impl EditorState {
 
     pub fn set_color(&mut self, color: Color) {
         self.color = color;
+    }
+
+    pub fn grid(&self) -> (u32, u32) {
+        self.grid
+    }
+
+    pub fn set_grid(&mut self, horz: u32, vert: u32) {
+        self.grid = (horz, vert);
     }
 
     pub fn tool(&self) -> Tool {

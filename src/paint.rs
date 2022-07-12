@@ -27,6 +27,8 @@ use std::cmp;
 
 //===========================================================================//
 
+const GRID_COLOR: (u8, u8, u8, u8) = (192, 0, 255, 255);
+
 enum Shape {
     Line,
     Oval,
@@ -347,6 +349,39 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             canvas_rect.y(),
             scale,
         );
+        let (grid_horz, grid_vert) = state.grid();
+        if grid_horz > 0 {
+            let width = state.image().width();
+            let mut x = grid_horz;
+            while x < width {
+                canvas.draw_rect(
+                    GRID_COLOR,
+                    Rect::new(
+                        canvas_rect.x() + (x * scale) as i32,
+                        canvas_rect.y(),
+                        1,
+                        canvas_rect.height(),
+                    ),
+                );
+                x += grid_horz;
+            }
+        }
+        if grid_vert > 0 {
+            let height = state.image().height();
+            let mut y = grid_vert;
+            while y < height {
+                canvas.draw_rect(
+                    GRID_COLOR,
+                    Rect::new(
+                        canvas_rect.x(),
+                        canvas_rect.y() + (y * scale) as i32,
+                        canvas_rect.width(),
+                        1,
+                    ),
+                );
+                y += grid_vert;
+            }
+        }
         if let Some((baseline, left_edge, right_edge)) = state.image_metrics()
         {
             canvas.draw_rect(
