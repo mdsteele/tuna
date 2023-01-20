@@ -18,7 +18,11 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Windowed instead of fullscreen
+// - Sort file completion list alphabetically
+// - Exclude *~ files from file completion list
+// - Make file completion list items clickable
+// - Commands to chop up image along grid, either row-major or col-major
+// - Ability to import a PNG, and/or set a PNG as the editor background
 // - Finish lasso tool
 // - Limited region redraws
 // - Zoom/scroll
