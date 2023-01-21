@@ -182,10 +182,22 @@ pub struct AggregateElement<S, A> {
 }
 
 impl<S, A> AggregateElement<S, A> {
+    pub fn empty() -> AggregateElement<S, A> {
+        AggregateElement { elements: Vec::new() }
+    }
+
     pub fn new(
         elements: Vec<Box<dyn GuiElement<S, A>>>,
     ) -> AggregateElement<S, A> {
         AggregateElement { elements }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elements.len()
     }
 }
 

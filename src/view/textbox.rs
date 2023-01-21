@@ -358,51 +358,110 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
 
 //===========================================================================//
 
+struct FileMatch {
+    file_name: String,
+    file_path: String,
+}
+
+impl FileMatch {
+    fn new(file_name: String, file_path: String) -> FileMatch {
+        FileMatch { file_name, file_path }
+    }
+}
+
+impl GuiElement<(), String> for FileMatch {
+    fn draw(&self, _: &(), resources: &Resources, canvas: &mut Canvas) {
+        let rect = canvas.rect();
+        canvas.draw_string(
+            resources.font(),
+            rect.left(),
+            rect.top(),
+            &self.file_name,
+        );
+    }
+
+    fn on_event(&mut self, event: &Event, _: &mut ()) -> Action<String> {
+        match event {
+            &Event::MouseDown(_) => {
+                Action::redraw().and_return(self.file_path.clone())
+            }
+            _ => Action::ignore(),
+        }
+    }
+}
+
+//===========================================================================//
+
 struct MatchesPanel {
     left: i32,
     top: i32,
-    matches: Vec<String>,
+    matches: AggregateElement<(), String>,
 }
 
 impl MatchesPanel {
+    const MATCH_HEIGHT: u32 = 14;
+    const MARGIN: u32 = 4;
+    const WIDTH: u32 = 360;
+
     fn new(left: i32, top: i32) -> MatchesPanel {
-        MatchesPanel { left, top, matches: Vec::new() }
+        MatchesPanel { left, top, matches: AggregateElement::empty() }
     }
 
-    fn set_matches(&mut self, matches: Vec<String>) {
-        self.matches = matches;
+    fn is_empty(&self) -> bool {
+        self.matches.is_empty()
+    }
+
+    fn set_matches(&mut self, matches: Vec<(String, String)>) {
+        let elements = matches
+            .into_iter()
+            .enumerate()
+            .map(|(row, (file_name, file_path))| {
+                MatchesPanel::make_match(row, file_name, file_path)
+            })
+            .collect();
+        self.matches = AggregateElement::new(elements);
     }
 
     fn clear_matches(&mut self) {
-        self.matches.clear();
+        self.matches = AggregateElement::empty()
+    }
+
+    fn make_match(
+        row: usize,
+        file_name: String,
+        file_path: String,
+    ) -> Box<dyn GuiElement<(), String>> {
+        let left = MatchesPanel::MARGIN as i32;
+        let top = (MatchesPanel::MARGIN as i32)
+            + (MatchesPanel::MATCH_HEIGHT as i32) * (row as i32);
+        let width = MatchesPanel::WIDTH - MatchesPanel::MARGIN * 2;
+        let height = MatchesPanel::MATCH_HEIGHT;
+        Box::new(SubrectElement::new(
+            FileMatch::new(file_name, file_path),
+            Rect::new(left, top, width, height),
+        ))
     }
 }
 
-impl GuiElement<(), ()> for MatchesPanel {
-    fn draw(&self, _: &(), resources: &Resources, canvas: &mut Canvas) {
+impl GuiElement<(), String> for MatchesPanel {
+    fn draw(&self, state: &(), resources: &Resources, canvas: &mut Canvas) {
         if !self.matches.is_empty() {
             let rect = Rect::new(
                 self.left,
                 self.top,
-                360,
-                4 + 14 * (self.matches.len() as u32),
+                MatchesPanel::WIDTH,
+                MatchesPanel::MARGIN
+                    + MatchesPanel::MATCH_HEIGHT * (self.matches.len() as u32),
             );
             canvas.fill_rect((128, 128, 128, 255), rect);
             canvas.draw_rect((255, 255, 255, 255), rect);
-            let font = resources.font();
-            for (row, string) in self.matches.iter().enumerate() {
-                canvas.draw_string(
-                    font,
-                    self.left + 4,
-                    self.top + 4 + 14 * (row as i32),
-                    string,
-                );
-            }
+            let mut subcanvas = canvas.subcanvas(rect);
+            self.matches.draw(state, resources, &mut subcanvas);
         }
     }
 
-    fn on_event(&mut self, _: &Event, _: &mut ()) -> Action<()> {
-        Action::ignore()
+    fn on_event(&mut self, event: &Event, state: &mut ()) -> Action<String> {
+        self.matches.on_event(&event.translate(-self.left, -self.top), state)
     }
 }
 
@@ -552,6 +611,19 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             action.merge(subaction.but_no_value());
         }
         if !action.should_stop() {
+            if !self.matches_panel.is_empty() {
+                let mut subaction =
+                    self.matches_panel.on_event(event, &mut ());
+                if let Some(file_path) = subaction.take_value() {
+                    self.textbox.inner_mut().set_text(file_path);
+                    self.matches_panel.clear_matches();
+                    action.merge(Action::redraw().and_stop());
+                } else {
+                    action.merge(subaction.but_no_value());
+                }
+            }
+        }
+        if !action.should_stop() {
             if let Mode::SetColor(_) = self.mode {
                 let mut subaction = self.rgba_panel.on_event(event, &mut ());
                 if let Some((r, g, b, a)) = subaction.take_value() {
@@ -581,7 +653,20 @@ fn shrink(rect: Rect, by: i32) -> Rect {
     )
 }
 
-fn tab_complete_path(path_string: &str) -> io::Result<(String, Vec<String>)> {
+fn join_to_string(dir: &Path, file_name: &str) -> io::Result<String> {
+    let mut file_path = dir.join(file_name);
+    if file_path.is_dir() {
+        file_path.push("");
+    }
+    file_path
+        .into_os_string()
+        .into_string()
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))
+}
+
+fn tab_complete_path(
+    path_string: &str,
+) -> io::Result<(String, Vec<(String, String)>)> {
     let path = Path::new(path_string);
     let (dir, prefix): (&Path, &str) = if path_string.ends_with('/') {
         (path, "")
@@ -593,7 +678,7 @@ fn tab_complete_path(path_string: &str) -> io::Result<(String, Vec<String>)> {
         )
     };
 
-    let mut file_names = Vec::<String>::new();
+    let mut file_names_and_paths = Vec::<(String, String)>::new();
     for entry_result in dir.read_dir()? {
         let entry = entry_result?;
         let file_name = entry.file_name().to_str().unwrap_or("").to_string();
@@ -602,33 +687,27 @@ fn tab_complete_path(path_string: &str) -> io::Result<(String, Vec<String>)> {
                 || file_name.ends_with(".ahi")
                 || file_name.ends_with(".ahf")
             {
-                file_names.push(file_name);
+                let file_path = join_to_string(dir, &file_name)?;
+                file_names_and_paths.push((file_name, file_path));
             }
         }
     }
-    file_names.sort();
+    file_names_and_paths.sort();
 
-    if let Some(first) = file_names.first() {
+    if let Some((first, _)) = file_names_and_paths.first() {
         let mut completed = String::new();
         for chr in first.chars() {
             let mut candidate = completed.clone();
             candidate.push(chr);
-            if !file_names.iter().all(|name| name.starts_with(&candidate)) {
+            if !file_names_and_paths
+                .iter()
+                .all(|(name, _)| name.starts_with(&candidate))
+            {
                 break;
             }
             completed = candidate;
         }
-        let mut completed_path = dir.join(completed);
-        if completed_path.is_dir() {
-            completed_path.push("");
-        }
-        Ok((
-            completed_path
-                .into_os_string()
-                .into_string()
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))?,
-            file_names,
-        ))
+        Ok((join_to_string(dir, &completed)?, file_names_and_paths))
     } else {
         Err(io::Error::new(io::ErrorKind::Other, ""))
     }
