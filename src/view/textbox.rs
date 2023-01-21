@@ -19,7 +19,7 @@
 
 use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use crate::event::{Event, Keycode};
+use crate::event::{Event, Keycode, ALT};
 use crate::state::EditorState;
 use ahi::Color;
 use sdl2::rect::Rect;
@@ -114,10 +114,28 @@ impl GuiElement<(), ()> for TextBox {
                 let is_on = self.cursor_blink < CURSOR_ON_FRAMES;
                 Action::redraw_if(was_on != is_on)
             }
-            &Event::KeyDown(Keycode::Backspace, _) => {
+            &Event::KeyDown(Keycode::Backspace, keymod) => {
                 if self.byte_index > 0 {
                     let rest = self.text.split_off(self.byte_index);
-                    self.text.pop();
+                    if keymod == ALT {
+                        let mut popped_non_slash = false;
+                        loop {
+                            match self.text.pop() {
+                                None => break,
+                                Some('/') => {
+                                    if popped_non_slash {
+                                        self.text.push('/');
+                                        break;
+                                    }
+                                }
+                                Some(_) => {
+                                    popped_non_slash = true;
+                                }
+                            }
+                        }
+                    } else {
+                        self.text.pop();
+                    }
                     self.byte_index = self.text.len();
                     self.text.push_str(&rest);
                     self.cursor_blink = 0;
