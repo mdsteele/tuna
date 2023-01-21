@@ -598,9 +598,15 @@ fn tab_complete_path(path_string: &str) -> io::Result<(String, Vec<String>)> {
         let entry = entry_result?;
         let file_name = entry.file_name().to_str().unwrap_or("").to_string();
         if file_name.starts_with(prefix) {
-            file_names.push(file_name);
+            if entry.file_type()?.is_dir()
+                || file_name.ends_with(".ahi")
+                || file_name.ends_with(".ahf")
+            {
+                file_names.push(file_name);
+            }
         }
     }
+    file_names.sort();
 
     if let Some(first) = file_names.first() {
         let mut completed = String::new();
