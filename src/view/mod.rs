@@ -18,6 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 mod editor;
+mod menu;
 mod metadata;
 mod mirrors;
 mod palette;

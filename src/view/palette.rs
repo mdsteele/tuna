@@ -36,6 +36,7 @@ pub enum PaletteAction {
 pub struct PaletteView {
     element: SubrectElement<AggregateElement<EditorState, PaletteAction>>,
 }
+
 impl PaletteView {
     pub fn new(left: i32, top: i32) -> PaletteView {
         let elements: Vec<Box<dyn GuiElement<EditorState, PaletteAction>>> = vec![

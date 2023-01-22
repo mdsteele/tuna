@@ -17,6 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use super::menu::{MenuAction, MenuView};
 use super::metadata::MetadataView;
 use super::mirrors::Mirrors;
 use super::palette::{PaletteAction, PaletteView};
@@ -38,6 +39,7 @@ use sdl2::rect::{Point, Rect};
 
 pub struct EditorView {
     aggregate: AggregateElement<EditorState, ()>,
+    menu: MenuView,
     palette: PaletteView,
     textbox: ModalTextBox,
 }
@@ -60,6 +62,7 @@ impl EditorView {
         SubrectElement::new(
             EditorView {
                 aggregate: AggregateElement::new(elements),
+                menu: MenuView::new(8, 297),
                 palette: PaletteView::new(3, 188),
                 textbox: ModalTextBox::new(20, 10),
             },
@@ -72,11 +75,16 @@ impl EditorView {
         )
     }
 
+    fn set_textbox_mode(&mut self, mode: Mode, text: String) {
+        self.menu.close();
+        self.textbox.set_mode(mode, text);
+    }
+
     fn begin_new_image(&mut self, state: &mut EditorState) -> bool {
         if state.font().is_some() {
             if self.textbox.mode() == Mode::Edit {
                 state.unselect_if_necessary();
-                self.textbox.set_mode(Mode::NewGlyph, String::new());
+                self.set_textbox_mode(Mode::NewGlyph, String::new());
                 true
             } else {
                 false
@@ -95,7 +103,7 @@ impl EditorView {
             state.unselect_if_necessary();
             let (r, g, b, a) = state.palette()[color];
             let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
-            self.textbox.set_mode(Mode::SetColor(color), text);
+            self.set_textbox_mode(Mode::SetColor(color), text);
             true
         } else {
             false
@@ -105,7 +113,7 @@ impl EditorView {
     fn begin_goto(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox.set_mode(Mode::Goto, String::new());
+            self.set_textbox_mode(Mode::Goto, String::new());
             true
         } else {
             false
@@ -116,7 +124,7 @@ impl EditorView {
         if self.textbox.mode() == Mode::Edit {
             let (horz, vert) = state.grid();
             let text = format!("{}x{}", horz, vert);
-            self.textbox.set_mode(Mode::SetGrid, text);
+            self.set_textbox_mode(Mode::SetGrid, text);
             true
         } else {
             false
@@ -126,8 +134,10 @@ impl EditorView {
     fn begin_load_file(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox
-                .set_mode(Mode::LoadFile, state.filepath().to_string());
+            self.set_textbox_mode(
+                Mode::LoadFile,
+                state.filepath().to_string(),
+            );
             true
         } else {
             false
@@ -137,7 +147,7 @@ impl EditorView {
     fn begin_resize(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox.set_mode(
+            self.set_textbox_mode(
                 Mode::Resize,
                 format!(
                     "{}x{}",
@@ -154,7 +164,7 @@ impl EditorView {
     fn begin_save_as(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox.set_mode(Mode::SaveAs, state.filepath().to_string());
+            self.set_textbox_mode(Mode::SaveAs, state.filepath().to_string());
             true
         } else {
             false
@@ -164,7 +174,7 @@ impl EditorView {
     fn begin_set_metadata(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox.set_mode(
+            self.set_textbox_mode(
                 Mode::SetMetadata,
                 state
                     .image()
@@ -184,7 +194,7 @@ impl EditorView {
         if self.textbox.mode() == Mode::Edit {
             if let Some((bl, le, re)) = state.image_metrics() {
                 state.unselect_if_necessary();
-                self.textbox.set_mode(
+                self.set_textbox_mode(
                     Mode::SetMetrics,
                     format!("{}/{}/{}", bl, le, re),
                 );
@@ -200,8 +210,10 @@ impl EditorView {
     fn begin_set_tag(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.textbox
-                .set_mode(Mode::SetTag, state.image().tag().to_string());
+            self.set_textbox_mode(
+                Mode::SetTag,
+                state.image().tag().to_string(),
+            );
             true
         } else {
             false
@@ -210,7 +222,7 @@ impl EditorView {
 
     fn begin_set_test_sentence(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit && state.font().is_some() {
-            self.textbox.set_mode(
+            self.set_textbox_mode(
                 Mode::TestSentence,
                 state.test_sentence().to_string(),
             );
@@ -377,6 +389,33 @@ impl EditorView {
             }
         }
     }
+
+    fn perform(
+        &mut self,
+        state: &mut EditorState,
+        menu_action: MenuAction,
+    ) -> Action<()> {
+        let action = match menu_action {
+            MenuAction::FlipHorz => {
+                state.mutation().flip_selection_horz();
+                Action::redraw()
+            }
+            MenuAction::FlipVert => {
+                state.mutation().flip_selection_vert();
+                Action::redraw()
+            }
+            MenuAction::Resize => Action::redraw_if(self.begin_resize(state)),
+            MenuAction::RotateLeft => {
+                state.mutation().rotate_selection_counterclockwise();
+                Action::redraw()
+            }
+            MenuAction::RotateRight => {
+                state.mutation().rotate_selection_clockwise();
+                Action::redraw()
+            }
+        };
+        action.and_stop()
+    }
 }
 
 impl GuiElement<EditorState, ()> for EditorView {
@@ -391,6 +430,7 @@ impl GuiElement<EditorState, ()> for EditorView {
         canvas.draw_rect((127, 127, 127, 127), rect);
         self.aggregate.draw(state, resources, canvas);
         self.palette.draw(state, resources, canvas);
+        self.menu.draw(state, resources, canvas);
         self.textbox.draw(state, resources, canvas);
     }
 
@@ -421,12 +461,10 @@ impl GuiElement<EditorState, ()> for EditorView {
                 Action::redraw_if(self.begin_set_grid(state)).and_stop()
             }
             &Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_selection_horz();
-                Action::redraw().and_stop()
+                self.perform(state, MenuAction::FlipHorz)
             }
             &Event::KeyDown(Keycode::L, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().rotate_selection_counterclockwise();
-                Action::redraw().and_stop()
+                self.perform(state, MenuAction::RotateLeft)
             }
             &Event::KeyDown(Keycode::M, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_set_metadata(state)).and_stop()
@@ -438,11 +476,10 @@ impl GuiElement<EditorState, ()> for EditorView {
                 Action::redraw_if(self.begin_load_file(state)).and_stop()
             }
             &Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
-                Action::redraw_if(self.begin_resize(state)).and_stop()
+                self.perform(state, MenuAction::Resize)
             }
             &Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().rotate_selection_clockwise();
-                Action::redraw().and_stop()
+                self.perform(state, MenuAction::RotateRight)
             }
             &Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();
@@ -463,8 +500,7 @@ impl GuiElement<EditorState, ()> for EditorView {
                 Action::redraw().and_stop()
             }
             &Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
-                state.mutation().flip_selection_vert();
-                Action::redraw().and_stop()
+                self.perform(state, MenuAction::FlipVert)
             }
             &Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
                 state.mutation().cut_selection();
@@ -491,6 +527,15 @@ impl GuiElement<EditorState, ()> for EditorView {
                             self.textbox.clear_mode();
                             subaction.also_redraw();
                         }
+                    }
+                    action.merge(subaction.but_no_value());
+                }
+                if !action.should_stop() {
+                    let mut subaction = self.menu.on_event(event, state);
+                    if let Some(menu_action) = subaction.take_value() {
+                        subaction.merge(
+                            self.perform(state, menu_action).but_no_value(),
+                        );
                     }
                     action.merge(subaction.but_no_value());
                 }

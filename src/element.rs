@@ -101,6 +101,13 @@ impl<A> Action<A> {
         }
     }
 
+    pub fn has_value(&self) -> bool {
+        match self.value {
+            Value::Return(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn take_value(&mut self) -> Option<A> {
         match self.value {
             Value::Continue | Value::Stop => return None,
