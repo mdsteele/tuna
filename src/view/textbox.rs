@@ -42,6 +42,7 @@ pub enum Mode {
     Edit,
     Export,
     Goto,
+    Import,
     LoadFile,
     NewGlyph,
     Resize,
@@ -57,8 +58,9 @@ pub enum Mode {
 impl Mode {
     fn tab_completion(self) -> Option<TabCompletion> {
         match self {
-            Mode::LoadFile => Some(TabCompletion::LoadableFiles),
             Mode::Export | Mode::SaveAs => Some(TabCompletion::AllFiles),
+            Mode::Import => Some(TabCompletion::PngFiles),
+            Mode::LoadFile => Some(TabCompletion::AhiFiles),
             _ => None,
         }
     }
@@ -69,16 +71,18 @@ impl Mode {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TabCompletion {
     AllFiles,
-    LoadableFiles,
+    AhiFiles,
+    PngFiles,
 }
 
 impl TabCompletion {
     fn allow(self, file_name: &str) -> bool {
         match self {
             TabCompletion::AllFiles => true,
-            TabCompletion::LoadableFiles => {
+            TabCompletion::AhiFiles => {
                 file_name.ends_with(".ahi") || file_name.ends_with(".ahf")
             }
+            TabCompletion::PngFiles => file_name.ends_with(".png"),
         }
     }
 }
@@ -609,6 +613,7 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             Mode::Edit => "Path:",
             Mode::Export => "Export:",
             Mode::Goto => "Goto:",
+            Mode::Import => "Import:",
             Mode::LoadFile => "Load:",
             Mode::NewGlyph => "Char:",
             Mode::Resize => "Size:",

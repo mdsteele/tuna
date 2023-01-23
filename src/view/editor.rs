@@ -93,6 +93,22 @@ impl EditorView {
         }
     }
 
+    fn begin_import(&mut self, state: &mut EditorState) -> bool {
+        if state.font().is_some() {
+            false
+        } else if self.textbox.mode() == Mode::Edit {
+            state.unselect_if_necessary();
+            let mut dir_path = state.filepath().to_string();
+            while !dir_path.is_empty() && !dir_path.ends_with("/") {
+                dir_path.pop();
+            }
+            self.set_textbox_mode(Mode::Import, dir_path);
+            true
+        } else {
+            false
+        }
+    }
+
     fn begin_new_image(&mut self, state: &mut EditorState) -> bool {
         if state.font().is_some() {
             if self.textbox.mode() == Mode::Edit {
@@ -267,6 +283,20 @@ impl EditorView {
                 }
             }
             Mode::Goto => state.go_to(&text),
+            Mode::Import => {
+                match util::load_png_from_file(state.palette(), &text) {
+                    Ok(image) => {
+                        let mut mutation = state.mutation();
+                        mutation.add_new_image('_');
+                        mutation.image().draw(&image, 0, 0);
+                        true
+                    }
+                    Err(error) => {
+                        println!("Error loading PNG: {}", error);
+                        false
+                    }
+                }
+            }
             Mode::LoadFile => match util::load_ahi_from_file(&text) {
                 Ok(collection) => {
                     state.load_collection(text, collection);
@@ -432,6 +462,9 @@ impl EditorView {
             MenuAction::FlipVert => {
                 state.mutation().flip_selection_vert();
                 Action::redraw()
+            }
+            MenuAction::ImportPng => {
+                Action::redraw_if(self.begin_import(state))
             }
             MenuAction::Resize => Action::redraw_if(self.begin_resize(state)),
             MenuAction::RotateLeft => {

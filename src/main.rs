@@ -19,7 +19,6 @@
 
 // TODO:
 // - Commands to chop up image along grid, either row-major or col-major
-// - Ability to import a PNG, and/or set a PNG as the editor background
 // - Finish lasso tool
 // - Limited region redraws
 // - Zoom/scroll
