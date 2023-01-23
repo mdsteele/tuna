@@ -27,6 +27,7 @@ use sdl2::rect::Rect;
 
 #[derive(Clone, Copy)]
 pub enum MenuAction {
+    ExportPng,
     FlipHorz,
     FlipVert,
     Resize,
@@ -37,6 +38,7 @@ pub enum MenuAction {
 impl MenuAction {
     pub fn label(&self) -> &'static str {
         match *self {
+            MenuAction::ExportPng => "Export PNG",
             MenuAction::FlipHorz => "Flip horizontally",
             MenuAction::FlipVert => "Flip vertically",
             MenuAction::Resize => "Resize images",
@@ -52,11 +54,13 @@ impl MenuAction {
             MenuAction::Resize => "C-R",
             MenuAction::RotateLeft => "CS-L",
             MenuAction::RotateRight => "CS-R",
+            _ => "",
         }
     }
 
     pub fn all() -> Vec<MenuAction> {
         vec![
+            MenuAction::ExportPng,
             MenuAction::FlipHorz,
             MenuAction::FlipVert,
             MenuAction::Resize,

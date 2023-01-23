@@ -80,6 +80,19 @@ impl EditorView {
         self.textbox.set_mode(mode, text);
     }
 
+    fn begin_export(&mut self, state: &mut EditorState) -> bool {
+        if self.textbox.mode() == Mode::Edit {
+            state.unselect_if_necessary();
+            self.set_textbox_mode(
+                Mode::Export,
+                format!("{}.{}.png", state.filepath(), state.image_index()),
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     fn begin_new_image(&mut self, state: &mut EditorState) -> bool {
         if state.font().is_some() {
             if self.textbox.mode() == Mode::Edit {
@@ -232,7 +245,7 @@ impl EditorView {
         }
     }
 
-    fn mode_perform(
+    fn finish_mode(
         &mut self,
         state: &mut EditorState,
         mode: Mode,
@@ -240,6 +253,19 @@ impl EditorView {
     ) -> bool {
         match mode {
             Mode::Edit => false,
+            Mode::Export => {
+                match util::save_png_to_file(
+                    state.image(),
+                    state.palette(),
+                    &text,
+                ) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        println!("Error saving PNG: {}", error);
+                        false
+                    }
+                }
+            }
             Mode::Goto => state.go_to(&text),
             Mode::LoadFile => match util::load_ahi_from_file(&text) {
                 Ok(collection) => {
@@ -396,6 +422,9 @@ impl EditorView {
         menu_action: MenuAction,
     ) -> Action<()> {
         let action = match menu_action {
+            MenuAction::ExportPng => {
+                Action::redraw_if(self.begin_export(state))
+            }
             MenuAction::FlipHorz => {
                 state.mutation().flip_selection_horz();
                 Action::redraw()
@@ -523,7 +552,7 @@ impl GuiElement<EditorState, ()> for EditorView {
                 {
                     let mut subaction = self.textbox.on_event(event, state);
                     if let Some((mode, text)) = subaction.take_value() {
-                        if self.mode_perform(state, mode, text) {
+                        if self.finish_mode(state, mode, text) {
                             self.textbox.clear_mode();
                             subaction.also_redraw();
                         }

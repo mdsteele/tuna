@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 ahi = { git = "https://github.com/mdsteele/ahi", rev = "1534f7c8" }
 num-integer = "0.1"
+png = "0.17"
 sdl2 = { version = "0.34", features = ["use_mac_framework"] }

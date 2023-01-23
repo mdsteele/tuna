@@ -40,6 +40,7 @@ const LABEL_WIDTH: i32 = 50;
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Mode {
     Edit,
+    Export,
     Goto,
     LoadFile,
     NewGlyph,
@@ -54,10 +55,30 @@ pub enum Mode {
 }
 
 impl Mode {
-    fn is_file_picker(self) -> bool {
+    fn tab_completion(self) -> Option<TabCompletion> {
         match self {
-            Mode::LoadFile | Mode::SaveAs => true,
-            _ => false,
+            Mode::LoadFile => Some(TabCompletion::LoadableFiles),
+            Mode::Export | Mode::SaveAs => Some(TabCompletion::AllFiles),
+            _ => None,
+        }
+    }
+}
+
+//===========================================================================//
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum TabCompletion {
+    AllFiles,
+    LoadableFiles,
+}
+
+impl TabCompletion {
+    fn allow(self, file_name: &str) -> bool {
+        match self {
+            TabCompletion::AllFiles => true,
+            TabCompletion::LoadableFiles => {
+                file_name.ends_with(".ahi") || file_name.ends_with(".ahf")
+            }
         }
     }
 }
@@ -538,18 +559,25 @@ impl ModalTextBox {
         self.matches_panel.clear_matches();
     }
 
-    fn tab_complete(&mut self) -> bool {
-        match tab_complete_path(self.textbox.inner().text()) {
-            Ok((path, matches)) => {
-                self.textbox.inner_mut().set_text(path);
-                if matches.len() > 1 {
-                    self.matches_panel.set_matches(matches);
-                } else {
-                    self.matches_panel.clear_matches();
+    fn tab_complete(&mut self) -> Action<(Mode, String)> {
+        if let Some(tab_completion) = self.mode.tab_completion() {
+            match tab_complete_path(
+                tab_completion,
+                self.textbox.inner().text(),
+            ) {
+                Ok((path, matches)) => {
+                    self.textbox.inner_mut().set_text(path);
+                    if matches.len() > 1 {
+                        self.matches_panel.set_matches(matches);
+                    } else {
+                        self.matches_panel.clear_matches();
+                    }
+                    Action::redraw().and_stop()
                 }
-                true
+                Err(_) => Action::ignore().and_stop(),
             }
-            Err(_) => false,
+        } else {
+            Action::ignore()
         }
     }
 }
@@ -573,12 +601,13 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             self.textbox.draw(&(), resources, canvas);
             if let Mode::SetColor(_) = self.mode {
                 self.rgba_panel.draw(&(), resources, canvas);
-            } else if self.mode.is_file_picker() {
+            } else if self.mode.tab_completion().is_some() {
                 self.matches_panel.draw(&(), resources, canvas);
             }
         }
         let label = match self.mode {
             Mode::Edit => "Path:",
+            Mode::Export => "Export:",
             Mode::Goto => "Goto:",
             Mode::LoadFile => "Load:",
             Mode::NewGlyph => "Char:",
@@ -618,10 +647,7 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
                 let text = self.textbox.inner().text().to_string();
                 Action::redraw().and_return((self.mode, text))
             }
-            &Event::KeyDown(Keycode::Tab, _) => Action::redraw_if(
-                self.mode.is_file_picker() && self.tab_complete(),
-            )
-            .and_stop(),
+            &Event::KeyDown(Keycode::Tab, _) => self.tab_complete(),
             _ => Action::ignore(),
         };
         if !action.should_stop() {
@@ -683,6 +709,7 @@ fn join_to_string(dir: &Path, file_name: &str) -> io::Result<String> {
 }
 
 fn tab_complete_path(
+    tab_completion: TabCompletion,
     path_string: &str,
 ) -> io::Result<(String, Vec<(String, String)>)> {
     let path = Path::new(path_string);
@@ -701,9 +728,7 @@ fn tab_complete_path(
         let entry = entry_result?;
         let file_name = entry.file_name().to_str().unwrap_or("").to_string();
         if file_name.starts_with(prefix) {
-            if entry.file_type()?.is_dir()
-                || file_name.ends_with(".ahi")
-                || file_name.ends_with(".ahf")
+            if entry.file_type()?.is_dir() || tab_completion.allow(&file_name)
             {
                 let file_path = join_to_string(dir, &file_name)?;
                 file_names_and_paths.push((file_name, file_path));

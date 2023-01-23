@@ -33,4 +33,23 @@ pub fn load_ahi_from_file(path: &String) -> io::Result<ahi::Collection> {
     ahi::Collection::read(&mut file)
 }
 
+pub fn save_png_to_file(
+    image: &ahi::Image,
+    palette: &ahi::Palette,
+    path: &String,
+) -> io::Result<()> {
+    let rgba_data = image.rgba_data(&palette);
+    let output_file = File::create(path)?;
+    let mut encoder =
+        png::Encoder::new(output_file, image.width(), image.height());
+    // TODO: Set palette and use ColorType::Indexed instead.
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(&rgba_data).map_err(|err| match err {
+        png::EncodingError::IoError(err) => err,
+        err => io::Error::new(io::ErrorKind::InvalidData, err.to_string()),
+    })
+}
+
 //===========================================================================//
