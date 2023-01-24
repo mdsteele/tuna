@@ -680,6 +680,16 @@ impl<'a> Mutation<'a> {
         }
     }
 
+    pub fn add_images(&mut self, images: &[Image]) -> bool {
+        for image in images {
+            if !self.add_new_image('_') {
+                return false;
+            }
+            self.image().draw(image, 0, 0);
+        }
+        return true;
+    }
+
     pub fn delete_image(&mut self) -> bool {
         self.unselect();
         match self.state.current.data {

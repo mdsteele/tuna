@@ -18,7 +18,7 @@
 // +--------------------------------------------------------------------------+
 
 // TODO:
-// - Commands to chop up image along grid, either row-major or col-major
+// - Animation preview
 // - Finish lasso tool
 // - Limited region redraws
 // - Zoom/scroll

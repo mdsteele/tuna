@@ -285,12 +285,7 @@ impl EditorView {
             Mode::Goto => state.go_to(&text),
             Mode::Import => {
                 match util::load_png_from_file(state.palette(), &text) {
-                    Ok(image) => {
-                        let mut mutation = state.mutation();
-                        mutation.add_new_image('_');
-                        mutation.image().draw(&image, 0, 0);
-                        true
-                    }
+                    Ok(image) => state.mutation().add_images(&[image]),
                     Err(error) => {
                         println!("Error loading PNG: {}", error);
                         false
@@ -446,12 +441,58 @@ impl EditorView {
         }
     }
 
+    fn chop_col_major(&mut self, state: &mut EditorState) -> bool {
+        let (grid_width, grid_height) = state.grid();
+        let chop_width = if grid_width == 0 { 8 } else { grid_width };
+        let chop_height = if grid_height == 0 { 8 } else { grid_height };
+        let chop_cols = state.image().width() / chop_width;
+        let chop_rows = state.image().height() / chop_height;
+        let mut chopped = Vec::<ahi::Image>::new();
+        for col in 0..chop_cols {
+            let dx = (col * chop_width) as i32;
+            for row in 0..chop_rows {
+                let dy = (row * chop_height) as i32;
+                let mut image = ahi::Image::new(chop_width, chop_height);
+                image.draw(state.image(), -dx, -dy);
+                chopped.push(image);
+            }
+        }
+        state.mutation().add_images(&chopped)
+    }
+
+    fn chop_row_major(&mut self, state: &mut EditorState) -> bool {
+        let (grid_width, grid_height) = state.grid();
+        let chop_width = if grid_width == 0 { 8 } else { grid_width };
+        let chop_height = if grid_height == 0 { 8 } else { grid_height };
+        let chop_cols = state.image().width() / chop_width;
+        let chop_rows = state.image().height() / chop_height;
+        let mut chopped = Vec::<ahi::Image>::new();
+        for row in 0..chop_rows {
+            let dy = (row * chop_height) as i32;
+            for col in 0..chop_cols {
+                let dx = (col * chop_width) as i32;
+                let mut image = ahi::Image::new(chop_width, chop_height);
+                image.draw(state.image(), -dx, -dy);
+                chopped.push(image);
+            }
+        }
+        state.mutation().add_images(&chopped)
+    }
+
     fn perform(
         &mut self,
         state: &mut EditorState,
         menu_action: MenuAction,
     ) -> Action<()> {
         let action = match menu_action {
+            MenuAction::ChopColMajor => {
+                self.chop_col_major(state);
+                Action::redraw()
+            }
+            MenuAction::ChopRowMajor => {
+                self.chop_row_major(state);
+                Action::redraw()
+            }
             MenuAction::ExportPng => {
                 Action::redraw_if(self.begin_export(state))
             }
