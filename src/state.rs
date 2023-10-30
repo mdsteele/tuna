@@ -899,11 +899,11 @@ impl<'a> Mutation<'a> {
         }
     }
 
-    pub fn scale_selection_2x(&mut self) {
+    pub fn scale_selection_up(&mut self, by: u32) {
         if let Some((ref mut image, _)) = self.state.current.selection {
-            *image = Rc::new(scale_2x(image));
+            *image = Rc::new(scale_up(image, by));
         } else {
-            let scaled = scale_2x(self.image());
+            let scaled = scale_up(self.image(), by);
             self.image().clear();
             self.image().draw(&scaled, 0, 0);
         }
@@ -947,12 +947,18 @@ impl<'a> Mutation<'a> {
 
 //===========================================================================//
 
-fn scale_2x(image: &Image) -> Image {
-    let mut scaled = Image::new(image.width() * 2, image.height() * 2);
+fn scale_up(image: &Image, by: u32) -> Image {
+    let mut scaled = Image::new(image.width() * by, image.height() * by);
     for row in 0..image.height() {
         for col in 0..image.width() {
             let color = image[(col, row)];
-            scaled.fill_rect((2 * col) as i32, (2 * row) as i32, 2, 2, color);
+            scaled.fill_rect(
+                (by * col) as i32,
+                (by * row) as i32,
+                by,
+                by,
+                color,
+            );
         }
     }
     scaled

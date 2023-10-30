@@ -615,10 +615,12 @@ impl GuiElement<EditorState, ()> for EditorView {
             &Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(state.redo()).and_stop()
             }
-            &Event::KeyDown(Keycode::Num2, kmod)
-                if kmod == COMMAND | SHIFT =>
-            {
-                state.mutation().scale_selection_2x();
+            &Event::KeyDown(Keycode::Num2, kmod) if kmod == COMMAND => {
+                state.mutation().scale_selection_up(2);
+                Action::redraw().and_stop()
+            }
+            &Event::KeyDown(Keycode::Num3, kmod) if kmod == COMMAND => {
+                state.mutation().scale_selection_up(3);
                 Action::redraw().and_stop()
             }
             _ => {
