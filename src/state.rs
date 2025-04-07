@@ -24,6 +24,7 @@ use std::io;
 use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
+use crate::util;
 
 //===========================================================================//
 
@@ -909,6 +910,17 @@ impl<'a> Mutation<'a> {
         }
     }
 
+    pub fn scale_selection_down(&mut self, by: u32) {
+        let palette = self.state.palette().clone();
+        if let Some((ref mut image, _)) = self.state.current.selection {
+            *image = Rc::new(scale_down(image, &palette, by));
+        } else {
+            let scaled = scale_down(self.image(), &palette, by);
+            self.image().clear();
+            self.image().draw(&scaled, 0, 0);
+        }
+    }
+
     pub fn delete_selection(&mut self) {
         self.state.current.selection = None;
     }
@@ -959,6 +971,34 @@ fn scale_up(image: &Image, by: u32) -> Image {
                 by,
                 color,
             );
+        }
+    }
+    scaled
+}
+
+fn scale_down(image: &Image, palette: &Palette, by: u32) -> Image {
+    let mut scaled = Image::new((image.width() / by).max(1), (image.height() / by).max(1));
+    for row in 0..scaled.height() {
+        for col in 0..scaled.width() {
+            let mut total_r = 0u32;
+            let mut total_g = 0u32;
+            let mut total_b = 0u32;
+            let mut total_a = 0u32;
+            for x in 0..by {
+                for y in 0..by {
+                    let color = image[(col * by + x, row * by + y)];
+                    let rgba = palette[color];
+                    total_r += rgba.0 as u32;
+                    total_g += rgba.1 as u32;
+                    total_b += rgba.2 as u32;
+                    total_a += rgba.3 as u32;
+                }
+            }
+            let avg_rgba = ((total_r / (by * by)) as u8,
+                            (total_g / (by * by)) as u8,
+                            (total_b / (by * by)) as u8,
+                            (total_a / (by * by)) as u8);
+            scaled[(col, row)] = util::nearest_color(palette, avg_rgba);
         }
     }
     scaled

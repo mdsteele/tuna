@@ -516,6 +516,14 @@ impl EditorView {
                 state.mutation().rotate_selection_clockwise();
                 Action::redraw()
             }
+            MenuAction::Scale2x => {
+                state.mutation().scale_selection_up(2);
+                Action::redraw()
+            }
+            MenuAction::ScaleHalf => {
+                state.mutation().scale_selection_down(2);
+                Action::redraw()
+            }
         };
         action.and_stop()
     }

@@ -131,29 +131,33 @@ pub fn load_png_from_file(
                 rgba_data[start + 2],
                 rgba_data[start + 3],
             );
-            let mut best_color = ahi::Color::C0;
-            let mut best_dist = i32::MAX;
-            for &color in COLORS {
-                let color_rgba: (u8, u8, u8, u8) = palette[color];
-                let delta = (
-                    (color_rgba.0 as i32) - (png_rgba.0 as i32),
-                    (color_rgba.1 as i32) - (png_rgba.1 as i32),
-                    (color_rgba.2 as i32) - (png_rgba.2 as i32),
-                    (color_rgba.3 as i32) - (png_rgba.3 as i32),
-                );
-                let dist = delta.0 * delta.0
-                    + delta.1 * delta.1
-                    + delta.2 * delta.2
-                    + delta.3 * delta.3;
-                if dist < best_dist {
-                    best_dist = dist;
-                    best_color = color;
-                }
-            }
-            image[(col, row)] = best_color;
+            image[(col, row)] = nearest_color(palette, png_rgba);
         }
     }
     Ok(image)
+}
+
+pub fn nearest_color(palette: &ahi::Palette, rgba: (u8, u8, u8, u8)) -> ahi::Color {
+    let mut best_color = ahi::Color::C0;
+    let mut best_dist = i32::MAX;
+    for &color in COLORS {
+        let color_rgba: (u8, u8, u8, u8) = palette[color];
+        let delta = (
+            (color_rgba.0 as i32) - (rgba.0 as i32),
+            (color_rgba.1 as i32) - (rgba.1 as i32),
+            (color_rgba.2 as i32) - (rgba.2 as i32),
+            (color_rgba.3 as i32) - (rgba.3 as i32),
+        );
+        let dist = delta.0 * delta.0
+            + delta.1 * delta.1
+            + delta.2 * delta.2
+            + delta.3 * delta.3;
+        if dist < best_dist {
+            best_dist = dist;
+            best_color = color;
+        }
+    }
+    best_color
 }
 
 //===========================================================================//

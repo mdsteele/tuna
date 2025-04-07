@@ -36,6 +36,8 @@ pub enum MenuAction {
     Resize,
     RotateLeft,
     RotateRight,
+    Scale2x,
+    ScaleHalf,
 }
 
 impl MenuAction {
@@ -50,6 +52,8 @@ impl MenuAction {
             MenuAction::Resize => "Resize images",
             MenuAction::RotateLeft => "Rotate left (CCW)",
             MenuAction::RotateRight => "Rotate right (CW)",
+            MenuAction::Scale2x => "Scale 2x",
+            MenuAction::ScaleHalf => "Scale 1/2",
         }
     }
 
@@ -60,6 +64,7 @@ impl MenuAction {
             MenuAction::Resize => "C-R",
             MenuAction::RotateLeft => "CS-L",
             MenuAction::RotateRight => "CS-R",
+            MenuAction::Scale2x => "C-2",
             _ => "",
         }
     }
@@ -75,6 +80,8 @@ impl MenuAction {
             MenuAction::Resize,
             MenuAction::RotateLeft,
             MenuAction::RotateRight,
+            MenuAction::Scale2x,
+            MenuAction::ScaleHalf,
         ]
     }
 }
