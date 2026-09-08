@@ -144,7 +144,7 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    pub fn subcanvas(&mut self, rect: Rect) -> Canvas {
+    pub fn subcanvas(&mut self, rect: Rect) -> Canvas<'_> {
         let new_clip_rect = Some(self.subrect(rect));
         self.renderer.set_clip_rect(new_clip_rect);
         Canvas {
@@ -217,7 +217,7 @@ impl<'a> Font<'a> {
         width
     }
 
-    fn glyph(&self, chr: char) -> &Glyph {
+    fn glyph(&self, chr: char) -> &Glyph<'a> {
         self.glyphs.get(&chr).unwrap_or(&self.default_glyph)
     }
 }
@@ -241,23 +241,23 @@ impl<'a> Resources<'a> {
         }
     }
 
-    pub fn arrow_down(&self) -> &Sprite {
+    pub fn arrow_down(&self) -> &Sprite<'a> {
         &self.arrows[1]
     }
 
-    pub fn arrow_up(&self) -> &Sprite {
+    pub fn arrow_up(&self) -> &Sprite<'a> {
         &self.arrows[0]
     }
 
-    pub fn font(&self) -> &Font {
+    pub fn font(&self) -> &Font<'a> {
         &self.font
     }
 
-    pub fn tool_icon(&self, icon: ToolIcon) -> &Sprite {
+    pub fn tool_icon(&self, icon: ToolIcon) -> &Sprite<'a> {
         &self.tool_icons[icon as usize]
     }
 
-    pub fn unsaved_icon(&self) -> &Sprite {
+    pub fn unsaved_icon(&self) -> &Sprite<'a> {
         &self.unsaved_icon
     }
 }

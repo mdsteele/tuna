@@ -76,9 +76,9 @@ pub fn load_png_from_file(
     palette: &ahi::Palette,
     path: &String,
 ) -> io::Result<ahi::Image> {
-    let decoder = png::Decoder::new(File::open(path)?);
+    let decoder = png::Decoder::new(io::BufReader::new(File::open(path)?));
     let mut reader = decoder.read_info()?;
-    let mut buffer = vec![0; reader.output_buffer_size()];
+    let mut buffer = vec![0; reader.output_buffer_size().unwrap()];
     let info = reader.next_frame(&mut buffer)?;
     let rgba_data = match info.color_type {
         png::ColorType::Rgba => buffer,

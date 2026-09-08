@@ -459,13 +459,13 @@ impl EditorState {
         }
     }
 
-    pub fn mutation(&mut self) -> Mutation {
+    pub fn mutation<'a>(&'a mut self) -> Mutation<'a> {
         self.push_change();
         self.current.unsaved = true;
         Mutation { state: self }
     }
 
-    pub fn persistent_mutation(&mut self) -> Mutation {
+    pub fn persistent_mutation<'a>(&'a mut self) -> Mutation<'a> {
         if !self.persistent_mutation_active {
             self.push_change();
             self.persistent_mutation_active = true;
