@@ -133,16 +133,14 @@ impl GuiElement<Tool, ()> for ToolPicker {
     }
 
     fn on_event(&mut self, event: &Event, tool: &mut Tool) -> Action<()> {
-        match event {
-            &Event::MouseDown(_) => {
+        match *event {
+            Event::MouseDown(_) => {
                 *tool = self.tool;
                 return Action::redraw().and_stop();
             }
-            &Event::KeyDown(key, kmod) => {
-                if key == self.key && kmod == NONE {
-                    *tool = self.tool;
-                    return Action::redraw().and_stop();
-                }
+            Event::KeyDown(key, kmod) if key == self.key && kmod == NONE => {
+                *tool = self.tool;
+                return Action::redraw().and_stop();
             }
             _ => {}
         }

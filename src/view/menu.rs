@@ -36,8 +36,9 @@ pub enum MenuAction {
     Resize,
     RotateLeft,
     RotateRight,
-    Scale2x,
     ScaleHalf,
+    Scale2x,
+    Scale3x,
 }
 
 impl MenuAction {
@@ -52,8 +53,9 @@ impl MenuAction {
             MenuAction::Resize => "Resize images",
             MenuAction::RotateLeft => "Rotate left (CCW)",
             MenuAction::RotateRight => "Rotate right (CW)",
-            MenuAction::Scale2x => "Scale 2x",
             MenuAction::ScaleHalf => "Scale 1/2",
+            MenuAction::Scale2x => "Scale 2x",
+            MenuAction::Scale3x => "Scale 3x",
         }
     }
 
@@ -65,6 +67,7 @@ impl MenuAction {
             MenuAction::RotateLeft => "CS-L",
             MenuAction::RotateRight => "CS-R",
             MenuAction::Scale2x => "C-2",
+            MenuAction::Scale3x => "C-3",
             _ => "",
         }
     }
@@ -80,8 +83,9 @@ impl MenuAction {
             MenuAction::Resize,
             MenuAction::RotateLeft,
             MenuAction::RotateRight,
-            MenuAction::Scale2x,
             MenuAction::ScaleHalf,
+            MenuAction::Scale2x,
+            MenuAction::Scale3x,
         ]
     }
 }
@@ -126,14 +130,11 @@ impl GuiElement<EditorState, MenuAction> for MenuView {
         _: &mut EditorState,
     ) -> Action<MenuAction> {
         let mut action = Action::ignore();
-        match event {
-            &Event::KeyDown(Keycode::Escape, _) => {
-                if self.is_open {
-                    self.close();
-                    action.merge(Action::redraw().and_stop());
-                }
-            }
-            _ => {}
+        if let Event::KeyDown(Keycode::Escape, _) = *event
+            && self.is_open
+        {
+            self.close();
+            action.merge(Action::redraw().and_stop());
         }
         if !action.should_stop() && self.is_open {
             let subaction = self.items.on_event(event, &mut ());
@@ -246,11 +247,11 @@ impl GuiElement<(), MenuAction> for MenuItems {
             state,
         );
         if !action.should_stop() {
-            match event {
-                &Event::MouseDrag(pt) | &Event::MouseDown(pt) => {
-                    if self.rect.contains_point(pt) {
-                        action = action.and_stop();
-                    }
+            match *event {
+                Event::MouseDrag(pt) | Event::MouseDown(pt)
+                    if self.rect.contains_point(pt) =>
+                {
+                    action = action.and_stop();
                 }
                 _ => {}
             }

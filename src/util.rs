@@ -22,6 +22,10 @@ use std::io;
 
 //===========================================================================//
 
+pub type Rgba = (u8, u8, u8, u8);
+
+//===========================================================================//
+
 const COLORS: &[ahi::Color] = &[
     ahi::Color::C0,
     ahi::Color::C1,
@@ -58,7 +62,7 @@ pub fn save_png_to_file(
     palette: &ahi::Palette,
     path: &String,
 ) -> io::Result<()> {
-    let rgba_data = image.rgba_data(&palette);
+    let rgba_data = image.rgba_data(palette);
     let output_file = File::create(path)?;
     let mut encoder =
         png::Encoder::new(output_file, image.width(), image.height());
@@ -110,7 +114,7 @@ pub fn load_png_from_file(
                 rgba.push(value);
                 rgba.push(value);
                 rgba.push(value);
-                rgba.push(std::u8::MAX);
+                rgba.push(u8::MAX);
             }
             rgba
         }
@@ -125,8 +129,8 @@ pub fn load_png_from_file(
     for row in 0..info.height {
         for col in 0..info.width {
             let start = ((row * info.width + col) as usize) * 4;
-            let png_rgba: (u8, u8, u8, u8) = (
-                rgba_data[start + 0],
+            let png_rgba: Rgba = (
+                rgba_data[start],
                 rgba_data[start + 1],
                 rgba_data[start + 2],
                 rgba_data[start + 3],
@@ -137,11 +141,11 @@ pub fn load_png_from_file(
     Ok(image)
 }
 
-pub fn nearest_color(palette: &ahi::Palette, rgba: (u8, u8, u8, u8)) -> ahi::Color {
+pub fn nearest_color(palette: &ahi::Palette, rgba: Rgba) -> ahi::Color {
     let mut best_color = ahi::Color::C0;
     let mut best_dist = i32::MAX;
     for &color in COLORS {
-        let color_rgba: (u8, u8, u8, u8) = palette[color];
+        let color_rgba: Rgba = palette[color];
         let delta = (
             (color_rgba.0 as i32) - (rgba.0 as i32),
             (color_rgba.1 as i32) - (rgba.1 as i32),

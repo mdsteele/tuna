@@ -19,8 +19,9 @@
 
 use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use crate::event::{Event, Keycode, ALT};
+use crate::event::{ALT, Event, Keycode};
 use crate::state::EditorState;
+use crate::util::Rgba;
 use ahi::Color;
 use sdl2::rect::Rect;
 use std::cmp;
@@ -59,8 +60,8 @@ impl Mode {
     fn tab_completion(self) -> Option<TabCompletion> {
         match self {
             Mode::Export | Mode::SaveAs => Some(TabCompletion::AllFiles),
-            Mode::Import => Some(TabCompletion::PngFiles),
-            Mode::LoadFile => Some(TabCompletion::AhiFiles),
+            Mode::Import => Some(TabCompletion::PngFilesOnly),
+            Mode::LoadFile => Some(TabCompletion::AhiFilesOnly),
             _ => None,
         }
     }
@@ -69,20 +70,20 @@ impl Mode {
 //===========================================================================//
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub enum TabCompletion {
+enum TabCompletion {
     AllFiles,
-    AhiFiles,
-    PngFiles,
+    AhiFilesOnly,
+    PngFilesOnly,
 }
 
 impl TabCompletion {
     fn allow(self, file_name: &str) -> bool {
         match self {
             TabCompletion::AllFiles => true,
-            TabCompletion::AhiFiles => {
+            TabCompletion::AhiFilesOnly => {
                 file_name.ends_with(".ahi") || file_name.ends_with(".ahf")
             }
-            TabCompletion::PngFiles => file_name.ends_with(".png"),
+            TabCompletion::PngFilesOnly => file_name.ends_with(".png"),
         }
     }
 }
@@ -131,15 +132,15 @@ impl GuiElement<(), ()> for TextBox {
     }
 
     fn on_event(&mut self, event: &Event, _: &mut ()) -> Action<()> {
-        match event {
-            &Event::ClockTick => {
+        match *event {
+            Event::ClockTick => {
                 let was_on = self.cursor_blink < CURSOR_ON_FRAMES;
                 self.cursor_blink = (self.cursor_blink + 1)
                     % (CURSOR_ON_FRAMES + CURSOR_OFF_FRAMES);
                 let is_on = self.cursor_blink < CURSOR_ON_FRAMES;
                 Action::redraw_if(was_on != is_on)
             }
-            &Event::KeyDown(Keycode::Backspace, keymod) => {
+            Event::KeyDown(Keycode::Backspace, keymod) => {
                 if self.byte_index > 0 {
                     let rest = self.text.split_off(self.byte_index);
                     if keymod == ALT {
@@ -169,7 +170,7 @@ impl GuiElement<(), ()> for TextBox {
                     Action::ignore()
                 }
             }
-            &Event::KeyDown(Keycode::Up, _) => {
+            Event::KeyDown(Keycode::Up, _) => {
                 if self.byte_index > 0 {
                     self.byte_index = 0;
                     self.cursor_blink = 0;
@@ -178,7 +179,7 @@ impl GuiElement<(), ()> for TextBox {
                     Action::ignore()
                 }
             }
-            &Event::KeyDown(Keycode::Down, _) => {
+            Event::KeyDown(Keycode::Down, _) => {
                 if self.byte_index < self.text.len() {
                     self.byte_index = self.text.len();
                     self.cursor_blink = 0;
@@ -187,7 +188,7 @@ impl GuiElement<(), ()> for TextBox {
                     Action::ignore()
                 }
             }
-            &Event::KeyDown(Keycode::Left, _) => {
+            Event::KeyDown(Keycode::Left, _) => {
                 if self.byte_index > 0 {
                     let mut new_byte_index = self.byte_index - 1;
                     while !self.text.is_char_boundary(new_byte_index) {
@@ -200,7 +201,7 @@ impl GuiElement<(), ()> for TextBox {
                     Action::ignore()
                 }
             }
-            &Event::KeyDown(Keycode::Right, _) => {
+            Event::KeyDown(Keycode::Right, _) => {
                 if self.byte_index < self.text.len() {
                     let mut new_byte_index = self.byte_index + 1;
                     while !self.text.is_char_boundary(new_byte_index) {
@@ -213,8 +214,8 @@ impl GuiElement<(), ()> for TextBox {
                     Action::ignore()
                 }
             }
-            &Event::KeyDown(_, _) => Action::ignore().and_stop(),
-            &Event::TextInput(ref input) => {
+            Event::KeyDown(_, _) => Action::ignore().and_stop(),
+            Event::TextInput(ref input) => {
                 self.text.insert_str(self.byte_index, input);
                 self.byte_index += input.len();
                 self.cursor_blink = 0;
@@ -228,16 +229,16 @@ impl GuiElement<(), ()> for TextBox {
 //===========================================================================//
 
 struct RgbaSwatch {
-    rgba: (u8, u8, u8, u8),
+    rgba: Rgba,
 }
 
 impl RgbaSwatch {
-    fn new(rgba: (u8, u8, u8, u8)) -> RgbaSwatch {
+    fn new(rgba: Rgba) -> RgbaSwatch {
         RgbaSwatch { rgba }
     }
 }
 
-impl GuiElement<(), (u8, u8, u8, u8)> for RgbaSwatch {
+impl GuiElement<(), Rgba> for RgbaSwatch {
     fn draw(&self, _: &(), _: &Resources, canvas: &mut Canvas) {
         let rect = canvas.rect();
         let inner = shrink(rect, 2);
@@ -253,11 +254,7 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaSwatch {
         canvas.draw_rect((255, 255, 255, 255), shrink(rect, 1));
     }
 
-    fn on_event(
-        &mut self,
-        event: &Event,
-        _: &mut (),
-    ) -> Action<(u8, u8, u8, u8)> {
+    fn on_event(&mut self, event: &Event, _: &mut ()) -> Action<Rgba> {
         match event {
             &Event::MouseDown(_) => Action::redraw().and_return(self.rgba),
             _ => Action::ignore(),
@@ -268,7 +265,7 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaSwatch {
 //===========================================================================//
 
 struct RgbaPanel {
-    swatches: AggregateElement<(), (u8, u8, u8, u8)>,
+    swatches: AggregateElement<(), Rgba>,
 }
 
 impl RgbaPanel {
@@ -282,7 +279,7 @@ impl RgbaPanel {
         + RgbaPanel::MARGIN * 2) as u32;
 
     fn new() -> RgbaPanel {
-        let elements: Vec<Box<dyn GuiElement<(), (u8, u8, u8, u8)>>> = vec![
+        let elements: Vec<Box<dyn GuiElement<(), Rgba>>> = vec![
             // Default palette:
             RgbaPanel::swatch(0, 0, (0, 0, 0, 0)),
             RgbaPanel::swatch(1, 0, (0, 0, 0, 255)),
@@ -367,8 +364,8 @@ impl RgbaPanel {
     fn swatch(
         col: i32,
         row: i32,
-        rgba: (u8, u8, u8, u8),
-    ) -> Box<dyn GuiElement<(), (u8, u8, u8, u8)>> {
+        rgba: Rgba,
+    ) -> Box<dyn GuiElement<(), Rgba>> {
         let left = RgbaPanel::MARGIN + RgbaPanel::SWATCH_SIZE * col;
         let top = RgbaPanel::MARGIN + RgbaPanel::SWATCH_SIZE * row;
         Box::new(SubrectElement::new(
@@ -382,7 +379,7 @@ impl RgbaPanel {
         ))
     }
 }
-impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
+impl GuiElement<(), Rgba> for RgbaPanel {
     fn draw(&self, state: &(), resources: &Resources, canvas: &mut Canvas) {
         let rect = canvas.rect();
         canvas.fill_rect((128, 128, 128, 255), rect);
@@ -390,11 +387,7 @@ impl GuiElement<(), (u8, u8, u8, u8)> for RgbaPanel {
         self.swatches.draw(state, resources, canvas);
     }
 
-    fn on_event(
-        &mut self,
-        event: &Event,
-        state: &mut (),
-    ) -> Action<(u8, u8, u8, u8)> {
+    fn on_event(&mut self, event: &Event, state: &mut ()) -> Action<Rgba> {
         self.swatches.on_event(event, state)
     }
 }
@@ -643,45 +636,41 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
         if self.mode == Mode::Edit {
             return Action::ignore();
         }
-        let mut action = match event {
-            &Event::KeyDown(Keycode::Escape, _) => {
+        let mut action = match *event {
+            Event::KeyDown(Keycode::Escape, _) => {
                 self.clear_mode();
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::Return, _) => {
+            Event::KeyDown(Keycode::Return, _) => {
                 let text = self.textbox.inner().text().to_string();
                 Action::redraw().and_return((self.mode, text))
             }
-            &Event::KeyDown(Keycode::Tab, _) => self.tab_complete(),
+            Event::KeyDown(Keycode::Tab, _) => self.tab_complete(),
             _ => Action::ignore(),
         };
         if !action.should_stop() {
             let subaction = self.textbox.on_event(event, &mut ());
             action.merge(subaction.but_no_value());
         }
-        if !action.should_stop() {
-            if !self.matches_panel.is_empty() {
-                let mut subaction =
-                    self.matches_panel.on_event(event, &mut ());
-                if let Some(file_path) = subaction.take_value() {
-                    self.textbox.inner_mut().set_text(file_path);
-                    self.matches_panel.clear_matches();
-                    action.merge(Action::redraw().and_stop());
-                } else {
-                    action.merge(subaction.but_no_value());
-                }
+        if !action.should_stop() && !self.matches_panel.is_empty() {
+            let mut subaction = self.matches_panel.on_event(event, &mut ());
+            if let Some(file_path) = subaction.take_value() {
+                self.textbox.inner_mut().set_text(file_path);
+                self.matches_panel.clear_matches();
+                action.merge(Action::redraw().and_stop());
+            } else {
+                action.merge(subaction.but_no_value());
             }
         }
-        if !action.should_stop() {
-            if let Mode::SetColor(_) = self.mode {
-                let mut subaction = self.rgba_panel.on_event(event, &mut ());
-                if let Some((r, g, b, a)) = subaction.take_value() {
-                    let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
-                    action
-                        .merge(Action::redraw().and_return((self.mode, text)));
-                } else {
-                    action.merge(subaction.but_no_value());
-                }
+        if !action.should_stop()
+            && let Mode::SetColor(_) = self.mode
+        {
+            let mut subaction = self.rgba_panel.on_event(event, &mut ());
+            if let Some((r, g, b, a)) = subaction.take_value() {
+                let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
+                action.merge(Action::redraw().and_return((self.mode, text)));
+            } else {
+                action.merge(subaction.but_no_value());
             }
         }
         if !action.should_stop() {
@@ -707,10 +696,7 @@ fn join_to_string(dir: &Path, file_name: &str) -> io::Result<String> {
     if file_path.is_dir() {
         file_path.push("");
     }
-    file_path
-        .into_os_string()
-        .into_string()
-        .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))
+    file_path.into_os_string().into_string().map_err(|_| io::Error::other(""))
 }
 
 fn tab_complete_path(
@@ -722,8 +708,7 @@ fn tab_complete_path(
         (path, "")
     } else {
         (
-            path.parent()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, ""))?,
+            path.parent().ok_or_else(|| io::Error::other(""))?,
             path.file_name().map(OsStr::to_str).unwrap_or(None).unwrap_or(""),
         )
     };
@@ -732,12 +717,12 @@ fn tab_complete_path(
     for entry_result in dir.read_dir()? {
         let entry = entry_result?;
         let file_name = entry.file_name().to_str().unwrap_or("").to_string();
-        if file_name.starts_with(prefix) {
-            if entry.file_type()?.is_dir() || tab_completion.allow(&file_name)
-            {
-                let file_path = join_to_string(dir, &file_name)?;
-                file_names_and_paths.push((file_name, file_path));
-            }
+        if file_name.starts_with(prefix)
+            && (entry.file_type()?.is_dir()
+                || tab_completion.allow(&file_name))
+        {
+            let file_path = join_to_string(dir, &file_name)?;
+            file_names_and_paths.push((file_name, file_path));
         }
     }
     file_names_and_paths.sort();
@@ -757,7 +742,7 @@ fn tab_complete_path(
         }
         Ok((join_to_string(dir, &completed)?, file_names_and_paths))
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, ""))
+        Err(io::Error::other(""))
     }
 }
 

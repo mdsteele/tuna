@@ -35,10 +35,11 @@ impl<A> Value<A> {
     fn merge(&mut self, other: Value<A>) {
         match other {
             Value::Continue => {}
-            Value::Stop => match *self {
-                Value::Continue => *self = other,
-                _ => {}
-            },
+            Value::Stop => {
+                if let Value::Continue = self {
+                    *self = other;
+                }
+            }
             Value::Return(_) => {
                 *self = other;
             }
@@ -95,17 +96,11 @@ impl<A> Action<A> {
     }
 
     pub fn should_stop(&self) -> bool {
-        match self.value {
-            Value::Continue => false,
-            _ => true,
-        }
+        !matches!(self.value, Value::Continue)
     }
 
     pub fn has_value(&self) -> bool {
-        match self.value {
-            Value::Return(_) => true,
-            _ => false,
-        }
+        matches!(self.value, Value::Return(_))
     }
 
     pub fn take_value(&mut self) -> Option<A> {
@@ -167,13 +162,10 @@ where
     }
 
     fn on_event(&mut self, event: &Event, state: &mut S) -> Action<A> {
-        match event {
-            &Event::MouseDown(pt) => {
-                if !self.subrect.contains_point(pt) {
-                    return Action::ignore();
-                }
-            }
-            _ => {}
+        if let &Event::MouseDown(pt) = event
+            && !self.subrect.contains_point(pt)
+        {
+            return Action::ignore();
         }
         let dx = self.subrect.x();
         let dy = self.subrect.y();

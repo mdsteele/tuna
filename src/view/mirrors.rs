@@ -124,12 +124,9 @@ impl GuiElement<Mirror, ()> for MirrorPicker {
     }
 
     fn on_event(&mut self, event: &Event, mirror: &mut Mirror) -> Action<()> {
-        match event {
-            &Event::MouseDown(_) => {
-                *mirror = self.mirror;
-                return Action::redraw().and_stop();
-            }
-            _ => {}
+        if let Event::MouseDown(_) = event {
+            *mirror = self.mirror;
+            return Action::redraw().and_stop();
         }
         Action::ignore()
     }

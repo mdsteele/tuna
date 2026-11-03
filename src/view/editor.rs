@@ -28,7 +28,7 @@ use super::toolbox::Toolbox;
 use super::unsaved::UnsavedIndicator;
 use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
-use crate::event::{Event, Keycode, COMMAND, SHIFT};
+use crate::event::{COMMAND, Event, Keycode, SHIFT};
 use crate::paint::ImageCanvas;
 use crate::state::EditorState;
 use crate::util;
@@ -53,7 +53,7 @@ impl EditorView {
             Box::new(UnsavedIndicator::new(4, 11)),
             Box::new(Toolbox::new(3, 34)),
             Box::new(Mirrors::new(3, 134)),
-            Box::new(ImagesScrollbar::new(440, 34)),
+            Box::new(ImagesScrollbar::new(439, 33, 262)),
             Box::new(ImageCanvas::new(80, 36, 256)),
             Box::new(ImageCanvas::new(348, 36, 64)),
             Box::new(TileView::new(341, 126, 96, 96)),
@@ -516,12 +516,16 @@ impl EditorView {
                 state.mutation().rotate_selection_clockwise();
                 Action::redraw()
             }
+            MenuAction::ScaleHalf => {
+                state.mutation().scale_selection_down(2);
+                Action::redraw()
+            }
             MenuAction::Scale2x => {
                 state.mutation().scale_selection_up(2);
                 Action::redraw()
             }
-            MenuAction::ScaleHalf => {
-                state.mutation().scale_selection_down(2);
+            MenuAction::Scale3x => {
+                state.mutation().scale_selection_up(3);
                 Action::redraw()
             }
         };
@@ -550,84 +554,84 @@ impl GuiElement<EditorState, ()> for EditorView {
         event: &Event,
         state: &mut EditorState,
     ) -> Action<()> {
-        match event {
-            &Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
+        match *event {
+            Event::KeyDown(Keycode::Backspace, kmod) if kmod == COMMAND => {
                 Action::redraw_if(state.mutation().delete_image()).and_stop()
             }
-            &Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::A, kmod) if kmod == COMMAND => {
                 state.mutation().select_all();
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::B, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::B, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_set_metrics(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::C, kmod) if kmod == COMMAND => {
                 state.mutation().copy_selection();
                 Action::ignore().and_stop()
             }
-            &Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND => {
                 Action::redraw_if(self.begin_goto(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::G, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_set_grid(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::H, kmod) if kmod == COMMAND | SHIFT => {
                 self.perform(state, MenuAction::FlipHorz)
             }
-            &Event::KeyDown(Keycode::L, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::L, kmod) if kmod == COMMAND | SHIFT => {
                 self.perform(state, MenuAction::RotateLeft)
             }
-            &Event::KeyDown(Keycode::M, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::M, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_set_metadata(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::N, kmod) if kmod == COMMAND => {
                 Action::redraw_if(self.begin_new_image(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::O, kmod) if kmod == COMMAND => {
                 Action::redraw_if(self.begin_load_file(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND => {
                 self.perform(state, MenuAction::Resize)
             }
-            &Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::R, kmod) if kmod == COMMAND | SHIFT => {
                 self.perform(state, MenuAction::RotateRight)
             }
-            &Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND => {
                 state.save_to_file().unwrap();
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::S, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_save_as(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND => {
                 Action::redraw_if(self.begin_set_tag(state)).and_stop()
             }
-            &Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::T, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(self.begin_set_test_sentence(state))
                     .and_stop()
             }
-            &Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND => {
                 state.mutation().paste_selection();
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::V, kmod) if kmod == COMMAND | SHIFT => {
                 self.perform(state, MenuAction::FlipVert)
             }
-            &Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::X, kmod) if kmod == COMMAND => {
                 state.mutation().cut_selection();
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND => {
                 Action::redraw_if(state.undo()).and_stop()
             }
-            &Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
+            Event::KeyDown(Keycode::Z, kmod) if kmod == COMMAND | SHIFT => {
                 Action::redraw_if(state.redo()).and_stop()
             }
-            &Event::KeyDown(Keycode::Num2, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::Num2, kmod) if kmod == COMMAND => {
                 state.mutation().scale_selection_up(2);
                 Action::redraw().and_stop()
             }
-            &Event::KeyDown(Keycode::Num3, kmod) if kmod == COMMAND => {
+            Event::KeyDown(Keycode::Num3, kmod) if kmod == COMMAND => {
                 state.mutation().scale_selection_up(3);
                 Action::redraw().and_stop()
             }
@@ -635,11 +639,11 @@ impl GuiElement<EditorState, ()> for EditorView {
                 let mut action = Action::ignore();
                 {
                     let mut subaction = self.textbox.on_event(event, state);
-                    if let Some((mode, text)) = subaction.take_value() {
-                        if self.finish_mode(state, mode, text) {
-                            self.textbox.clear_mode();
-                            subaction.also_redraw();
-                        }
+                    if let Some((mode, text)) = subaction.take_value()
+                        && self.finish_mode(state, mode, text)
+                    {
+                        self.textbox.clear_mode();
+                        subaction.also_redraw();
                     }
                     action.merge(subaction.but_no_value());
                 }
@@ -654,13 +658,11 @@ impl GuiElement<EditorState, ()> for EditorView {
                 }
                 if !action.should_stop() {
                     let mut subaction = self.palette.on_event(event, state);
-                    match subaction.take_value() {
-                        Some(PaletteAction::EditColor(color)) => {
-                            if self.begin_set_color(state, color) {
-                                subaction.also_redraw();
-                            }
-                        }
-                        None => {}
+                    if let Some(PaletteAction::EditColor(color)) =
+                        subaction.take_value()
+                        && self.begin_set_color(state, color)
+                    {
+                        subaction.also_redraw();
                     }
                     action.merge(subaction.but_no_value());
                 }

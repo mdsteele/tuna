@@ -17,8 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use crate::util;
-use ahi;
+use crate::util::{self, Rgba};
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Canvas as SdlCanvas;
@@ -72,8 +71,7 @@ impl<'a> Canvas<'a> {
             .unwrap();
     }
 
-    pub fn clear(&mut self, color: (u8, u8, u8, u8)) {
-        let (r, g, b, a) = color;
+    pub fn clear(&mut self, (r, g, b, a): Rgba) {
         self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
         if let Some(rect) = self.clip_rect {
             self.renderer.fill_rect(rect).unwrap();
@@ -109,19 +107,17 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    pub fn draw_pixel(&mut self, color: (u8, u8, u8, u8), point: Point) {
-        self.fill_rect(color, Rect::new(point.x(), point.y(), 1, 1));
+    pub fn draw_pixel(&mut self, rgba: Rgba, point: Point) {
+        self.fill_rect(rgba, Rect::new(point.x(), point.y(), 1, 1));
     }
 
-    pub fn draw_rect(&mut self, color: (u8, u8, u8, u8), rect: Rect) {
-        let (r, g, b, a) = color;
+    pub fn draw_rect(&mut self, (r, g, b, a): Rgba, rect: Rect) {
         self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
         let subrect = self.subrect(rect);
         self.renderer.draw_rect(subrect).unwrap();
     }
 
-    pub fn fill_rect(&mut self, color: (u8, u8, u8, u8), rect: Rect) {
-        let (r, g, b, a) = color;
+    pub fn fill_rect(&mut self, (r, g, b, a): Rgba, rect: Rect) {
         if a > 0 {
             self.renderer.set_draw_color(Color::RGBA(r, g, b, a));
             let subrect = self.subrect(rect);

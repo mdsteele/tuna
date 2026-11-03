@@ -17,6 +17,7 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
+use crate::util::{self, Rgba};
 use ahi::{Collection, Color, Font, Glyph, Image, Palette};
 use sdl2::rect::{Point, Rect};
 use std::fs::File;
@@ -24,7 +25,6 @@ use std::io;
 use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
-use crate::util;
 
 //===========================================================================//
 
@@ -86,13 +86,13 @@ struct AhfData {
 
 #[derive(Clone)]
 enum Data {
-    AHI(AhiData),
-    AHF(AhfData),
+    Ahi(AhiData),
+    Ahf(AhfData),
 }
 
 impl Data {
     fn from_collection(collection: Collection) -> Data {
-        Data::AHI(AhiData::new(collection))
+        Data::Ahi(AhiData::new(collection))
     }
 }
 
@@ -266,51 +266,51 @@ impl EditorState {
 
     pub fn num_palettes(&self) -> usize {
         match self.current.data {
-            Data::AHI(ref ahi) => ahi.palettes.len(),
-            Data::AHF(_) => 1,
+            Data::Ahi(ref ahi) => ahi.palettes.len(),
+            Data::Ahf(_) => 1,
         }
     }
 
     pub fn palette_index(&self) -> usize {
         match self.current.data {
-            Data::AHI(ref ahi) => ahi.palette_index,
-            Data::AHF(_) => 0,
+            Data::Ahi(ref ahi) => ahi.palette_index,
+            Data::Ahf(_) => 0,
         }
     }
 
     pub fn set_palette_index(&mut self, index: usize) {
         match self.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 ahi.palette_index = index % (1 + ahi.palettes.len());
             }
-            Data::AHF(_) => {}
+            Data::Ahf(_) => {}
         }
     }
 
     pub fn palette(&self) -> &Palette {
         match self.current.data {
-            Data::AHI(ref ahi) => {
+            Data::Ahi(ref ahi) => {
                 if ahi.palette_index < ahi.palettes.len() {
                     &ahi.palettes[ahi.palette_index]
                 } else {
                     Palette::default()
                 }
             }
-            Data::AHF(_) => Palette::default(),
+            Data::Ahf(_) => Palette::default(),
         }
     }
 
     pub fn num_images(&self) -> usize {
         match self.current.data {
-            Data::AHI(ref ahi) => ahi.images.len(),
-            Data::AHF(ref ahf) => 1 + ahf.font.chars().len(),
+            Data::Ahi(ref ahi) => ahi.images.len(),
+            Data::Ahf(ref ahf) => 1 + ahf.font.chars().len(),
         }
     }
 
     pub fn image_index(&self) -> usize {
         match self.current.data {
-            Data::AHI(ref ahi) => ahi.image_index,
-            Data::AHF(ref ahf) => {
+            Data::Ahi(ref ahi) => ahi.image_index,
+            Data::Ahf(ref ahf) => {
                 if let Some(current) = ahf.current_char {
                     for (index, chr) in ahf.font.chars().enumerate() {
                         if chr == current {
@@ -326,15 +326,15 @@ impl EditorState {
     pub fn set_image_index(&mut self, index: usize) {
         self.unselect_if_necessary();
         match self.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 debug_assert!(!ahi.images.is_empty());
                 ahi.image_index = index % ahi.images.len();
             }
-            Data::AHF(ref mut ahf) => {
+            Data::Ahf(ref mut ahf) => {
                 if index == 0 {
                     ahf.current_char = None;
                 } else {
-                    let chr = ahf.font.chars().skip(index - 1).next().unwrap();
+                    let chr = ahf.font.chars().nth(index - 1).unwrap();
                     ahf.current_char = Some(chr);
                 }
             }
@@ -343,14 +343,14 @@ impl EditorState {
 
     pub fn go_to(&mut self, text: &str) -> bool {
         match self.current.data {
-            Data::AHI(ref mut ahi) => match text.parse::<usize>() {
+            Data::Ahi(ref mut ahi) => match text.parse::<usize>() {
                 Ok(index) if index < ahi.images.len() => {
                     ahi.image_index = index;
                     true
                 }
                 _ => false,
             },
-            Data::AHF(ref mut ahf) => {
+            Data::Ahf(ref mut ahf) => {
                 if text == "def" {
                     ahf.current_char = None;
                     true
@@ -369,8 +369,8 @@ impl EditorState {
 
     pub fn image_name(&self) -> String {
         match self.current.data {
-            Data::AHI(ref ahi) => format!("{}", ahi.image_index),
-            Data::AHF(ref ahf) => {
+            Data::Ahi(ref ahi) => format!("{}", ahi.image_index),
+            Data::Ahf(ref ahf) => {
                 if let Some(current) = ahf.current_char {
                     let mut name = "'".to_string();
                     for chr in current.escape_default() {
@@ -387,8 +387,8 @@ impl EditorState {
 
     pub fn image_metrics(&self) -> Option<(i32, i32, i32)> {
         match self.current.data {
-            Data::AHI(_) => None,
-            Data::AHF(ref ahf) => {
+            Data::Ahi(_) => None,
+            Data::Ahf(ref ahf) => {
                 let glyph = match ahf.current_char {
                     Some(chr) => &ahf.font[chr],
                     None => ahf.font.default_glyph(),
@@ -410,8 +410,8 @@ impl EditorState {
 
     pub fn image(&self) -> &Image {
         match self.current.data {
-            Data::AHI(ref ahi) => &ahi.images[ahi.image_index],
-            Data::AHF(ref ahf) => match ahf.current_char {
+            Data::Ahi(ref ahi) => &ahi.images[ahi.image_index],
+            Data::Ahf(ref ahf) => match ahf.current_char {
                 Some(chr) => ahf.font[chr].image(),
                 None => ahf.font.default_glyph().image(),
             },
@@ -420,12 +420,12 @@ impl EditorState {
 
     pub fn image_at(&self, index: usize) -> &Image {
         match self.current.data {
-            Data::AHI(ref ahi) => &ahi.images[index],
-            Data::AHF(ref ahf) => {
+            Data::Ahi(ref ahi) => &ahi.images[index],
+            Data::Ahf(ref ahf) => {
                 if index == 0 {
                     ahf.font.default_glyph().image()
                 } else {
-                    let chr = ahf.font.chars().skip(index - 1).next().unwrap();
+                    let chr = ahf.font.chars().nth(index - 1).unwrap();
                     ahf.font[chr].image()
                 }
             }
@@ -434,14 +434,14 @@ impl EditorState {
 
     pub fn font(&self) -> Option<&Font> {
         match self.current.data {
-            Data::AHI(_) => None,
-            Data::AHF(ref ahf) => Some(&ahf.font),
+            Data::Ahi(_) => None,
+            Data::Ahf(ref ahf) => Some(&ahf.font),
         }
     }
 
     pub fn selection(&self) -> Option<(&Image, Point)> {
         match self.current.selection {
-            Some((ref image, position)) => Some((&image, position)),
+            Some((ref image, position)) => Some((image, position)),
             None => None,
         }
     }
@@ -517,7 +517,7 @@ impl EditorState {
         self.unselect_if_necessary();
         let mut file = File::create(&self.filepath)?;
         match self.current.data {
-            Data::AHI(ref ahi) => {
+            Data::Ahi(ref ahi) => {
                 let images: Vec<Image> =
                     ahi.images.iter().map(|rc| rc.deref().clone()).collect();
                 let palettes: Vec<Palette> =
@@ -525,7 +525,7 @@ impl EditorState {
                 let collection = Collection { images, palettes };
                 collection.write(&mut file)?;
             }
-            Data::AHF(ref ahf) => {
+            Data::Ahf(ref ahf) => {
                 ahf.font.write(file)?;
             }
         }
@@ -544,7 +544,7 @@ impl EditorState {
     }
 
     pub fn load_font(&mut self, path: String, font: Font) {
-        self.load_data(path, Data::AHF(AhfData { current_char: None, font }));
+        self.load_data(path, Data::Ahf(AhfData { current_char: None, font }));
     }
 
     fn load_data(&mut self, path: String, data: Data) {
@@ -565,8 +565,8 @@ pub struct Mutation<'a> {
 impl<'a> Mutation<'a> {
     fn image_rc(&self) -> Rc<Image> {
         match self.state.current.data {
-            Data::AHI(ref ahi) => ahi.images[ahi.image_index].clone(),
-            Data::AHF(ref ahf) => Rc::new(match ahf.current_char {
+            Data::Ahi(ref ahi) => ahi.images[ahi.image_index].clone(),
+            Data::Ahf(ref ahf) => Rc::new(match ahf.current_char {
                 Some(chr) => ahf.font[chr].image().clone(),
                 None => ahf.font.default_glyph().image().clone(),
             }),
@@ -575,10 +575,10 @@ impl<'a> Mutation<'a> {
 
     pub fn image(&mut self) -> &mut Image {
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 Rc::make_mut(&mut ahi.images[ahi.image_index])
             }
-            Data::AHF(ref mut ahf) => match ahf.current_char {
+            Data::Ahf(ref mut ahf) => match ahf.current_char {
                 Some(chr) => ahf.font[chr].image_mut(),
                 None => ahf.font.default_glyph_mut().image_mut(),
             },
@@ -598,7 +598,7 @@ impl<'a> Mutation<'a> {
         self.unselect();
         let new_palette = self.state.palette().clone();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 if ahi.palette_index < ahi.palettes.len() {
                     ahi.palette_index += 1;
                 } else {
@@ -608,14 +608,14 @@ impl<'a> Mutation<'a> {
                 ahi.palettes.insert(ahi.palette_index, rc);
                 true
             }
-            Data::AHF(_) => false,
+            Data::Ahf(_) => false,
         }
     }
 
     pub fn delete_palette(&mut self) -> bool {
         self.unselect();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 if ahi.palette_index < ahi.palettes.len() {
                     ahi.palettes.remove(ahi.palette_index);
                     if ahi.palette_index > 0 {
@@ -628,18 +628,14 @@ impl<'a> Mutation<'a> {
                     false
                 }
             }
-            Data::AHF(_) => false,
+            Data::Ahf(_) => false,
         }
     }
 
-    pub fn set_palette_color(
-        &mut self,
-        color: Color,
-        rgba: (u8, u8, u8, u8),
-    ) -> bool {
+    pub fn set_palette_color(&mut self, color: Color, rgba: Rgba) -> bool {
         self.unselect();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 if ahi.palette_index < ahi.palettes.len() {
                     let mut palette =
                         Palette::clone(&ahi.palettes[ahi.palette_index]);
@@ -650,7 +646,7 @@ impl<'a> Mutation<'a> {
                     false
                 }
             }
-            Data::AHF(_) => false,
+            Data::Ahf(_) => false,
         }
     }
 
@@ -658,13 +654,13 @@ impl<'a> Mutation<'a> {
         self.unselect();
         let (width, height) = self.state.image_size();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 ahi.image_index += 1;
                 let rc = Rc::new(Image::new(width, height));
                 ahi.images.insert(ahi.image_index, rc);
                 true
             }
-            Data::AHF(ref mut ahf) => {
+            Data::Ahf(ref mut ahf) => {
                 ahf.current_char = Some(chr);
                 if ahf.font.get_char_glyph(chr).is_none() {
                     let glyph = Glyph::new(
@@ -688,13 +684,13 @@ impl<'a> Mutation<'a> {
             }
             self.image().draw(image, 0, 0);
         }
-        return true;
+        true
     }
 
     pub fn delete_image(&mut self) -> bool {
         self.unselect();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 if ahi.images.len() > 1 {
                     let index = ahi.image_index;
                     ahi.images.remove(index);
@@ -706,7 +702,7 @@ impl<'a> Mutation<'a> {
                     false
                 }
             }
-            Data::AHF(ref mut ahf) => {
+            Data::Ahf(ref mut ahf) => {
                 if let Some(chr) = ahf.current_char {
                     ahf.font.remove_char_glyph(chr);
                     ahf.current_char = None;
@@ -721,14 +717,14 @@ impl<'a> Mutation<'a> {
     pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
         self.unselect();
         match self.state.current.data {
-            Data::AHI(ref mut ahi) => {
+            Data::Ahi(ref mut ahi) => {
                 ahi.images = ahi
                     .images
                     .iter()
                     .map(|image| Rc::new(image.crop(new_width, new_height)))
                     .collect();
             }
-            Data::AHF(ref mut ahf) => {
+            Data::Ahf(ref mut ahf) => {
                 if new_height != ahf.font.glyph_height() {
                     let mut font = Font::with_glyph_height(new_height);
                     {
@@ -788,7 +784,7 @@ impl<'a> Mutation<'a> {
     }
 
     pub fn set_metadata(&mut self, data: Vec<i16>) {
-        if let Data::AHI(ref mut ahi) = self.state.current.data {
+        if let Data::Ahi(ref mut ahi) = self.state.current.data {
             Rc::make_mut(&mut ahi.images[ahi.image_index]).set_metadata(data);
         }
     }
@@ -799,7 +795,7 @@ impl<'a> Mutation<'a> {
         new_left_edge: i32,
         new_right_edge: i32,
     ) {
-        if let Data::AHF(ref mut ahf) = self.state.current.data {
+        if let Data::Ahf(ref mut ahf) = self.state.current.data {
             ahf.font.set_baseline(new_baseline);
             let glyph = match ahf.current_char {
                 Some(chr) => &mut ahf.font[chr],
@@ -811,7 +807,7 @@ impl<'a> Mutation<'a> {
     }
 
     pub fn set_tag(&mut self, tag: String) {
-        if let Data::AHI(ref mut ahi) = self.state.current.data {
+        if let Data::Ahi(ref mut ahi) = self.state.current.data {
             Rc::make_mut(&mut ahi.images[ahi.image_index]).set_tag(tag);
         }
     }
@@ -977,7 +973,8 @@ fn scale_up(image: &Image, by: u32) -> Image {
 }
 
 fn scale_down(image: &Image, palette: &Palette, by: u32) -> Image {
-    let mut scaled = Image::new((image.width() / by).max(1), (image.height() / by).max(1));
+    let mut scaled =
+        Image::new((image.width() / by).max(1), (image.height() / by).max(1));
     for row in 0..scaled.height() {
         for col in 0..scaled.width() {
             let mut total_r = 0u32;
@@ -994,10 +991,12 @@ fn scale_down(image: &Image, palette: &Palette, by: u32) -> Image {
                     total_a += rgba.3 as u32;
                 }
             }
-            let avg_rgba = ((total_r / (by * by)) as u8,
-                            (total_g / (by * by)) as u8,
-                            (total_b / (by * by)) as u8,
-                            (total_a / (by * by)) as u8);
+            let avg_rgba = (
+                (total_r / (by * by)) as u8,
+                (total_g / (by * by)) as u8,
+                (total_b / (by * by)) as u8,
+                (total_a / (by * by)) as u8,
+            );
             scaled[(col, row)] = util::nearest_color(palette, avg_rgba);
         }
     }
@@ -1006,8 +1005,8 @@ fn scale_down(image: &Image, palette: &Palette, by: u32) -> Image {
 
 //===========================================================================//
 
-const DEFAULT_TEST_SENTENCE: &'static str = "The quick, brown fox jumps over \
-                                             a ``lazy'' dog.";
+const DEFAULT_TEST_SENTENCE: &str =
+    "The quick, brown fox jumps over a ``lazy'' dog.";
 
 const MAX_UNDOS: usize = 100;
 

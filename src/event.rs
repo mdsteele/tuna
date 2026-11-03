@@ -17,8 +17,6 @@
 // | with Tuna.  If not, see <http://www.gnu.org/licenses/>.                  |
 // +--------------------------------------------------------------------------+
 
-use sdl2;
-
 pub use sdl2::keyboard::Keycode;
 use sdl2::keyboard::Mod;
 use sdl2::mouse::MouseButton;
@@ -40,31 +38,31 @@ pub enum Event {
 
 impl Event {
     pub fn from_sdl2(event: &sdl2::event::Event) -> Option<Event> {
-        match event {
-            &sdl2::event::Event::Quit { .. } => Some(Event::Quit),
-            &sdl2::event::Event::MouseMotion { x, y, mousestate, .. } => {
+        match *event {
+            sdl2::event::Event::Quit { .. } => Some(Event::Quit),
+            sdl2::event::Event::MouseMotion { x, y, mousestate, .. } => {
                 if mousestate.left() {
                     Some(Event::MouseDrag(Point::new(x, y)))
                 } else {
                     None
                 }
             }
-            &sdl2::event::Event::MouseButtonDown {
+            sdl2::event::Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
                 x,
                 y,
                 ..
             } => Some(Event::MouseDown(Point::new(x, y))),
-            &sdl2::event::Event::MouseButtonUp {
+            sdl2::event::Event::MouseButtonUp {
                 mouse_btn: MouseButton::Left,
                 ..
             } => Some(Event::MouseUp),
-            &sdl2::event::Event::KeyDown {
+            sdl2::event::Event::KeyDown {
                 keycode: Some(keycode),
                 keymod,
                 ..
             } => Some(Event::KeyDown(keycode, KeyMod::from_sdl2(keymod))),
-            &sdl2::event::Event::TextInput { ref text, .. } => {
+            sdl2::event::Event::TextInput { ref text, .. } => {
                 Some(Event::TextInput(text.clone()))
             }
             _ => None,
@@ -72,9 +70,9 @@ impl Event {
     }
 
     pub fn translate(&self, dx: i32, dy: i32) -> Event {
-        match self {
-            &Event::MouseDrag(pt) => Event::MouseDrag(pt.offset(dx, dy)),
-            &Event::MouseDown(pt) => Event::MouseDown(pt.offset(dx, dy)),
+        match *self {
+            Event::MouseDrag(pt) => Event::MouseDrag(pt.offset(dx, dy)),
+            Event::MouseDown(pt) => Event::MouseDown(pt.offset(dx, dy)),
             _ => self.clone(),
         }
     }

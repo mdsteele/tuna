@@ -89,12 +89,7 @@ impl PaletteView {
     ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
         Box::new(SubrectElement::new(
             NextPrevPalette::new(delta, key),
-            Rect::new(
-                x,
-                y,
-                NextPrevPalette::WIDTH as u32,
-                NextPrevPalette::HEIGHT as u32,
-            ),
+            Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
         ))
     }
 
@@ -104,12 +99,7 @@ impl PaletteView {
     ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
         Box::new(SubrectElement::new(
             AddPalettteButton::new(),
-            Rect::new(
-                x,
-                y,
-                NextPrevPalette::WIDTH as u32,
-                NextPrevPalette::HEIGHT as u32,
-            ),
+            Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
         ))
     }
 
@@ -119,12 +109,7 @@ impl PaletteView {
     ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
         Box::new(SubrectElement::new(
             DeletePalettteButton::new(),
-            Rect::new(
-                x,
-                y,
-                NextPrevPalette::WIDTH as u32,
-                NextPrevPalette::HEIGHT as u32,
-            ),
+            Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
         ))
     }
 }
@@ -274,13 +259,13 @@ impl GuiElement<EditorState, PaletteAction> for ColorPicker {
         event: &Event,
         state: &mut EditorState,
     ) -> Action<PaletteAction> {
-        match event {
-            &Event::ClockTick => {
+        match *event {
+            Event::ClockTick => {
                 if self.double_click_counter > 0 {
                     self.double_click_counter -= 1;
                 }
             }
-            &Event::MouseDown(_) => {
+            Event::MouseDown(_) => {
                 if self.double_click_counter > 0 {
                     return Action::redraw()
                         .and_return(PaletteAction::EditColor(self.color));
@@ -290,11 +275,9 @@ impl GuiElement<EditorState, PaletteAction> for ColorPicker {
                     return Action::redraw().and_stop();
                 }
             }
-            &Event::KeyDown(key, kmod) => {
-                if key == self.key && kmod == NONE {
-                    self.pick_color(state);
-                    return Action::redraw().and_stop();
-                }
+            Event::KeyDown(key, kmod) if key == self.key && kmod == NONE => {
+                self.pick_color(state);
+                return Action::redraw().and_stop();
             }
             _ => {}
         }
@@ -347,14 +330,12 @@ impl GuiElement<EditorState, PaletteAction> for NextPrevPalette {
         event: &Event,
         state: &mut EditorState,
     ) -> Action<PaletteAction> {
-        match event {
-            &Event::MouseDown(_) => {
+        match *event {
+            Event::MouseDown(_) => {
                 return self.increment(state);
             }
-            &Event::KeyDown(key, kmod) => {
-                if key == self.key && kmod == NONE {
-                    return self.increment(state);
-                }
+            Event::KeyDown(key, kmod) if key == self.key && kmod == NONE => {
+                return self.increment(state);
             }
             _ => {}
         }

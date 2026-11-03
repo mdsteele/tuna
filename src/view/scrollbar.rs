@@ -31,28 +31,23 @@ pub struct ImagesScrollbar {
 }
 
 impl ImagesScrollbar {
-    pub fn new(left: i32, top: i32) -> ImagesScrollbar {
+    pub fn new(left: i32, top: i32, height: u32) -> Self {
         let elements: Vec<Box<dyn GuiElement<EditorState, ()>>> = vec![
-            ImagesScrollbar::arrow_button(2, -1, Keycode::Up),
-            ImagesScrollbar::picker(20, -2),
-            ImagesScrollbar::picker(58, -1),
-            ImagesScrollbar::picker(96, 0),
-            ImagesScrollbar::picker(134, 1),
-            ImagesScrollbar::picker(172, 2),
-            ImagesScrollbar::picker(210, 3),
-            ImagesScrollbar::arrow_button(248, 1, Keycode::Down),
+            Self::arrow_button(2, -1, Keycode::Up),
+            Self::multipicker(20, height - 40),
+            Self::arrow_button(height as i32 - 18, 1, Keycode::Down),
         ];
-        ImagesScrollbar {
+        Self {
             element: SubrectElement::new(
                 AggregateElement::new(elements),
-                Rect::new(left, top, 38, 266),
+                Rect::new(left, top, 38, height),
             ),
         }
     }
 
     fn arrow_button(
         y: i32,
-        delta: i32,
+        delta: isize,
         key: Keycode,
     ) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
@@ -61,10 +56,13 @@ impl ImagesScrollbar {
         ))
     }
 
-    fn picker(y: i32, delta: i32) -> Box<dyn GuiElement<EditorState, ()>> {
+    fn multipicker(
+        y: i32,
+        height: u32,
+    ) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
-            ImagePicker::new(delta),
-            Rect::new(1, y, 36, 36),
+            ImageMultipicker::new(36, height),
+            Rect::new(1, y, 36, height),
         ))
     }
 }
@@ -91,44 +89,89 @@ impl GuiElement<EditorState, ()> for ImagesScrollbar {
 
 //===========================================================================//
 
-struct ImagePicker {
-    delta: i32,
+struct ImageMultipicker {
+    width: u32,
+    height: u32,
 }
 
-impl ImagePicker {
-    fn new(delta: i32) -> ImagePicker {
-        ImagePicker { delta }
+impl ImageMultipicker {
+    const BOX_MARGIN: i32 = 2;
+    const BOX_SPACING: i32 = 2;
+
+    fn new(width: u32, height: u32) -> Self {
+        ImageMultipicker { width, height }
     }
 
-    fn index(&self, state: &EditorState) -> Option<usize> {
-        let index = (state.image_index() as i32) + self.delta;
-        if index >= 0 && index < (state.num_images() as i32) {
-            Some(index as usize)
-        } else {
-            None
+    fn boxes(&self, state: &EditorState) -> Vec<(Rect, usize)> {
+        let num_images = state.num_images();
+        let current_image_index = state.image_index();
+
+        let mut height_above: i32 = 0;
+        for index in 0..current_image_index {
+            let image_height = state.image_at(index).height() as i32;
+            let box_height = image_height + Self::BOX_MARGIN * 2;
+            height_above += Self::BOX_SPACING + box_height;
         }
+
+        let mut height_below: i32 = 0;
+        for index in (current_image_index + 1)..num_images {
+            let image_height = state.image_at(index).height() as i32;
+            let box_height = image_height + Self::BOX_MARGIN * 2;
+            height_below += Self::BOX_SPACING + box_height;
+        }
+
+        let picker_height = self.height as i32;
+        let current_image_height = state.image().height() as i32;
+        let current_box_height = current_image_height + Self::BOX_MARGIN * 2;
+        let mut box_y = (picker_height - current_box_height) / 2;
+        if height_below < (picker_height - current_box_height) / 2 {
+            box_y = picker_height - height_below - current_box_height;
+        }
+        box_y = box_y.min(height_above);
+
+        let mut index = current_image_index;
+        while index > 0 && box_y > Self::BOX_SPACING {
+            index -= 1;
+            let image_height = state.image_at(index).height() as i32;
+            box_y -= Self::BOX_SPACING + image_height + Self::BOX_MARGIN * 2;
+        }
+
+        let mut boxes = Vec::<(Rect, usize)>::new();
+        while index < num_images && box_y < picker_height {
+            let image_height = state.image_at(index).height() as i32;
+            let box_height = Self::BOX_MARGIN * 2 + image_height;
+            let box_rect = Rect::new(0, box_y, self.width, box_height as u32);
+            boxes.push((box_rect, index));
+            index += 1;
+            box_y += box_height + Self::BOX_SPACING;
+        }
+        boxes
     }
 }
 
-impl GuiElement<EditorState, ()> for ImagePicker {
+impl GuiElement<EditorState, ()> for ImageMultipicker {
     fn draw(
         &self,
         state: &EditorState,
         _resources: &Resources,
         canvas: &mut Canvas,
     ) {
-        let color = if let Some(index) = self.index(state) {
-            canvas.draw_image(state.image_at(index), state.palette(), 2, 2, 1);
-            if self.delta == 0 {
+        let current_image_index = state.image_index();
+        for (subrect, index) in self.boxes(state) {
+            canvas.draw_image(
+                state.image_at(index),
+                state.palette(),
+                subrect.x() + Self::BOX_MARGIN,
+                subrect.y() + Self::BOX_MARGIN,
+                1,
+            );
+            let border_color = if index == current_image_index {
                 (255, 255, 127, 255)
             } else {
                 (127, 127, 63, 255)
-            }
-        } else {
-            (0, 0, 0, 255)
-        };
-        let rect = canvas.rect();
-        canvas.draw_rect(color, rect);
+            };
+            canvas.draw_rect(border_color, subrect);
+        }
     }
 
     fn on_event(
@@ -137,13 +180,14 @@ impl GuiElement<EditorState, ()> for ImagePicker {
         state: &mut EditorState,
     ) -> Action<()> {
         match event {
-            &Event::MouseDown(_) => {
-                if let Some(index) = self.index(state) {
-                    state.set_image_index(index);
-                    Action::redraw().and_stop()
-                } else {
-                    Action::ignore().and_stop()
+            &Event::MouseDown(pt) => {
+                for (subrect, index) in self.boxes(state) {
+                    if subrect.contains_point(pt) {
+                        state.set_image_index(index);
+                        return Action::redraw().and_stop();
+                    }
                 }
+                Action::ignore().and_stop()
             }
             _ => Action::ignore(),
         }
@@ -153,19 +197,19 @@ impl GuiElement<EditorState, ()> for ImagePicker {
 //===========================================================================//
 
 struct NextPrevImage {
-    delta: i32,
+    delta: isize,
     key: Keycode,
 }
 
 impl NextPrevImage {
-    fn new(delta: i32, key: Keycode) -> NextPrevImage {
-        NextPrevImage { delta, key }
+    fn new(delta: isize, key: Keycode) -> Self {
+        Self { delta, key }
     }
 
     fn increment(&self, state: &mut EditorState) -> Action<()> {
         let new_index = mod_floor(
-            (state.image_index() as i32) + self.delta,
-            state.num_images() as i32,
+            (state.image_index() as isize) + self.delta,
+            state.num_images() as isize,
         );
         state.set_image_index(new_index as usize);
         Action::redraw().and_stop()
@@ -192,14 +236,12 @@ impl GuiElement<EditorState, ()> for NextPrevImage {
         event: &Event,
         state: &mut EditorState,
     ) -> Action<()> {
-        match event {
-            &Event::MouseDown(_) => {
+        match *event {
+            Event::MouseDown(_) => {
                 return self.increment(state);
             }
-            &Event::KeyDown(key, kmod) => {
-                if key == self.key && kmod == NONE {
-                    return self.increment(state);
-                }
+            Event::KeyDown(key, kmod) if key == self.key && kmod == NONE => {
+                return self.increment(state);
             }
             _ => {}
         }

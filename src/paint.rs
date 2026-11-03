@@ -21,13 +21,14 @@ use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::{Event, Keycode};
 use crate::state::{EditorState, Tool};
+use crate::util::Rgba;
 use num_integer::mod_floor;
 use sdl2::rect::{Point, Rect};
 use std::cmp;
 
 //===========================================================================//
 
-const GRID_COLOR: (u8, u8, u8, u8) = (192, 0, 255, 255);
+const GRID_RGBA: Rgba = (192, 0, 255, 255);
 
 enum Shape {
     Line,
@@ -153,10 +154,9 @@ impl ImageCanvas {
     fn try_pencil(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(position) = self.mouse_to_row_col(mouse, state) {
             state.persistent_mutation().color_pixel(position);
-            true
-        } else {
-            false
+            return true;
         }
+        false
     }
 
     fn start_watercolor(&mut self, mouse: Point, state: &mut EditorState) {
@@ -166,32 +166,31 @@ impl ImageCanvas {
     }
 
     fn try_watercolor(&self, mouse: Point, state: &mut EditorState) -> bool {
-        if let Some(position) = self.mouse_to_row_col(mouse, state) {
-            if self.watercolor_parity == (position.0 + position.1) % 2 {
-                state.persistent_mutation().color_pixel(position);
-                return true;
-            }
+        if let Some(position) = self.mouse_to_row_col(mouse, state)
+            && self.watercolor_parity == (position.0 + position.1) % 2
+        {
+            state.persistent_mutation().color_pixel(position);
+            return true;
         }
-        return false;
+        false
     }
 
     fn try_eyedrop(&self, mouse: Point, state: &mut EditorState) -> bool {
         if let Some(position) = self.mouse_to_row_col(mouse, state) {
             state.eyedrop_at(position);
-            true
-        } else {
-            false
+            return true;
         }
+        false
     }
 
     fn try_lasso(&mut self, mouse: Point, state: &mut EditorState) -> bool {
-        if let Some(position) = self.mouse_to_row_col(mouse, state) {
-            if !self.lasso_points.contains(&position) {
-                self.lasso_points.push(position);
-                return true;
-            }
+        if let Some(position) = self.mouse_to_row_col(mouse, state)
+            && !self.lasso_points.contains(&position)
+        {
+            self.lasso_points.push(position);
+            return true;
         }
-        return false;
+        false
     }
 
     fn try_draw_shape(
@@ -411,7 +410,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             );
         }
         let mut canvas = canvas.subcanvas(canvas_rect);
-        if let Some((ref selected, topleft)) = state.selection() {
+        if let Some((selected, topleft)) = state.selection() {
             let left = topleft.x() * (scale as i32);
             let top = topleft.y() * (scale as i32);
             canvas.draw_image(selected, state.palette(), left, top, scale);
@@ -480,7 +479,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             let mut x = grid_horz;
             while x < width {
                 canvas.draw_rect(
-                    GRID_COLOR,
+                    GRID_RGBA,
                     Rect::new((x * scale) as i32, 0, 1, canvas_rect.height()),
                 );
                 x += grid_horz;
@@ -491,7 +490,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             let mut y = grid_vert;
             while y < height {
                 canvas.draw_rect(
-                    GRID_COLOR,
+                    GRID_RGBA,
                     Rect::new(0, (y * scale) as i32, canvas_rect.width(), 1),
                 );
                 y += grid_vert;
@@ -504,8 +503,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         event: &Event,
         state: &mut EditorState,
     ) -> Action<()> {
-        match event {
-            &Event::ClockTick => {
+        match *event {
+            Event::ClockTick => {
                 if state.selection().is_some() {
                     self.selection_animation_counter = mod_floor(
                         self.selection_animation_counter + 1,
@@ -516,7 +515,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     return Action::ignore();
                 }
             }
-            &Event::KeyDown(Keycode::Backspace, _) => {
+            Event::KeyDown(Keycode::Backspace, _) => {
                 if state.selection().is_some() {
                     state.mutation().delete_selection();
                     return Action::redraw().and_stop();
@@ -524,7 +523,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     return Action::ignore();
                 }
             }
-            &Event::KeyDown(Keycode::Escape, _) => {
+            Event::KeyDown(Keycode::Escape, _) => {
                 if state.selection().is_some() {
                     state.mutation().unselect();
                     return Action::redraw().and_stop();
@@ -532,7 +531,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     return Action::ignore();
                 }
             }
-            &Event::MouseDown(pt) => {
+            Event::MouseDown(pt) => {
                 if self.rect(state).contains_point(pt) {
                     match state.tool() {
                         Tool::Checkerboard => {
@@ -616,7 +615,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     self.drag_from_to = None;
                 }
             }
-            &Event::MouseUp => {
+            Event::MouseUp => {
                 match state.tool() {
                     Tool::Lasso => {
                         if !self.lasso_points.is_empty() {
@@ -641,20 +640,20 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                         return Action::redraw_if(changed);
                     }
                     Tool::Select => {
-                        if state.selection().is_none() {
-                            if let Some(rect) = self.dragged_rect(state) {
-                                state.mutation().select(&rect);
-                                self.drag_from_to = None;
-                                self.selection_animation_counter = 0;
-                                return Action::redraw();
-                            }
+                        if state.selection().is_none()
+                            && let Some(rect) = self.dragged_rect(state)
+                        {
+                            state.mutation().select(&rect);
+                            self.drag_from_to = None;
+                            self.selection_animation_counter = 0;
+                            return Action::redraw();
                         }
                     }
                     _ => {}
                 }
                 self.drag_from_to = None;
             }
-            &Event::MouseDrag(pt) => match state.tool() {
+            Event::MouseDrag(pt) => match state.tool() {
                 Tool::Lasso => {
                     let changed = self.try_lasso(pt, state);
                     return Action::redraw_if(changed);
@@ -691,7 +690,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             },
             _ => {}
         }
-        return Action::ignore();
+        Action::ignore()
     }
 }
 
