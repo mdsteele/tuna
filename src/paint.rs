@@ -225,7 +225,7 @@ impl ImageCanvas {
                 return false;
             }
             let mut mutation = state.mutation();
-            let image = mutation.image();
+            let image = mutation.image_mut();
             let width = image.width();
             let height = image.height();
             image[start] = to_color;
@@ -265,7 +265,7 @@ impl ImageCanvas {
                 return false;
             }
             let mut mutation = state.mutation();
-            let image = mutation.image();
+            let image = mutation.image_mut();
             let width = image.width();
             let height = image.height();
             image[start] = to_color;
@@ -311,7 +311,7 @@ impl ImageCanvas {
             }
             state.set_color(from_color);
             let mut mutation = state.mutation();
-            let image = mutation.image();
+            let image = mutation.image_mut();
             let width = image.width();
             let height = image.height();
             for y in 0..height {
@@ -348,7 +348,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             canvas_rect.y(),
             scale,
         );
-        if let Some((baseline, left_edge, right_edge)) = state.image_metrics()
+        if let Some((baseline, left_edge, right_edge)) = state.glyph_metrics()
         {
             canvas.draw_rect(
                 (0, 127, 255, 255),

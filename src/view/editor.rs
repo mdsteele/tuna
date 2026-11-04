@@ -223,7 +223,7 @@ impl EditorView {
 
     fn begin_set_metrics(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
-            if let Some((bl, le, re)) = state.image_metrics() {
+            if let Some((bl, le, re)) = state.glyph_metrics() {
                 state.unselect_if_necessary();
                 self.set_textbox_mode(
                     Mode::SetMetrics,
@@ -425,7 +425,7 @@ impl EditorView {
                     Ok(right_edge) => right_edge,
                     Err(_) => return false,
                 };
-                state.mutation().set_metrics(
+                state.mutation().set_glyph_metrics(
                     new_baseline,
                     new_left_edge,
                     new_right_edge,

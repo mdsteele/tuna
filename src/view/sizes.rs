@@ -62,7 +62,8 @@ impl GuiElement<EditorState, ()> for SizesToggle {
     ) -> Action<()> {
         match *event {
             Event::MouseDown(pt) if self.rect.contains_point(pt) => {
-                state.set_allows_mixed_sizes(!state.allows_mixed_sizes());
+                let allow = !state.allows_mixed_sizes();
+                state.mutation().set_allows_mixed_sizes(allow);
                 Action::redraw().and_stop()
             }
             _ => Action::ignore(),

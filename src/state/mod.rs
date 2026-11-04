@@ -19,37 +19,20 @@
 
 mod ahf_data;
 mod ahi_data;
+mod data;
 mod mirror;
 mod settings;
 mod tool;
 
-use self::ahf_data::AhfData;
-use self::ahi_data::AhiData;
+use self::data::Data;
 pub use self::mirror::Mirror;
 use self::settings::Settings;
 pub use self::tool::Tool;
 use crate::util::{self, Rgba};
 use ahi::{Collection, Color, Font, Image, Palette};
 use sdl2::rect::{Point, Rect};
-use std::fs::File;
 use std::io;
-use std::mem;
-use std::ops::Deref;
 use std::rc::Rc;
-
-//===========================================================================//
-
-#[derive(Clone)]
-enum Data {
-    Ahi(AhiData),
-    Ahf(AhfData),
-}
-
-impl Data {
-    fn from_collection(collection: Collection) -> Data {
-        Data::Ahi(AhiData::new(collection))
-    }
-}
 
 //===========================================================================//
 
@@ -96,7 +79,7 @@ impl EditorState {
     }
 
     pub fn swap_filepath(&mut self, path: String) -> String {
-        mem::replace(&mut self.filepath, path)
+        std::mem::replace(&mut self.filepath, path)
     }
 
     pub fn color(&self) -> Color {
@@ -140,19 +123,7 @@ impl EditorState {
     }
 
     pub fn allows_mixed_sizes(&self) -> bool {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.mixed_sizes,
-            Data::Ahf(_) => true,
-        }
-    }
-
-    pub fn set_allows_mixed_sizes(&mut self, allow: bool) {
-        if self.allows_mixed_sizes() == allow {
-            return;
-        }
-        if let Data::Ahi(_) = self.current.data {
-            self.mutation().set_allows_mixed_sizes(allow);
-        }
+        self.current.data.allows_mixed_sizes()
     }
 
     pub fn test_sentence(&self) -> &str {
@@ -175,156 +146,61 @@ impl EditorState {
     }
 
     pub fn num_palettes(&self) -> usize {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.palettes.len(),
-            Data::Ahf(_) => 0,
-        }
+        self.current.data.num_palettes()
     }
 
     pub fn palette_index(&self) -> usize {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.palette_index,
-            Data::Ahf(_) => 0,
-        }
+        self.current.data.palette_index()
     }
 
     pub fn set_palette_index(&mut self, index: usize) {
-        match &mut self.current.data {
-            Data::Ahi(ahi) => {
-                ahi.palette_index = index % (1 + ahi.palettes.len());
-            }
-            Data::Ahf(_) => {}
-        }
+        self.current.data.set_palette_index(index);
     }
 
     pub fn palette(&self) -> &Palette {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.current_palette(),
-            Data::Ahf(_) => Palette::default(),
-        }
+        self.current.data.palette()
     }
 
     pub fn num_images(&self) -> usize {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.images.len(),
-            Data::Ahf(ahf) => 1 + ahf.font.chars().len(),
-        }
+        self.current.data.num_images()
     }
 
     pub fn image_index(&self) -> usize {
-        match &self.current.data {
-            Data::Ahi(ahi) => ahi.image_index,
-            Data::Ahf(ahf) => ahf.image_index(),
-        }
+        self.current.data.image_index()
     }
 
     pub fn set_image_index(&mut self, index: usize) {
         self.unselect_if_necessary();
-        match &mut self.current.data {
-            Data::Ahi(ahi) => {
-                debug_assert!(!ahi.images.is_empty());
-                ahi.image_index = index % ahi.images.len();
-            }
-            Data::Ahf(ahf) => ahf.set_image_index(index),
-        }
+        self.current.data.set_image_index(index);
     }
 
-    pub fn go_to(&mut self, text: &str) -> bool {
-        match &mut self.current.data {
-            Data::Ahi(ahi) => match text.parse::<usize>() {
-                Ok(index) if index < ahi.images.len() => {
-                    ahi.image_index = index;
-                    true
-                }
-                _ => false,
-            },
-            Data::Ahf(ahf) => {
-                if text == "def" {
-                    ahf.current_char = None;
-                    true
-                } else {
-                    let chars: Vec<char> = text.chars().collect();
-                    if chars.len() == 1 {
-                        ahf.current_char = Some(chars[0]);
-                        true
-                    } else {
-                        false
-                    }
-                }
-            }
-        }
+    pub fn go_to(&mut self, name: &str) -> bool {
+        self.unselect_if_necessary();
+        self.current.data.go_to_image(name)
     }
 
     pub fn image_name(&self) -> String {
-        match &self.current.data {
-            Data::Ahi(ahi) => format!("{}", ahi.image_index),
-            Data::Ahf(ahf) => {
-                if let Some(current) = ahf.current_char {
-                    let mut name = "'".to_string();
-                    for chr in current.escape_default() {
-                        name.push(chr);
-                    }
-                    name.push('\'');
-                    name
-                } else {
-                    "def".to_string()
-                }
-            }
-        }
+        self.current.data.image_name()
     }
 
-    pub fn image_metrics(&self) -> Option<(i32, i32, i32)> {
-        match &self.current.data {
-            Data::Ahi(_) => None,
-            Data::Ahf(ahf) => {
-                let glyph = match ahf.current_char {
-                    Some(chr) => &ahf.font[chr],
-                    None => ahf.font.default_glyph(),
-                };
-                let tuple = (
-                    ahf.font.baseline(),
-                    glyph.left_edge(),
-                    glyph.right_edge(),
-                );
-                Some(tuple)
-            }
-        }
+    pub fn glyph_metrics(&self) -> Option<(i32, i32, i32)> {
+        self.current.data.glyph_metrics()
     }
 
     pub fn image_size(&self) -> (u32, u32) {
-        let image = self.image();
-        (image.width(), image.height())
+        self.current.data.image_size()
     }
 
     pub fn image(&self) -> &Image {
-        match &self.current.data {
-            Data::Ahi(ahi) => &ahi.images[ahi.image_index],
-            Data::Ahf(ahf) => match ahf.current_char {
-                Some(chr) => ahf.font[chr].image(),
-                None => ahf.font.default_glyph().image(),
-            },
-        }
+        self.current.data.image()
     }
 
     pub fn image_at(&self, index: usize) -> &Image {
-        match &self.current.data {
-            Data::Ahi(ahi) => &ahi.images[index],
-            Data::Ahf(ahf) => {
-                if index == 0 {
-                    ahf.font.default_glyph().image()
-                } else {
-                    let chr = ahf.font.chars().nth(index - 1).unwrap();
-                    ahf.font[chr].image()
-                }
-            }
-        }
+        self.current.data.image_at(index)
     }
 
     pub fn font(&self) -> Option<&Font> {
-        match &self.current.data {
-            Data::Ahi(_) => None,
-            Data::Ahf(ahf) => Some(&ahf.font),
-        }
+        self.current.data.font()
     }
 
     pub fn selection(&self) -> Option<(&Image, Point)> {
@@ -377,7 +253,7 @@ impl EditorState {
 
     pub fn undo(&mut self) -> bool {
         if let Some(mut snapshot) = self.undo_stack.pop() {
-            mem::swap(&mut snapshot, &mut self.current);
+            std::mem::swap(&mut snapshot, &mut self.current);
             self.redo_stack.push(snapshot);
             if self.current.selection.is_some() {
                 self.settings.tool = Tool::Select;
@@ -390,7 +266,7 @@ impl EditorState {
 
     pub fn redo(&mut self) -> bool {
         if let Some(mut snapshot) = self.redo_stack.pop() {
-            mem::swap(&mut snapshot, &mut self.current);
+            std::mem::swap(&mut snapshot, &mut self.current);
             self.undo_stack.push(snapshot);
             if self.current.selection.is_some() {
                 self.settings.tool = Tool::Select;
@@ -403,18 +279,7 @@ impl EditorState {
 
     pub fn save_to_file(&mut self) -> io::Result<()> {
         self.unselect_if_necessary();
-        let mut file = File::create(&self.filepath)?;
-        match &self.current.data {
-            Data::Ahi(ahi) => {
-                let images: Vec<Image> =
-                    ahi.images.iter().map(|rc| rc.deref().clone()).collect();
-                let palettes: Vec<Palette> =
-                    ahi.palettes.iter().map(|rc| rc.deref().clone()).collect();
-                let collection = Collection { images, palettes };
-                collection.write(&mut file)?;
-            }
-            Data::Ahf(ahf) => ahf.font.write(file)?,
-        }
+        self.current.data.save_to_file(&self.filepath)?;
         self.current.unsaved = false;
         for snapshot in self.undo_stack.iter_mut() {
             snapshot.unsaved = true;
@@ -430,7 +295,7 @@ impl EditorState {
     }
 
     pub fn load_font(&mut self, path: String, font: Font) {
-        self.load_data(path, Data::Ahf(AhfData { current_char: None, font }));
+        self.load_data(path, Data::from_font(font));
     }
 
     fn load_data(&mut self, path: String, data: Data) {
@@ -449,30 +314,22 @@ pub struct Mutation<'a> {
 }
 
 impl<'a> Mutation<'a> {
-    fn image_rc(&self) -> Rc<Image> {
-        match &self.state.current.data {
-            Data::Ahi(ahi) => ahi.images[ahi.image_index].clone(),
-            Data::Ahf(ahf) => Rc::new(match ahf.current_char {
-                Some(chr) => ahf.font[chr].image().clone(),
-                None => ahf.font.default_glyph().image().clone(),
-            }),
-        }
+    fn data_mut(&mut self) -> &mut Data {
+        &mut self.state.current.data
     }
 
-    pub fn image(&mut self) -> &mut Image {
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => Rc::make_mut(&mut ahi.images[ahi.image_index]),
-            Data::Ahf(ahf) => match ahf.current_char {
-                Some(chr) => ahf.font[chr].image_mut(),
-                None => ahf.font.default_glyph_mut().image_mut(),
-            },
-        }
+    pub fn image_mut(&mut self) -> &mut Image {
+        self.data_mut().image_mut()
+    }
+
+    fn image_clone(&self) -> Rc<Image> {
+        self.state.current.data.image_clone()
     }
 
     pub fn color_pixel(&mut self, position: (u32, u32)) {
         let color = self.state.color();
         let positions = self.state.mirror_positions(position);
-        let image = self.image();
+        let image = self.image_mut();
         for pos in positions {
             image[pos] = color;
         }
@@ -480,41 +337,22 @@ impl<'a> Mutation<'a> {
 
     pub fn add_new_palette(&mut self) -> bool {
         self.unselect();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => {
-                ahi.add_new_palette();
-                true
-            }
-            Data::Ahf(_) => false,
-        }
+        self.data_mut().add_new_palette()
     }
 
     pub fn delete_palette(&mut self) -> bool {
         self.unselect();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => ahi.delete_current_palette(),
-            Data::Ahf(_) => false,
-        }
+        self.data_mut().delete_palette()
     }
 
     pub fn set_palette_color(&mut self, color: Color, rgba: Rgba) -> bool {
         self.unselect();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => ahi.set_palette_color(color, rgba),
-            Data::Ahf(_) => false,
-        }
+        self.data_mut().set_palette_color(color, rgba)
     }
 
     pub fn add_new_image(&mut self, chr: char) -> bool {
         self.unselect();
-        let (width, height) = self.state.image_size();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => {
-                ahi.add_new_image(width, height);
-                true
-            }
-            Data::Ahf(ahf) => ahf.add_new_glyph(chr, width, height),
-        }
+        self.data_mut().add_new_image(chr)
     }
 
     pub fn add_images(&mut self, images: &[Image]) -> bool {
@@ -522,74 +360,45 @@ impl<'a> Mutation<'a> {
             if !self.add_new_image('_') {
                 return false;
             }
-            self.image().draw(image, 0, 0);
+            self.image_mut().draw(image, 0, 0);
         }
         true
     }
 
     pub fn delete_image(&mut self) -> bool {
         self.unselect();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => ahi.delete_current_image(),
-            Data::Ahf(ahf) => ahf.delete_current_glyph(),
-        }
+        self.data_mut().delete_image()
     }
 
     pub fn set_allows_mixed_sizes(&mut self, allow: bool) {
         self.unselect();
-        let (width, height) = self.state.image_size();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => {
-                ahi.mixed_sizes = allow;
-                if !allow {
-                    ahi.resize_all_images(width, height)
-                }
-            }
-            Data::Ahf(_) => {}
-        }
+        self.data_mut().set_allows_mixed_sizes(allow);
     }
 
     pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
         self.unselect();
-        match &mut self.state.current.data {
-            Data::Ahi(ahi) => {
-                if ahi.mixed_sizes {
-                    ahi.resize_current_image(new_width, new_height)
-                } else {
-                    ahi.resize_all_images(new_width, new_height)
-                }
-            }
-            Data::Ahf(ahf) => ahf.resize_current_glyph(new_width, new_height),
-        }
+        self.data_mut().resize_images(new_width, new_height);
     }
 
-    pub fn set_metadata(&mut self, data: Vec<i16>) {
-        if let Data::Ahi(ahi) = &mut self.state.current.data {
-            Rc::make_mut(&mut ahi.images[ahi.image_index]).set_metadata(data);
-        }
+    pub fn set_metadata(&mut self, metadata: Vec<i16>) {
+        self.data_mut().set_metadata(metadata);
     }
 
-    pub fn set_metrics(
+    pub fn set_glyph_metrics(
         &mut self,
         new_baseline: i32,
         new_left_edge: i32,
         new_right_edge: i32,
     ) {
-        if let Data::Ahf(ahf) = &mut self.state.current.data {
-            ahf.font.set_baseline(new_baseline);
-            let glyph = match ahf.current_char {
-                Some(chr) => &mut ahf.font[chr],
-                None => ahf.font.default_glyph_mut(),
-            };
-            glyph.set_left_edge(new_left_edge);
-            glyph.set_right_edge(new_right_edge);
-        }
+        self.data_mut().set_glyph_metrics(
+            new_baseline,
+            new_left_edge,
+            new_right_edge,
+        );
     }
 
     pub fn set_tag(&mut self, tag: String) {
-        if let Data::Ahi(ahi) = &mut self.state.current.data {
-            Rc::make_mut(&mut ahi.images[ahi.image_index]).set_tag(tag);
-        }
+        self.data_mut().set_tag(tag);
     }
 
     pub fn lasso(&mut self, vertices: &[(u32, u32)]) {
@@ -599,7 +408,7 @@ impl<'a> Mutation<'a> {
         let min_y = vertices.iter().map(|&(_, y)| y).min().unwrap_or(0);
         let max_y = vertices.iter().map(|&(_, y)| y + 1).max().unwrap_or(0);
         let mut selected = Image::new(max_x - min_x, max_y - min_y);
-        let image = self.image();
+        let image = self.image_mut();
         for row in min_y..max_y {
             for col in min_x..max_x {
                 if vertices.contains(&(col, row)) {
@@ -616,10 +425,10 @@ impl<'a> Mutation<'a> {
     pub fn select(&mut self, rect: &Rect) {
         self.unselect();
         let mut selected = Image::new(rect.width(), rect.height());
-        selected.draw(self.image(), -rect.x(), -rect.y());
+        selected.draw(self.image_mut(), -rect.x(), -rect.y());
         self.state.current.selection =
             Some((Rc::new(selected), rect.top_left()));
-        self.image().fill_rect(
+        self.image_mut().fill_rect(
             rect.x(),
             rect.y(),
             rect.width(),
@@ -636,7 +445,7 @@ impl<'a> Mutation<'a> {
 
     pub fn unselect(&mut self) {
         if let Some((image, position)) = self.state.current.selection.take() {
-            self.image().draw(&image, position.x(), position.y());
+            self.image_mut().draw(&image, position.x(), position.y());
         }
     }
 
@@ -644,7 +453,7 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(image.flip_horz());
         } else {
-            *self.image() = self.state.image().flip_horz();
+            *self.image_mut() = self.state.image().flip_horz();
         }
     }
 
@@ -652,7 +461,7 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(image.flip_vert());
         } else {
-            *self.image() = self.state.image().flip_vert();
+            *self.image_mut() = self.state.image().flip_vert();
         }
     }
 
@@ -660,9 +469,9 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(image.rotate_cw());
         } else {
-            let rotated = self.image().rotate_cw();
-            self.image().clear();
-            self.image().draw(&rotated, 0, 0);
+            let rotated = self.image_mut().rotate_cw();
+            self.image_mut().clear();
+            self.image_mut().draw(&rotated, 0, 0);
         }
     }
 
@@ -670,9 +479,9 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(image.rotate_ccw());
         } else {
-            let rotated = self.image().rotate_ccw();
-            self.image().clear();
-            self.image().draw(&rotated, 0, 0);
+            let rotated = self.image_mut().rotate_ccw();
+            self.image_mut().clear();
+            self.image_mut().draw(&rotated, 0, 0);
         }
     }
 
@@ -680,9 +489,9 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(scale_up(image, by));
         } else {
-            let scaled = scale_up(self.image(), by);
-            self.image().clear();
-            self.image().draw(&scaled, 0, 0);
+            let scaled = scale_up(self.image_mut(), by);
+            self.image_mut().clear();
+            self.image_mut().draw(&scaled, 0, 0);
         }
     }
 
@@ -691,9 +500,9 @@ impl<'a> Mutation<'a> {
         if let Some((ref mut image, _)) = self.state.current.selection {
             *image = Rc::new(scale_down(image, &palette, by));
         } else {
-            let scaled = scale_down(self.image(), &palette, by);
-            self.image().clear();
-            self.image().draw(&scaled, 0, 0);
+            let scaled = scale_down(self.image_mut(), &palette, by);
+            self.image_mut().clear();
+            self.image_mut().draw(&scaled, 0, 0);
         }
     }
 
@@ -704,8 +513,8 @@ impl<'a> Mutation<'a> {
     pub fn cut_selection(&mut self) {
         let selection = self.state.current.selection.take();
         self.state.settings.clipboard = selection.or_else(|| {
-            let image = self.image_rc();
-            self.image().clear();
+            let image = self.image_clone();
+            self.image_mut().clear();
             Some((image, Point::new(0, 0)))
         });
     }
@@ -713,7 +522,7 @@ impl<'a> Mutation<'a> {
     pub fn copy_selection(&mut self) {
         let selection = self.state.current.selection.clone();
         self.state.settings.clipboard =
-            selection.or_else(|| Some((self.image_rc(), Point::new(0, 0))));
+            selection.or_else(|| Some((self.image_clone(), Point::new(0, 0))));
     }
 
     pub fn paste_selection(&mut self) {

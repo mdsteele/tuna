@@ -28,6 +28,10 @@ pub(super) struct AhfData {
 }
 
 impl AhfData {
+    pub fn new(font: Font) -> Self {
+        Self { current_char: None, font }
+    }
+
     pub fn image_index(&self) -> usize {
         if let Some(current) = self.current_char {
             for (index, chr) in self.font.chars().enumerate() {
