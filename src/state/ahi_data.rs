@@ -29,6 +29,7 @@ pub(super) struct AhiData {
     pub palettes: Vec<Rc<Palette>>,
     pub image_index: usize,
     pub images: Vec<Rc<Image>>,
+    pub mixed_sizes: bool,
 }
 
 impl AhiData {
@@ -36,11 +37,13 @@ impl AhiData {
         if collection.images.is_empty() {
             collection.images.push(Image::new(32, 32));
         }
+        let mixed_sizes = has_mixed_sizes(&collection.images);
         AhiData {
             palette_index: 0,
             palettes: collection.palettes.drain(..).map(Rc::new).collect(),
             image_index: 0,
             images: collection.images.drain(..).map(Rc::new).collect(),
+            mixed_sizes,
         }
     }
 
@@ -107,12 +110,30 @@ impl AhiData {
         }
     }
 
-    pub fn resize_all(&mut self, new_width: u32, new_height: u32) {
+    pub fn resize_current_image(&mut self, new_width: u32, new_height: u32) {
+        let image = &mut self.images[self.image_index];
+        *image = Rc::new(image.crop(new_width, new_height));
+    }
+
+    pub fn resize_all_images(&mut self, new_width: u32, new_height: u32) {
         self.images = self
             .images
             .iter()
             .map(|image| Rc::new(image.crop(new_width, new_height)))
             .collect();
+    }
+}
+
+//===========================================================================//
+
+fn has_mixed_sizes<'a, T: IntoIterator<Item = &'a Image>>(images: T) -> bool {
+    let mut iter = images.into_iter();
+    if let Some(first) = iter.next() {
+        !iter.all(|image| {
+            image.width() == first.width() && image.height() == first.height()
+        })
+    } else {
+        false
     }
 }
 

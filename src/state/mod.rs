@@ -165,6 +165,22 @@ impl EditorState {
         self.mirror().positions(self.image_size(), (x, y))
     }
 
+    pub fn allows_mixed_sizes(&self) -> bool {
+        match &self.current.data {
+            Data::Ahi(ahi) => ahi.mixed_sizes,
+            Data::Ahf(_) => true,
+        }
+    }
+
+    pub fn set_allows_mixed_sizes(&mut self, allow: bool) {
+        if self.allows_mixed_sizes() == allow {
+            return;
+        }
+        if let Data::Ahi(_) = self.current.data {
+            self.mutation().set_allows_mixed_sizes(allow);
+        }
+    }
+
     pub fn test_sentence(&self) -> &String {
         &self.test_sentence
     }
@@ -545,10 +561,30 @@ impl<'a> Mutation<'a> {
         }
     }
 
+    pub fn set_allows_mixed_sizes(&mut self, allow: bool) {
+        self.unselect();
+        let (width, height) = self.state.image_size();
+        match &mut self.state.current.data {
+            Data::Ahi(ahi) => {
+                ahi.mixed_sizes = allow;
+                if !allow {
+                    ahi.resize_all_images(width, height)
+                }
+            }
+            Data::Ahf(_) => {}
+        }
+    }
+
     pub fn resize_images(&mut self, new_width: u32, new_height: u32) {
         self.unselect();
         match &mut self.state.current.data {
-            Data::Ahi(ahi) => ahi.resize_all(new_width, new_height),
+            Data::Ahi(ahi) => {
+                if ahi.mixed_sizes {
+                    ahi.resize_current_image(new_width, new_height)
+                } else {
+                    ahi.resize_all_images(new_width, new_height)
+                }
+            }
             Data::Ahf(ahf) => ahf.resize_current_glyph(new_width, new_height),
         }
     }

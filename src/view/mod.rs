@@ -23,6 +23,7 @@ mod metadata;
 mod mirrors;
 mod palette;
 mod scrollbar;
+mod sizes;
 mod textbox;
 mod tiles;
 mod toolbox;

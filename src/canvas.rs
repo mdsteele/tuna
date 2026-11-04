@@ -284,6 +284,8 @@ pub enum ToolIcon {
     ArrowRight,
     AddPalette,
     DeletePalette,
+    EqualSizes,
+    MixedSizes,
 }
 
 //===========================================================================//

@@ -22,6 +22,7 @@ use super::metadata::MetadataView;
 use super::mirrors::Mirrors;
 use super::palette::{PaletteAction, PaletteView};
 use super::scrollbar::ImagesScrollbar;
+use super::sizes::SizesToggle;
 use super::textbox::{ModalTextBox, Mode};
 use super::tiles::TileView;
 use super::toolbox::Toolbox;
@@ -58,6 +59,7 @@ impl EditorView {
             Box::new(ImageCanvas::new(348, 36, 64)),
             Box::new(TileView::new(341, 126, 96, 96)),
             Box::new(MetadataView::new(348, 230)),
+            Box::new(SizesToggle::new(448, 298)),
         ];
         SubrectElement::new(
             EditorView {
