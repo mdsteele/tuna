@@ -20,10 +20,14 @@
 mod ahf_data;
 mod ahi_data;
 mod mirror;
+mod settings;
+mod tool;
 
 use self::ahf_data::AhfData;
 use self::ahi_data::AhiData;
 pub use self::mirror::Mirror;
+use self::settings::Settings;
+pub use self::tool::Tool;
 use crate::util::{self, Rgba};
 use ahi::{Collection, Color, Font, Image, Palette};
 use sdl2::rect::{Point, Rect};
@@ -32,24 +36,6 @@ use std::io;
 use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
-
-//===========================================================================//
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum Tool {
-    Checkerboard,
-    Eyedropper,
-    Lasso,
-    Line,
-    Oval,
-    PaintBucket,
-    PaletteReplace,
-    PaletteSwap,
-    Pencil,
-    Rectangle,
-    Select,
-    Watercolor,
-}
 
 //===========================================================================//
 
@@ -77,24 +63,18 @@ struct Snapshot {
 //===========================================================================//
 
 pub struct EditorState {
-    color: Color,
+    settings: Settings,
     filepath: String,
     current: Snapshot,
     undo_stack: Vec<Snapshot>,
     redo_stack: Vec<Snapshot>,
-    clipboard: Option<(Rc<Image>, Point)>,
-    tool: Tool,
-    prev_tool: Tool,
-    mirror: Mirror,
     persistent_mutation_active: bool,
-    grid: (u32, u32),
-    test_sentence: String,
 }
 
 impl EditorState {
     pub fn new(filepath: String, collection: Collection) -> EditorState {
         EditorState {
-            color: Color::C1,
+            settings: Settings::default(),
             filepath,
             current: Snapshot {
                 data: Data::from_collection(collection),
@@ -103,13 +83,7 @@ impl EditorState {
             },
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            clipboard: None,
-            tool: Tool::Pencil,
-            prev_tool: Tool::Pencil,
-            mirror: Mirror::None,
             persistent_mutation_active: false,
-            grid: (0, 0),
-            test_sentence: DEFAULT_TEST_SENTENCE.to_string(),
         }
     }
 
@@ -117,7 +91,7 @@ impl EditorState {
         self.current.unsaved
     }
 
-    pub fn filepath(&self) -> &String {
+    pub fn filepath(&self) -> &str {
         &self.filepath
     }
 
@@ -126,39 +100,39 @@ impl EditorState {
     }
 
     pub fn color(&self) -> Color {
-        self.color
+        self.settings.color
     }
 
     pub fn set_color(&mut self, color: Color) {
-        self.color = color;
+        self.settings.color = color;
     }
 
     pub fn grid(&self) -> (u32, u32) {
-        self.grid
+        self.settings.grid
     }
 
     pub fn set_grid(&mut self, horz: u32, vert: u32) {
-        self.grid = (horz, vert);
+        self.settings.grid = (horz, vert);
     }
 
     pub fn tool(&self) -> Tool {
-        self.tool
+        self.settings.tool
     }
 
     pub fn set_tool(&mut self, tool: Tool) {
-        if self.tool != tool {
+        if self.settings.tool != tool {
             self.unselect_if_necessary();
-            self.prev_tool = self.tool;
-            self.tool = tool;
+            self.settings.prev_tool = self.settings.tool;
+            self.settings.tool = tool;
         }
     }
 
     pub fn mirror(&self) -> Mirror {
-        self.mirror
+        self.settings.mirror
     }
 
     pub fn set_mirror(&mut self, mirror: Mirror) {
-        self.mirror = mirror;
+        self.settings.mirror = mirror;
     }
 
     pub fn mirror_positions(&self, (x, y): (u32, u32)) -> Vec<(u32, u32)> {
@@ -181,21 +155,21 @@ impl EditorState {
         }
     }
 
-    pub fn test_sentence(&self) -> &String {
-        &self.test_sentence
+    pub fn test_sentence(&self) -> &str {
+        &self.settings.test_sentence
     }
 
     pub fn set_test_sentence(&mut self, text: String) {
-        self.test_sentence = text;
+        self.settings.test_sentence = text;
     }
 
     pub fn eyedrop_at(&mut self, position: (u32, u32)) {
-        self.color = self.image()[position];
-        if self.tool == Tool::Eyedropper {
-            self.tool = if self.prev_tool == Tool::Select {
+        self.settings.color = self.image()[position];
+        if self.settings.tool == Tool::Eyedropper {
+            self.settings.tool = if self.settings.prev_tool == Tool::Select {
                 Tool::Pencil
             } else {
-                self.prev_tool
+                self.settings.prev_tool
             };
         }
     }
@@ -406,7 +380,7 @@ impl EditorState {
             mem::swap(&mut snapshot, &mut self.current);
             self.redo_stack.push(snapshot);
             if self.current.selection.is_some() {
-                self.tool = Tool::Select;
+                self.settings.tool = Tool::Select;
             }
             true
         } else {
@@ -419,7 +393,7 @@ impl EditorState {
             mem::swap(&mut snapshot, &mut self.current);
             self.undo_stack.push(snapshot);
             if self.current.selection.is_some() {
-                self.tool = Tool::Select;
+                self.settings.tool = Tool::Select;
             }
             true
         } else {
@@ -636,7 +610,7 @@ impl<'a> Mutation<'a> {
         }
         self.state.current.selection =
             Some((Rc::new(selected), Point::new(min_x as i32, min_y as i32)));
-        self.state.tool = Tool::Select;
+        self.state.settings.tool = Tool::Select;
     }
 
     pub fn select(&mut self, rect: &Rect) {
@@ -652,7 +626,7 @@ impl<'a> Mutation<'a> {
             rect.height(),
             Color::C0,
         );
-        self.state.tool = Tool::Select;
+        self.state.settings.tool = Tool::Select;
     }
 
     pub fn select_all(&mut self) {
@@ -728,27 +702,26 @@ impl<'a> Mutation<'a> {
     }
 
     pub fn cut_selection(&mut self) {
-        if self.state.current.selection.is_some() {
-            self.state.clipboard = self.state.current.selection.take();
-        } else {
-            self.state.clipboard = Some((self.image_rc(), Point::new(0, 0)));
+        let selection = self.state.current.selection.take();
+        self.state.settings.clipboard = selection.or_else(|| {
+            let image = self.image_rc();
             self.image().clear();
-        }
+            Some((image, Point::new(0, 0)))
+        });
     }
 
     pub fn copy_selection(&mut self) {
-        if self.state.current.selection.is_some() {
-            self.state.clipboard = self.state.current.selection.clone();
-        } else {
-            self.state.clipboard = Some((self.image_rc(), Point::new(0, 0)));
-        }
+        let selection = self.state.current.selection.clone();
+        self.state.settings.clipboard =
+            selection.or_else(|| Some((self.image_rc(), Point::new(0, 0))));
     }
 
     pub fn paste_selection(&mut self) {
-        if self.state.clipboard.is_some() {
+        if self.state.settings.clipboard.is_some() {
             self.unselect();
-            self.state.current.selection = self.state.clipboard.clone();
-            self.state.tool = Tool::Select;
+            self.state.current.selection =
+                self.state.settings.clipboard.clone();
+            self.state.settings.tool = Tool::Select;
         }
     }
 
@@ -810,9 +783,6 @@ fn scale_down(image: &Image, palette: &Palette, by: u32) -> Image {
 }
 
 //===========================================================================//
-
-const DEFAULT_TEST_SENTENCE: &str =
-    "The quick, brown fox jumps over a ``lazy'' dog.";
 
 const MAX_UNDOS: usize = 100;
 

@@ -47,12 +47,12 @@ const COLORS: &[ahi::Color] = &[
 
 //===========================================================================//
 
-pub fn load_ahf_from_file(path: &String) -> io::Result<ahi::Font> {
+pub fn load_ahf_from_file(path: &str) -> io::Result<ahi::Font> {
     let mut file = File::open(path)?;
     ahi::Font::read(&mut file)
 }
 
-pub fn load_ahi_from_file(path: &String) -> io::Result<ahi::Collection> {
+pub fn load_ahi_from_file(path: &str) -> io::Result<ahi::Collection> {
     let mut file = File::open(path)?;
     ahi::Collection::read(&mut file)
 }
@@ -60,7 +60,7 @@ pub fn load_ahi_from_file(path: &String) -> io::Result<ahi::Collection> {
 pub fn save_png_to_file(
     image: &ahi::Image,
     palette: &ahi::Palette,
-    path: &String,
+    path: &str,
 ) -> io::Result<()> {
     let rgba_data = image.rgba_data(palette);
     let output_file = File::create(path)?;
@@ -78,7 +78,7 @@ pub fn save_png_to_file(
 
 pub fn load_png_from_file(
     palette: &ahi::Palette,
-    path: &String,
+    path: &str,
 ) -> io::Result<ahi::Image> {
     let decoder = png::Decoder::new(io::BufReader::new(File::open(path)?));
     let mut reader = decoder.read_info()?;

@@ -305,7 +305,7 @@ fn load_font_from_file<'a>(
     creator: &'a TextureCreator<WindowContext>,
     path: &str,
 ) -> Font<'a> {
-    let font = util::load_ahf_from_file(&path.to_string()).unwrap();
+    let font = util::load_ahf_from_file(path).unwrap();
     let mut glyphs = HashMap::new();
     for chr in font.chars() {
         glyphs.insert(chr, load_glyph(creator, &font[chr]));
@@ -321,7 +321,7 @@ fn load_sprites_from_file<'a>(
     creator: &'a TextureCreator<WindowContext>,
     path: &str,
 ) -> Vec<Sprite<'a>> {
-    let collection = util::load_ahi_from_file(&path.to_string()).unwrap();
+    let collection = util::load_ahi_from_file(path).unwrap();
     collection
         .images
         .iter()
@@ -333,7 +333,7 @@ fn load_sprite_from_file<'a>(
     creator: &'a TextureCreator<WindowContext>,
     path: &str,
 ) -> Sprite<'a> {
-    let collection = util::load_ahi_from_file(&path.to_string()).unwrap();
+    let collection = util::load_ahi_from_file(path).unwrap();
     load_sprite_from_image(creator, &collection.images[0])
 }
 
