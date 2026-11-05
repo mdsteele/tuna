@@ -28,7 +28,16 @@ use std::rc::Rc;
 pub(super) struct Snapshot {
     pub data: Data,
     pub selection: Option<(Rc<Image>, Point)>,
+    pub zoom: (u32, u32),
     pub unsaved: bool,
+}
+
+impl Snapshot {
+    pub fn with_data(data: Data) -> Self {
+        let (width, height) = data.image_size();
+        let scale = (256 / width.max(height)).max(1);
+        Self { data, selection: None, zoom: (scale, scale), unsaved: false }
+    }
 }
 
 //===========================================================================//

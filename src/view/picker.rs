@@ -163,7 +163,6 @@ impl GuiElement<EditorState, ()> for Multipicker {
                 state.palette(),
                 subrect.x() + Self::BOX_MARGIN,
                 subrect.y() + Self::BOX_MARGIN,
-                1,
             );
             let border_color = if index == current_image_index {
                 (255, 255, 127, 255)

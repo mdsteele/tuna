@@ -27,6 +27,7 @@ use super::textbox::{ModalTextBox, Mode};
 use super::tiles::TileView;
 use super::toolbox::Toolbox;
 use super::unsaved::UnsavedIndicator;
+use super::zoom::{ZoomAction, ZoomControls};
 use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{COMMAND, Event, Keycode, SHIFT};
@@ -43,6 +44,7 @@ pub struct EditorView {
     menu: MenuView,
     palette: PaletteView,
     textbox: ModalTextBox,
+    zoom: ZoomControls,
 }
 
 impl EditorView {
@@ -55,10 +57,11 @@ impl EditorView {
             Box::new(Toolbox::new(3, 34)),
             Box::new(Mirrors::new(3, 134)),
             Box::new(ImagePicker::new(439, 33, 262)),
-            Box::new(ImageCanvas::new(80, 36, 256)),
-            Box::new(ImageCanvas::new(366, 36, 64)),
+            Box::new(ImageCanvas::new(80, 36, 256, false)),
+            Box::new(ImageCanvas::new(366, 36, 64, true)),
             Box::new(TileView::new(364, 106, 68, 124)),
             Box::new(MetadataView::new(364, 236)),
+            // TODO: scrollbars
             Box::new(SizesToggle::new(448, 298)),
         ];
         SubrectElement::new(
@@ -67,6 +70,7 @@ impl EditorView {
                 menu: MenuView::new(8, 297),
                 palette: PaletteView::new(3, 188),
                 textbox: ModalTextBox::new(20, 10),
+                zoom: ZoomControls::new(342, 298),
             },
             Rect::new(
                 offset.x(),
@@ -130,11 +134,24 @@ impl EditorView {
         state: &mut EditorState,
         color: Color,
     ) -> bool {
-        if state.palette_index() < state.num_palettes() {
+        if self.textbox.mode() == Mode::Edit
+            && state.palette_index() < state.num_palettes()
+        {
             state.unselect_if_necessary();
             let (r, g, b, a) = state.palette()[color];
-            let text = format!("{:02X}{:02X}{:02X}{:02X}", r, g, b, a);
+            let text = format!("{r:02X}{g:02X}{b:02X}{a:02X}");
             self.set_textbox_mode(Mode::SetColor(color), text);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn begin_set_zoom(&mut self, state: &mut EditorState) -> bool {
+        if self.textbox.mode() == Mode::Edit {
+            state.unselect_if_necessary();
+            let (horz, vert) = state.zoom();
+            self.set_textbox_mode(Mode::SetZoom, format!("{horz}x{vert}"));
             true
         } else {
             false
@@ -154,8 +171,7 @@ impl EditorView {
     fn begin_set_grid(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             let (horz, vert) = state.grid();
-            let text = format!("{}x{}", horz, vert);
-            self.set_textbox_mode(Mode::SetGrid, text);
+            self.set_textbox_mode(Mode::SetGrid, format!("{horz}x{vert}"));
             true
         } else {
             false
@@ -178,14 +194,8 @@ impl EditorView {
     fn begin_resize(&mut self, state: &mut EditorState) -> bool {
         if self.textbox.mode() == Mode::Edit {
             state.unselect_if_necessary();
-            self.set_textbox_mode(
-                Mode::Resize,
-                format!(
-                    "{}x{}",
-                    state.image().width(),
-                    state.image().height()
-                ),
-            );
+            let (width, height) = state.image_size();
+            self.set_textbox_mode(Mode::Resize, format!("{width}x{height}"));
             true
         } else {
             false
@@ -311,22 +321,13 @@ impl EditorView {
                 let chars: Vec<char> = text.chars().collect();
                 chars.len() == 1 && state.mutation().add_new_image(chars[0])
             }
-            Mode::Resize => {
-                let pieces: Vec<&str> = text.split('x').collect();
-                if pieces.len() != 2 {
-                    return false;
+            Mode::Resize => match Self::parse_dimensions(&text) {
+                Some((width, height)) => {
+                    state.mutation().resize_images(width, height);
+                    true
                 }
-                let new_width = match pieces[0].parse::<u32>() {
-                    Ok(width) => width,
-                    Err(_) => return false,
-                };
-                let new_height = match pieces[1].parse::<u32>() {
-                    Ok(height) => height,
-                    Err(_) => return false,
-                };
-                state.mutation().resize_images(new_width, new_height);
-                true
-            }
+                None => false,
+            },
             Mode::SaveAs => {
                 let old = state.swap_filepath(text);
                 match state.save_to_file() {
@@ -378,22 +379,13 @@ impl EditorView {
                 };
                 state.mutation().set_palette_color(color, rgba)
             }
-            Mode::SetGrid => {
-                let pieces: Vec<&str> = text.split('x').collect();
-                if pieces.len() != 2 {
-                    return false;
+            Mode::SetGrid => match Self::parse_dimensions(&text) {
+                Some((horz, vert)) => {
+                    state.set_grid(horz, vert);
+                    true
                 }
-                let new_horz = match pieces[0].parse::<u32>() {
-                    Ok(horz) => horz,
-                    Err(_) => return false,
-                };
-                let new_vert = match pieces[1].parse::<u32>() {
-                    Ok(vert) => vert,
-                    Err(_) => return false,
-                };
-                state.set_grid(new_horz, new_vert);
-                true
-            }
+                None => false,
+            },
             Mode::SetMetadata => {
                 let result = if text.is_empty() {
                     Ok(vec![])
@@ -440,7 +432,24 @@ impl EditorView {
                 state.set_test_sentence(text);
                 true
             }
+            Mode::SetZoom => match Self::parse_dimensions(&text) {
+                Some(zoom) => {
+                    state.set_zoom(zoom);
+                    true
+                }
+                None => false,
+            },
         }
+    }
+
+    fn parse_dimensions(text: &str) -> Option<(u32, u32)> {
+        let pieces: Vec<&str> = text.split('x').collect();
+        if pieces.len() != 2 {
+            return None;
+        }
+        let horz = pieces[0].parse::<u32>().ok()?;
+        let vert = pieces[1].parse::<u32>().ok()?;
+        Some((horz, vert))
     }
 
     fn chop_col_major(&mut self, state: &mut EditorState) -> bool {
@@ -546,6 +555,7 @@ impl GuiElement<EditorState, ()> for EditorView {
         let rect = canvas.rect();
         canvas.draw_rect((127, 127, 127, 127), rect);
         self.aggregate.draw(state, resources, canvas);
+        self.zoom.draw(state, resources, canvas);
         self.palette.draw(state, resources, canvas);
         self.menu.draw(state, resources, canvas);
         self.textbox.draw(state, resources, canvas);
@@ -663,6 +673,15 @@ impl GuiElement<EditorState, ()> for EditorView {
                     if let Some(PaletteAction::EditColor(color)) =
                         subaction.take_value()
                         && self.begin_set_color(state, color)
+                    {
+                        subaction.also_redraw();
+                    }
+                    action.merge(subaction.but_no_value());
+                }
+                if !action.should_stop() {
+                    let mut subaction = self.zoom.on_event(event, state);
+                    if let Some(ZoomAction::EditZoom) = subaction.take_value()
+                        && self.begin_set_zoom(state)
                     {
                         subaction.also_redraw();
                     }

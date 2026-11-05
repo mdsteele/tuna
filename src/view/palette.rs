@@ -23,7 +23,10 @@ use crate::event::{Event, Keycode, NONE};
 use crate::state::{EditorState, Tool};
 use ahi::{self, Color};
 use sdl2::rect::{Point, Rect};
-use std::cmp;
+
+//===========================================================================//
+
+type PaletteElement = Box<dyn GuiElement<EditorState, PaletteAction>>;
 
 //===========================================================================//
 
@@ -39,7 +42,7 @@ pub struct PaletteView {
 
 impl PaletteView {
     pub fn new(left: i32, top: i32) -> PaletteView {
-        let elements: Vec<Box<dyn GuiElement<EditorState, PaletteAction>>> = vec![
+        let elements: Vec<PaletteElement> = vec![
             Box::new(ColorPalette::new(0, 0)),
             PaletteView::arrow(
                 0,
@@ -81,32 +84,21 @@ impl PaletteView {
         }
     }
 
-    fn arrow(
-        x: i32,
-        y: i32,
-        delta: i32,
-        key: Keycode,
-    ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
+    fn arrow(x: i32, y: i32, delta: i32, key: Keycode) -> PaletteElement {
         Box::new(SubrectElement::new(
             NextPrevPalette::new(delta, key),
             Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
         ))
     }
 
-    fn add_palette_button(
-        x: i32,
-        y: i32,
-    ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
+    fn add_palette_button(x: i32, y: i32) -> PaletteElement {
         Box::new(SubrectElement::new(
             AddPalettteButton::new(),
             Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
         ))
     }
 
-    fn delete_palette_button(
-        x: i32,
-        y: i32,
-    ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
+    fn delete_palette_button(x: i32, y: i32) -> PaletteElement {
         Box::new(SubrectElement::new(
             DeletePalettteButton::new(),
             Rect::new(x, y, NextPrevPalette::WIDTH, NextPrevPalette::HEIGHT),
@@ -144,7 +136,7 @@ impl ColorPalette {
     const HEIGHT: u32 = 72;
 
     fn new(left: i32, top: i32) -> ColorPalette {
-        let elements: Vec<Box<dyn GuiElement<EditorState, PaletteAction>>> = vec![
+        let elements: Vec<PaletteElement> = vec![
             ColorPalette::picker(0, 0, Color::C0, Keycode::Num0),
             ColorPalette::picker(18, 0, Color::C1, Keycode::Num1),
             ColorPalette::picker(36, 0, Color::C2, Keycode::Num2),
@@ -175,12 +167,7 @@ impl ColorPalette {
         }
     }
 
-    fn picker(
-        x: i32,
-        y: i32,
-        color: Color,
-        key: Keycode,
-    ) -> Box<dyn GuiElement<EditorState, PaletteAction>> {
+    fn picker(x: i32, y: i32, color: Color, key: Keycode) -> PaletteElement {
         Box::new(SubrectElement::new(
             ColorPicker::new(color, key),
             Rect::new(x, y, 18, 18),
@@ -473,8 +460,8 @@ fn shrink(rect: Rect, by: i32) -> Rect {
     Rect::new(
         rect.x() + by,
         rect.y() + by,
-        cmp::max((rect.width() as i32) - 2 * by, 0) as u32,
-        cmp::max((rect.height() as i32) - 2 * by, 0) as u32,
+        ((rect.width() as i32) - 2 * by).max(0) as u32,
+        ((rect.height() as i32) - 2 * by).max(0) as u32,
     )
 }
 

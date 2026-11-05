@@ -22,9 +22,8 @@ use crate::element::{Action, GuiElement};
 use crate::event::{Event, Keycode};
 use crate::state::{EditorState, Tool};
 use crate::util::Rgba;
-use num_integer::mod_floor;
+use num_integer::{gcd, mod_floor};
 use sdl2::rect::{Point, Rect};
-use std::cmp;
 
 //===========================================================================//
 
@@ -56,6 +55,7 @@ struct ImageCanvasDrag {
 pub struct ImageCanvas {
     top_left: Point,
     max_size: u32,
+    autoscale: bool,
     drag_from_to: Option<ImageCanvasDrag>,
     lasso_points: Vec<(u32, u32)>,
     selection_animation_counter: i32,
@@ -63,10 +63,16 @@ pub struct ImageCanvas {
 }
 
 impl ImageCanvas {
-    pub fn new(left: i32, top: i32, max_size: u32) -> ImageCanvas {
+    pub fn new(
+        left: i32,
+        top: i32,
+        max_size: u32,
+        autoscale: bool,
+    ) -> ImageCanvas {
         ImageCanvas {
             top_left: Point::new(left, top),
             max_size,
+            autoscale,
             drag_from_to: None,
             lasso_points: Vec::new(),
             selection_animation_counter: 0,
@@ -74,20 +80,36 @@ impl ImageCanvas {
         }
     }
 
-    fn scale(&self, state: &EditorState) -> u32 {
+    fn scale(&self, state: &EditorState) -> (u32, u32) {
+        if !self.autoscale {
+            return state.zoom();
+        }
+        // Try to maintain the zoom aspect ratio, but then scale to fit
+        // self.max_size.
+        let (horz, vert) = state.zoom();
+        let div = gcd(horz, vert);
+        let (horz, vert) = (horz / div, vert / div);
         let (width, height) = state.image_size();
-        cmp::max(1, self.max_size / cmp::max(width, height))
+        let scale = self.max_size / (width * horz).max(height * vert);
+        if scale > 0 {
+            return (scale * horz, scale * vert);
+        }
+        // If the zoom aspect ratio is impossible to satisfy and still
+        // fit in max_size, then just use a 1:1 aspect ratio.
+        let scale = (self.max_size / width.max(height)).max(1);
+        (scale, scale)
     }
 
-    fn rect(&self, state: &EditorState) -> Rect {
-        let scale = self.scale(state);
-        let (width, height) = state.image_size();
-        Rect::new(
-            self.top_left.x(),
-            self.top_left.y(),
-            width * scale,
-            height * scale,
-        )
+    fn screen_rect(&self, state: &EditorState) -> Rect {
+        let (horz_scale, vert_scale) = self.scale(state);
+        let (image_width, image_height) = state.image_size();
+        let screen_width = self.max_size.min(image_width * horz_scale);
+        let screen_height = self.max_size.min(image_height * vert_scale);
+        let screen_x =
+            self.top_left.x() + ((self.max_size - screen_width) / 2) as i32;
+        let screen_y =
+            self.top_left.y() + ((self.max_size - screen_height) / 2) as i32;
+        Rect::new(screen_x, screen_y, screen_width, screen_height)
     }
 
     fn dragged_points(
@@ -107,8 +129,8 @@ impl ImageCanvas {
         if let Some(((from_col, from_row), (to_col, to_row))) =
             self.dragged_points(state)
         {
-            let x = cmp::min(from_col, to_col);
-            let y = cmp::min(from_row, to_row);
+            let x = from_col.min(to_col);
+            let y = from_row.min(to_row);
             let w = ((from_col - to_col).abs() + 1) as u32;
             let h = ((from_row - to_row).abs() + 1) as u32;
             Some(Rect::new(x, y, w, h))
@@ -122,19 +144,20 @@ impl ImageCanvas {
         mouse: Point,
         state: &EditorState,
     ) -> Option<(u32, u32)> {
-        if mouse.x() < self.top_left.x() || mouse.y() < self.top_left.y() {
+        let rect = self.screen_rect(state);
+        if !rect.contains_point(mouse) {
             return None;
         }
-        let scaled = (mouse - self.top_left) / self.scale(state) as i32;
+        let position = unscaled(mouse - rect.top_left(), self.scale(state));
         let (width, height) = state.image_size();
-        if scaled.x() < 0
-            || scaled.x() >= (width as i32)
-            || scaled.y() < 0
-            || scaled.y() >= (height as i32)
+        if position.x() < 0
+            || position.x() >= (width as i32)
+            || position.y() < 0
+            || position.y() >= (height as i32)
         {
             None
         } else {
-            Some((scaled.x() as u32, scaled.y() as u32))
+            Some((position.x() as u32, position.y() as u32))
         }
     }
 
@@ -143,11 +166,16 @@ impl ImageCanvas {
         mouse: Point,
         state: &EditorState,
     ) -> (u32, u32) {
-        let scaled = (mouse - self.top_left) / self.scale(state) as i32;
+        let rect = self.screen_rect(state);
+        let mouse = Point::new(
+            mouse.x().max(rect.x()).min(rect.x() + rect.width() as i32 - 1),
+            mouse.y().max(rect.y()).min(rect.y() + rect.height() as i32 - 1),
+        );
+        let position = unscaled(mouse - rect.top_left(), self.scale(state));
         let (width, height) = state.image_size();
         (
-            cmp::max(0, cmp::min(scaled.x(), width as i32 - 1)) as u32,
-            cmp::max(0, cmp::min(scaled.y(), height as i32 - 1)) as u32,
+            position.x().max(0).min(width as i32 - 1) as u32,
+            position.y().max(0).min(height as i32 - 1) as u32,
         )
     }
 
@@ -339,13 +367,13 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         canvas: &mut Canvas,
     ) {
         let scale = self.scale(state);
-        let canvas_rect = self.rect(state);
+        let canvas_rect = self.screen_rect(state);
         canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
-        canvas.draw_image(
+        canvas.subcanvas(canvas_rect).draw_image_scaled(
             state.image(),
             state.palette(),
-            canvas_rect.x(),
-            canvas_rect.y(),
+            0,
+            0,
             scale,
         );
         if let Some((baseline, left_edge, right_edge)) = state.glyph_metrics()
@@ -354,7 +382,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 (0, 127, 255, 255),
                 Rect::new(
                     canvas_rect.x(),
-                    canvas_rect.y() + baseline * scale as i32,
+                    canvas_rect.y() + baseline * scale.1 as i32,
                     canvas_rect.width(),
                     1,
                 ),
@@ -362,7 +390,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             canvas.draw_rect(
                 (127, 255, 0, 255),
                 Rect::new(
-                    canvas_rect.x() + left_edge * scale as i32 - 1,
+                    canvas_rect.x() + left_edge * scale.0 as i32 - 1,
                     canvas_rect.y(),
                     1,
                     canvas_rect.height(),
@@ -371,7 +399,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             canvas.draw_rect(
                 (255, 0, 127, 255),
                 Rect::new(
-                    canvas_rect.x() + right_edge * scale as i32,
+                    canvas_rect.x() + right_edge * scale.0 as i32,
                     canvas_rect.y(),
                     1,
                     canvas_rect.height(),
@@ -390,8 +418,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 (Point::new(rect.x(), rect.y()), label)
             };
             let topleft = Point::new(
-                canvas_rect.x() + (topleft.x() * (scale as i32)).max(0),
-                canvas_rect.y() + (topleft.y() * (scale as i32)).max(0),
+                canvas_rect.x() + (topleft.x() * (scale.0 as i32)).max(0),
+                canvas_rect.y() + (topleft.y() * (scale.1 as i32)).max(0),
             );
             canvas.fill_rect(
                 (255, 255, 255, 255),
@@ -411,14 +439,20 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         }
         let mut canvas = canvas.subcanvas(canvas_rect);
         if let Some((selected, topleft)) = state.selection() {
-            let left = topleft.x() * (scale as i32);
-            let top = topleft.y() * (scale as i32);
-            canvas.draw_image(selected, state.palette(), left, top, scale);
+            let left = topleft.x() * (scale.0 as i32);
+            let top = topleft.y() * (scale.1 as i32);
+            canvas.draw_image_scaled(
+                selected,
+                state.palette(),
+                left,
+                top,
+                scale,
+            );
             let marquee_rect = Rect::new(
                 left,
                 top,
-                selected.width() * scale,
-                selected.height() * scale,
+                selected.width() * scale.0,
+                selected.height() * scale.1,
             );
             draw_marquee(
                 &mut canvas,
@@ -442,10 +476,10 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                             canvas.draw_rect(
                                 (192, 64, 192, 255),
                                 Rect::new(
-                                    (col * scale) as i32,
-                                    (row * scale) as i32,
-                                    scale,
-                                    scale,
+                                    (col * scale.0) as i32,
+                                    (row * scale.1) as i32,
+                                    scale.0,
+                                    scale.1,
                                 ),
                             );
                         }
@@ -454,10 +488,10 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             }
         } else if let Some(rect) = self.dragged_rect(state) {
             let marquee_rect = Rect::new(
-                rect.x() * (scale as i32),
-                rect.y() * (scale as i32),
-                rect.width() * scale,
-                rect.height() * scale,
+                rect.x() * (scale.0 as i32),
+                rect.y() * (scale.1 as i32),
+                rect.width() * scale.0,
+                rect.height() * scale.1,
             );
             draw_marquee(&mut canvas, marquee_rect, 0);
         } else if state.tool() == Tool::Lasso {
@@ -465,10 +499,10 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 canvas.draw_rect(
                     (192, 192, 64, 255),
                     Rect::new(
-                        (x * scale) as i32,
-                        (y * scale) as i32,
-                        scale,
-                        scale,
+                        (x * scale.0) as i32,
+                        (y * scale.1) as i32,
+                        scale.0,
+                        scale.1,
                     ),
                 );
             }
@@ -480,7 +514,12 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             while x < width {
                 canvas.draw_rect(
                     GRID_RGBA,
-                    Rect::new((x * scale) as i32, 0, 1, canvas_rect.height()),
+                    Rect::new(
+                        (x * scale.0) as i32,
+                        0,
+                        1,
+                        canvas_rect.height(),
+                    ),
                 );
                 x += grid_horz;
             }
@@ -491,7 +530,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             while y < height {
                 canvas.draw_rect(
                     GRID_RGBA,
-                    Rect::new(0, (y * scale) as i32, canvas_rect.width(), 1),
+                    Rect::new(0, (y * scale.1) as i32, canvas_rect.width(), 1),
                 );
                 y += grid_vert;
             }
@@ -532,7 +571,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 }
             }
             Event::MouseDown(pt) => {
-                if self.rect(state).contains_point(pt) {
+                let rect = self.screen_rect(state);
+                if rect.contains_point(pt) {
                     match state.tool() {
                         Tool::Checkerboard => {
                             let changed = self.try_checker_fill(pt, state);
@@ -574,17 +614,16 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                             return Action::redraw_if(changed).and_stop();
                         }
                         Tool::Select => {
-                            let rect = state.selection_rect();
-                            if let Some(rect) = rect {
-                                let screen_topleft = self.top_left
-                                    + rect.top_left()
-                                        * self.scale(state) as i32;
+                            let sel_rect = state.selection_rect();
+                            if let Some(sr) = sel_rect {
                                 let scale = self.scale(state);
+                                let screen_topleft = rect.top_left()
+                                    + scaled(sr.top_left(), scale);
                                 let screen_rect = Rect::new(
                                     screen_topleft.x(),
                                     screen_topleft.y(),
-                                    rect.width() * scale,
-                                    rect.height() * scale,
+                                    sr.width() * scale.0,
+                                    sr.height() * scale.1,
                                 );
                                 if !screen_rect.contains_point(pt) {
                                     state.mutation().unselect();
@@ -594,8 +633,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                                 }
                             }
                             self.drag_from_to = Some(ImageCanvasDrag {
-                                from_selection: if let Some(r) = rect {
-                                    r.top_left()
+                                from_selection: if let Some(sr) = sel_rect {
+                                    sr.top_left()
                                 } else {
                                     Point::new(0, 0)
                                 },
@@ -669,12 +708,12 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                     return Action::redraw_if(changed);
                 }
                 Tool::Select => {
-                    let scale = self.scale(state) as i32;
+                    let scale = self.scale(state);
                     if let Some(ref mut drag) = self.drag_from_to {
                         drag.to_pixel = pt;
                         if state.selection().is_some() {
                             let position = drag.from_selection
-                                + (pt - drag.from_pixel) / scale;
+                                + unscaled(pt - drag.from_pixel, scale);
                             state
                                 .persistent_mutation()
                                 .reposition_selection(position);
@@ -738,8 +777,8 @@ fn bresenham_line(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
 fn bresenham_oval(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
     // This function was adapted from the plotEllipseRect function in
     // http://members.chello.at/easyfilter/bresenham.js by Zingl Alois.
-    let (mut x0, mut x1) = (cmp::min(x0, x1), cmp::max(x0, x1));
-    let (mut y0, mut y1) = (cmp::min(y0, y1), cmp::max(y0, y1));
+    let (mut x0, mut x1) = (x0.min(x1), x0.max(x1));
+    let (mut y0, mut y1) = (y0.min(y1), y0.max(y1));
     let width = x1 - x0;
     let height = y1 - y0;
     let h_parity = height & 1;
@@ -782,8 +821,8 @@ fn bresenham_oval(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
 }
 
 fn bresenham_rect(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
-    let (x0, x1) = (cmp::min(x0, x1), cmp::max(x0, x1));
-    let (y0, y1) = (cmp::min(y0, y1), cmp::max(y0, y1));
+    let (x0, x1) = (x0.min(x1), x0.max(x1));
+    let (y0, y1) = (y0.min(y1), y0.max(y1));
     let mut output = Vec::new();
     for x in x0..x1 {
         output.push((x, y0));
@@ -803,6 +842,14 @@ fn expand(rect: Rect, by: i32) -> Rect {
         ((rect.width() as i32) + 2 * by) as u32,
         ((rect.height() as i32) + 2 * by) as u32,
     )
+}
+
+fn scaled(point: Point, scale: (u32, u32)) -> Point {
+    Point::new(point.x() * scale.0 as i32, point.y() * scale.1 as i32)
+}
+
+fn unscaled(point: Point, scale: (u32, u32)) -> Point {
+    Point::new(point.x() / scale.0 as i32, point.y() / scale.1 as i32)
 }
 
 const MARQUEE_ANIMATION_MODULUS: i32 = 8;

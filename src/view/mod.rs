@@ -28,6 +28,7 @@ mod textbox;
 mod tiles;
 mod toolbox;
 mod unsaved;
+mod zoom;
 
 pub use editor::EditorView;
 

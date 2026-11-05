@@ -33,25 +33,25 @@ impl Toolbox {
     const WIDTH: u32 = 72;
     const HEIGHT: u32 = 96;
 
-    pub fn new(left: i32, top: i32) -> Toolbox {
+    pub fn new(left: i32, top: i32) -> Self {
         let elements: Vec<Box<dyn GuiElement<Tool, ()>>> = vec![
-            Toolbox::picker(2, 2, Tool::Pencil, Keycode::P),
-            Toolbox::picker(26, 2, Tool::PaintBucket, Keycode::K),
-            Toolbox::picker(50, 2, Tool::PaletteReplace, Keycode::V),
-            Toolbox::picker(2, 26, Tool::Watercolor, Keycode::W),
-            Toolbox::picker(26, 26, Tool::Checkerboard, Keycode::H),
-            Toolbox::picker(50, 26, Tool::PaletteSwap, Keycode::X),
-            Toolbox::picker(2, 50, Tool::Line, Keycode::I),
-            Toolbox::picker(26, 50, Tool::Rectangle, Keycode::R),
-            Toolbox::picker(50, 50, Tool::Oval, Keycode::O),
-            Toolbox::picker(2, 74, Tool::Eyedropper, Keycode::Y),
-            Toolbox::picker(26, 74, Tool::Select, Keycode::S),
-            Toolbox::picker(50, 74, Tool::Lasso, Keycode::L),
+            Self::picker(2, 2, Tool::Pencil, Keycode::P),
+            Self::picker(26, 2, Tool::PaintBucket, Keycode::K),
+            Self::picker(50, 2, Tool::PaletteReplace, Keycode::V),
+            Self::picker(2, 26, Tool::Watercolor, Keycode::W),
+            Self::picker(26, 26, Tool::Checkerboard, Keycode::H),
+            Self::picker(50, 26, Tool::PaletteSwap, Keycode::X),
+            Self::picker(2, 50, Tool::Line, Keycode::I),
+            Self::picker(26, 50, Tool::Rectangle, Keycode::R),
+            Self::picker(50, 50, Tool::Oval, Keycode::O),
+            Self::picker(2, 74, Tool::Eyedropper, Keycode::Y),
+            Self::picker(26, 74, Tool::Select, Keycode::S),
+            Self::picker(50, 74, Tool::Lasso, Keycode::L),
         ];
-        Toolbox {
+        Self {
             element: SubrectElement::new(
                 AggregateElement::new(elements),
-                Rect::new(left, top, Toolbox::WIDTH, Toolbox::HEIGHT),
+                Rect::new(left, top, Self::WIDTH, Self::HEIGHT),
             ),
         }
     }

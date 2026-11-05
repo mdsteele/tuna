@@ -86,7 +86,17 @@ impl<'a> Canvas<'a> {
         palette: &ahi::Palette,
         left: i32,
         top: i32,
-        scale: u32,
+    ) {
+        self.draw_image_scaled(image, palette, left, top, (1, 1));
+    }
+
+    pub fn draw_image_scaled(
+        &mut self,
+        image: &ahi::Image,
+        palette: &ahi::Palette,
+        left: i32,
+        top: i32,
+        scale: (u32, u32),
     ) {
         for row in 0..image.height() {
             for col in 0..image.width() {
@@ -96,10 +106,10 @@ impl<'a> Canvas<'a> {
                     self.fill_rect(
                         (r, g, b, a),
                         Rect::new(
-                            left + (scale * col) as i32,
-                            top + (scale * row) as i32,
-                            scale,
-                            scale,
+                            left + (scale.0 * col) as i32,
+                            top + (scale.1 * row) as i32,
+                            scale.0,
+                            scale.1,
                         ),
                     );
                 }
@@ -286,6 +296,8 @@ pub enum ToolIcon {
     DeletePalette,
     EqualSizes,
     MixedSizes,
+    ZoomOut,
+    ZoomIn,
 }
 
 //===========================================================================//

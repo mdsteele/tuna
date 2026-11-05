@@ -21,7 +21,6 @@
 // - Animation preview
 // - Finish lasso tool
 // - Limited region redraws
-// - Zoom/scroll
 
 mod canvas;
 mod element;

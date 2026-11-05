@@ -24,7 +24,6 @@ use crate::state::EditorState;
 use crate::util::Rgba;
 use ahi::Color;
 use sdl2::rect::Rect;
-use std::cmp;
 use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
@@ -54,6 +53,7 @@ pub enum Mode {
     SetMetrics,
     SetTag,
     TestSentence,
+    SetZoom,
 }
 
 impl Mode {
@@ -118,7 +118,7 @@ impl GuiElement<(), ()> for TextBox {
         let rect_width = rect.width() as i32;
         let font = resources.font();
         let text_width = font.text_width(&self.text);
-        let text_left = cmp::min(4, rect_width - 4 - text_width);
+        let text_left = (rect_width - 4 - text_width).min(4);
         canvas.fill_rect((128, 128, 128, 255), rect);
         canvas.draw_string(font, text_left, 4, &self.text);
         canvas.draw_rect((255, 255, 255, 255), rect);
@@ -617,6 +617,7 @@ impl GuiElement<EditorState, (Mode, String)> for ModalTextBox {
             Mode::SetMetrics => "Metrics:",
             Mode::SetTag => "Tag:",
             Mode::TestSentence => "Text:",
+            Mode::SetZoom => "Zoom:",
         };
         let font = resources.font();
         let text_width = font.text_width(label);
@@ -686,8 +687,8 @@ fn shrink(rect: Rect, by: i32) -> Rect {
     Rect::new(
         rect.x() + by,
         rect.y() + by,
-        cmp::max((rect.width() as i32) - 2 * by, 0) as u32,
-        cmp::max((rect.height() as i32) - 2 * by, 0) as u32,
+        ((rect.width() as i32) - 2 * by).max(0) as u32,
+        ((rect.height() as i32) - 2 * by).max(0) as u32,
     )
 }
 

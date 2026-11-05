@@ -47,11 +47,7 @@ impl EditorState {
         EditorState {
             settings: Settings::default(),
             filepath,
-            current: Snapshot {
-                data: Data::from_collection(collection),
-                selection: None,
-                unsaved: false,
-            },
+            current: Snapshot::with_data(Data::from_collection(collection)),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             persistent_mutation_active: false,
@@ -84,6 +80,14 @@ impl EditorState {
 
     pub fn set_grid(&mut self, horz: u32, vert: u32) {
         self.settings.grid = (horz, vert);
+    }
+
+    pub fn zoom(&self) -> (u32, u32) {
+        self.current.zoom
+    }
+
+    pub fn set_zoom(&mut self, new_zoom: (u32, u32)) {
+        self.current.zoom = new_zoom;
     }
 
     pub fn tool(&self) -> Tool {
@@ -288,7 +292,7 @@ impl EditorState {
 
     fn load_data(&mut self, path: String, data: Data) {
         self.filepath = path;
-        self.current = Snapshot { data, selection: None, unsaved: false };
+        self.current = Snapshot::with_data(data);
         self.undo_stack.clear();
         self.redo_stack.clear();
         self.persistent_mutation_active = false;
