@@ -29,6 +29,7 @@ mod tool;
 
 pub use editor::EditorState;
 pub use mirror::Mirror;
+pub use snapshot::MAIN_CANVAS_SIZE;
 pub use tool::Tool;
 
 //===========================================================================//

@@ -22,6 +22,7 @@ use super::metadata::MetadataView;
 use super::mirrors::Mirrors;
 use super::palette::{PaletteAction, PaletteView};
 use super::picker::ImagePicker;
+use super::scrollbar::Scrollbar;
 use super::sizes::SizesToggle;
 use super::textbox::{ModalTextBox, Mode};
 use super::tiles::TileView;
@@ -32,7 +33,7 @@ use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, AggregateElement, GuiElement, SubrectElement};
 use crate::event::{COMMAND, Event, Keycode, SHIFT};
 use crate::paint::ImageCanvas;
-use crate::state::EditorState;
+use crate::state::{EditorState, MAIN_CANVAS_SIZE};
 use crate::util;
 use ahi::Color;
 use sdl2::rect::{Point, Rect};
@@ -57,11 +58,12 @@ impl EditorView {
             Box::new(Toolbox::new(3, 34)),
             Box::new(Mirrors::new(3, 134)),
             Box::new(ImagePicker::new(439, 33, 262)),
-            Box::new(ImageCanvas::new(80, 36, 256, false)),
+            Box::new(ImageCanvas::new(80, 36, MAIN_CANVAS_SIZE, false)),
             Box::new(ImageCanvas::new(366, 36, 64, true)),
             Box::new(TileView::new(364, 106, 68, 124)),
             Box::new(MetadataView::new(364, 236)),
-            // TODO: scrollbars
+            Box::new(Scrollbar::new(80, 299, MAIN_CANVAS_SIZE, 14, false)),
+            Box::new(Scrollbar::new(343, 36, 14, MAIN_CANVAS_SIZE, true)),
             Box::new(SizesToggle::new(448, 298)),
         ];
         SubrectElement::new(

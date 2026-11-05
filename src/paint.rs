@@ -27,7 +27,20 @@ use sdl2::rect::{Point, Rect};
 
 //===========================================================================//
 
-const GRID_RGBA: Rgba = (192, 0, 255, 255);
+const BORDER_RGBA: Rgba = (255, 255, 255, 255);
+const GLYPH_BASELINE_RGBA: Rgba = (0, 127, 255, 255);
+const GLYPH_LEFT_EDGE_RGBA: Rgba = (127, 255, 0, 255);
+const GLYPH_RIGHT_EDGE_RGBA: Rgba = (255, 0, 127, 255);
+const GRID_LINES_RGBA: Rgba = (192, 0, 255, 255);
+const LASSO_PREVIEW_RGBA: Rgba = (192, 192, 64, 255);
+const MARQUEE_1_RGBA: Rgba = (255, 255, 255, 255);
+const MARQUEE_2_RGBA: Rgba = (0, 0, 0, 255);
+const SELECTION_LABEL_RGBA: Rgba = (255, 255, 255, 255);
+const SHAPE_PREVIEW_RGBA: Rgba = (192, 64, 192, 255);
+
+const MARQUEE_ANIMATION_MODULUS: i32 = 10;
+
+//===========================================================================//
 
 enum Shape {
     Line,
@@ -46,11 +59,15 @@ impl Shape {
     }
 }
 
+//===========================================================================//
+
 struct ImageCanvasDrag {
     from_selection: Point,
     from_pixel: Point,
     to_pixel: Point,
 }
+
+//===========================================================================//
 
 pub struct ImageCanvas {
     top_left: Point,
@@ -63,13 +80,8 @@ pub struct ImageCanvas {
 }
 
 impl ImageCanvas {
-    pub fn new(
-        left: i32,
-        top: i32,
-        max_size: u32,
-        autoscale: bool,
-    ) -> ImageCanvas {
-        ImageCanvas {
+    pub fn new(left: i32, top: i32, max_size: u32, autoscale: bool) -> Self {
+        Self {
             top_left: Point::new(left, top),
             max_size,
             autoscale,
@@ -98,6 +110,11 @@ impl ImageCanvas {
         // fit in max_size, then just use a 1:1 aspect ratio.
         let scale = (self.max_size / width.max(height)).max(1);
         (scale, scale)
+    }
+
+    fn scroll(&self, state: &EditorState) -> Point {
+        let (x, y) = if self.autoscale { (0, 0) } else { state.scroll() };
+        Point::new(x, y)
     }
 
     fn screen_rect(&self, state: &EditorState) -> Rect {
@@ -148,7 +165,8 @@ impl ImageCanvas {
         if !rect.contains_point(mouse) {
             return None;
         }
-        let position = unscaled(mouse - rect.top_left(), self.scale(state));
+        let position = unscaled(mouse - rect.top_left(), self.scale(state))
+            + self.scroll(state);
         let (width, height) = state.image_size();
         if position.x() < 0
             || position.x() >= (width as i32)
@@ -171,7 +189,8 @@ impl ImageCanvas {
             mouse.x().max(rect.x()).min(rect.x() + rect.width() as i32 - 1),
             mouse.y().max(rect.y()).min(rect.y() + rect.height() as i32 - 1),
         );
-        let position = unscaled(mouse - rect.top_left(), self.scale(state));
+        let position = unscaled(mouse - rect.top_left(), self.scale(state))
+            + self.scroll(state);
         let (width, height) = state.image_size();
         (
             position.x().max(0).min(width as i32 - 1) as u32,
@@ -367,19 +386,20 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         canvas: &mut Canvas,
     ) {
         let scale = self.scale(state);
+        let scroll = self.scroll(state);
         let canvas_rect = self.screen_rect(state);
-        canvas.draw_rect((255, 255, 255, 255), expand(canvas_rect, 2));
+        canvas.draw_rect(BORDER_RGBA, expand(canvas_rect, 2));
         canvas.subcanvas(canvas_rect).draw_image_scaled(
             state.image(),
             state.palette(),
-            0,
-            0,
+            -scroll.x() * (scale.0 as i32),
+            -scroll.y() * (scale.1 as i32),
             scale,
         );
         if let Some((baseline, left_edge, right_edge)) = state.glyph_metrics()
         {
             canvas.draw_rect(
-                (0, 127, 255, 255),
+                GLYPH_BASELINE_RGBA,
                 Rect::new(
                     canvas_rect.x(),
                     canvas_rect.y() + baseline * scale.1 as i32,
@@ -388,7 +408,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 ),
             );
             canvas.draw_rect(
-                (127, 255, 0, 255),
+                GLYPH_LEFT_EDGE_RGBA,
                 Rect::new(
                     canvas_rect.x() + left_edge * scale.0 as i32 - 1,
                     canvas_rect.y(),
@@ -397,7 +417,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 ),
             );
             canvas.draw_rect(
-                (255, 0, 127, 255),
+                GLYPH_RIGHT_EDGE_RGBA,
                 Rect::new(
                     canvas_rect.x() + right_edge * scale.0 as i32,
                     canvas_rect.y(),
@@ -417,12 +437,13 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 let label = format!("{}x{}", rect.width(), rect.height());
                 (Point::new(rect.x(), rect.y()), label)
             };
+            let topleft = topleft - scroll;
             let topleft = Point::new(
                 canvas_rect.x() + (topleft.x() * (scale.0 as i32)).max(0),
                 canvas_rect.y() + (topleft.y() * (scale.1 as i32)).max(0),
             );
             canvas.fill_rect(
-                (255, 255, 255, 255),
+                SELECTION_LABEL_RGBA,
                 Rect::new(
                     topleft.x() + 1,
                     topleft.y() - 11,
@@ -439,6 +460,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         }
         let mut canvas = canvas.subcanvas(canvas_rect);
         if let Some((selected, topleft)) = state.selection() {
+            let topleft = topleft - scroll;
             let left = topleft.x() * (scale.0 as i32);
             let top = topleft.y() * (scale.1 as i32);
             canvas.draw_image_scaled(
@@ -474,7 +496,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                             state.mirror_positions((x as u32, y as u32))
                         {
                             canvas.draw_rect(
-                                (192, 64, 192, 255),
+                                SHAPE_PREVIEW_RGBA,
                                 Rect::new(
                                     (col * scale.0) as i32,
                                     (row * scale.1) as i32,
@@ -488,8 +510,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             }
         } else if let Some(rect) = self.dragged_rect(state) {
             let marquee_rect = Rect::new(
-                rect.x() * (scale.0 as i32),
-                rect.y() * (scale.1 as i32),
+                (rect.x() - scroll.x()) * (scale.0 as i32),
+                (rect.y() - scroll.y()) * (scale.1 as i32),
                 rect.width() * scale.0,
                 rect.height() * scale.1,
             );
@@ -497,7 +519,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
         } else if state.tool() == Tool::Lasso {
             for &(x, y) in self.lasso_points.iter() {
                 canvas.draw_rect(
-                    (192, 192, 64, 255),
+                    LASSO_PREVIEW_RGBA,
                     Rect::new(
                         (x * scale.0) as i32,
                         (y * scale.1) as i32,
@@ -513,7 +535,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             let mut x = grid_horz;
             while x < width {
                 canvas.draw_rect(
-                    GRID_RGBA,
+                    GRID_LINES_RGBA,
                     Rect::new(
                         (x * scale.0) as i32,
                         0,
@@ -529,7 +551,7 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
             let mut y = grid_vert;
             while y < height {
                 canvas.draw_rect(
-                    GRID_RGBA,
+                    GRID_LINES_RGBA,
                     Rect::new(0, (y * scale.1) as i32, canvas_rect.width(), 1),
                 );
                 y += grid_vert;
@@ -571,8 +593,8 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                 }
             }
             Event::MouseDown(pt) => {
-                let rect = self.screen_rect(state);
-                if rect.contains_point(pt) {
+                let canvas_rect = self.screen_rect(state);
+                if canvas_rect.contains_point(pt) {
                     match state.tool() {
                         Tool::Checkerboard => {
                             let changed = self.try_checker_fill(pt, state);
@@ -617,8 +639,11 @@ impl GuiElement<EditorState, ()> for ImageCanvas {
                             let sel_rect = state.selection_rect();
                             if let Some(sr) = sel_rect {
                                 let scale = self.scale(state);
-                                let screen_topleft = rect.top_left()
-                                    + scaled(sr.top_left(), scale);
+                                let screen_topleft = canvas_rect.top_left()
+                                    + scaled(
+                                        sr.top_left() - self.scroll(state),
+                                        scale,
+                                    );
                                 let screen_rect = Rect::new(
                                     screen_topleft.x(),
                                     screen_topleft.y(),
@@ -852,29 +877,40 @@ fn unscaled(point: Point, scale: (u32, u32)) -> Point {
     Point::new(point.x() / scale.0 as i32, point.y() / scale.1 as i32)
 }
 
-const MARQUEE_ANIMATION_MODULUS: i32 = 8;
-
 fn draw_marquee(canvas: &mut Canvas, rect: Rect, anim: i32) {
-    canvas.draw_rect((255, 255, 255, 255), rect);
-    let color = (0, 0, 0, 255);
+    canvas.draw_rect(MARQUEE_1_RGBA, rect);
     for x in 0..(rect.width() as i32) {
-        if mod_floor(x - anim, MARQUEE_ANIMATION_MODULUS) < 4 {
-            canvas.draw_pixel(color, Point::new(rect.left() + x, rect.top()));
-        }
-        if mod_floor(x + anim, MARQUEE_ANIMATION_MODULUS) < 4 {
+        if mod_floor(x - anim, MARQUEE_ANIMATION_MODULUS)
+            < MARQUEE_ANIMATION_MODULUS / 2
+        {
             canvas.draw_pixel(
-                color,
+                MARQUEE_2_RGBA,
+                Point::new(rect.left() + x, rect.top()),
+            );
+        }
+        if mod_floor(x + anim, MARQUEE_ANIMATION_MODULUS)
+            < MARQUEE_ANIMATION_MODULUS / 2
+        {
+            canvas.draw_pixel(
+                MARQUEE_2_RGBA,
                 Point::new(rect.left() + x, rect.bottom() - 1),
             );
         }
     }
     for y in 0..(rect.height() as i32) {
-        if mod_floor(y + anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
-            canvas.draw_pixel(color, Point::new(rect.left(), rect.top() + y));
-        }
-        if mod_floor(y - anim, MARQUEE_ANIMATION_MODULUS) >= 4 {
+        if mod_floor(y + anim, MARQUEE_ANIMATION_MODULUS)
+            >= MARQUEE_ANIMATION_MODULUS / 2
+        {
             canvas.draw_pixel(
-                color,
+                MARQUEE_2_RGBA,
+                Point::new(rect.left(), rect.top() + y),
+            );
+        }
+        if mod_floor(y - anim, MARQUEE_ANIMATION_MODULUS)
+            >= MARQUEE_ANIMATION_MODULUS / 2
+        {
+            canvas.draw_pixel(
+                MARQUEE_2_RGBA,
                 Point::new(rect.right() - 1, rect.top() + y),
             );
         }

@@ -24,19 +24,25 @@ use std::rc::Rc;
 
 //===========================================================================//
 
+pub const MAIN_CANVAS_SIZE: u32 = 256;
+
+//===========================================================================//
+
 #[derive(Clone)]
 pub(super) struct Snapshot {
     pub data: Data,
     pub selection: Option<(Rc<Image>, Point)>,
     pub zoom: (u32, u32),
+    pub scroll: (i32, i32),
     pub unsaved: bool,
 }
 
 impl Snapshot {
     pub fn with_data(data: Data) -> Self {
         let (width, height) = data.image_size();
-        let scale = (256 / width.max(height)).max(1);
-        Self { data, selection: None, zoom: (scale, scale), unsaved: false }
+        let scale = (MAIN_CANVAS_SIZE / width.max(height)).max(1);
+        let zoom = (scale, scale);
+        Self { data, selection: None, zoom, scroll: (0, 0), unsaved: false }
     }
 }
 

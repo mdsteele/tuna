@@ -21,7 +21,7 @@ use super::data::Data;
 use super::mirror::Mirror;
 use super::mutation::Mutation;
 use super::settings::Settings;
-use super::snapshot::Snapshot;
+use super::snapshot::{MAIN_CANVAS_SIZE, Snapshot};
 use super::tool::Tool;
 use ahi::{Collection, Color, Font, Image, Palette};
 use sdl2::rect::{Point, Rect};
@@ -87,7 +87,28 @@ impl EditorState {
     }
 
     pub fn set_zoom(&mut self, new_zoom: (u32, u32)) {
+        let old_zoom = self.current.zoom;
+        let (old_scroll_x, old_scroll_y) = self.current.scroll;
+        let cx = old_scroll_x + (MAIN_CANVAS_SIZE / (2 * old_zoom.0)) as i32;
+        let cy = old_scroll_y + (MAIN_CANVAS_SIZE / (2 * old_zoom.1)) as i32;
         self.current.zoom = new_zoom;
+        let new_scroll_x = cx - (MAIN_CANVAS_SIZE / (2 * new_zoom.0)) as i32;
+        let new_scroll_y = cy - (MAIN_CANVAS_SIZE / (2 * new_zoom.1)) as i32;
+        self.set_scroll((new_scroll_x, new_scroll_y));
+    }
+
+    pub fn scroll(&self) -> (i32, i32) {
+        self.current.scroll
+    }
+
+    pub fn set_scroll(&mut self, new_scroll: (i32, i32)) {
+        let (width, height) = self.image_size();
+        let (horz, vert) = self.zoom();
+        let max_x = width.saturating_sub(MAIN_CANVAS_SIZE / horz);
+        let max_y = height.saturating_sub(MAIN_CANVAS_SIZE / vert);
+        let x = new_scroll.0.max(0).min(max_x as i32);
+        let y = new_scroll.1.max(0).min(max_y as i32);
+        self.current.scroll = (x, y);
     }
 
     pub fn tool(&self) -> Tool {
