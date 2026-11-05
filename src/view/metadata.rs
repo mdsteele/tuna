@@ -21,6 +21,7 @@ use crate::canvas::{Canvas, Resources};
 use crate::element::{Action, GuiElement};
 use crate::event::Event;
 use crate::state::EditorState;
+use sdl2::rect::Rect;
 
 //===========================================================================//
 
@@ -30,6 +31,10 @@ pub struct MetadataView {
 }
 
 impl MetadataView {
+    const WIDTH: u32 = 68;
+    const HEIGHT: u32 = 58;
+    const MARGIN: i32 = 3;
+
     pub fn new(left: i32, top: i32) -> MetadataView {
         MetadataView { left, top }
     }
@@ -44,29 +49,36 @@ impl GuiElement<EditorState, ()> for MetadataView {
     ) {
         let name = state.image_name();
         let num_images = state.num_images();
-        canvas.draw_string(
-            resources.font(),
+        let image = state.image();
+        let mut subcanvas = canvas.subcanvas(Rect::new(
             self.left,
             self.top,
-            &format!("{}/{}", name, num_images),
-        );
-        let image = state.image();
-        canvas.draw_string(
+            Self::WIDTH,
+            Self::HEIGHT,
+        ));
+        subcanvas.draw_rect((95, 95, 95, 255), subcanvas.rect());
+        subcanvas.draw_string(
             resources.font(),
-            self.left,
-            self.top + 14,
+            Self::MARGIN,
+            Self::MARGIN,
+            &format!("{name}/{num_images}"),
+        );
+        subcanvas.draw_string(
+            resources.font(),
+            Self::MARGIN,
+            Self::MARGIN + 14,
             &format!("{}x{}", image.width(), image.height()),
         );
-        canvas.draw_string(
+        subcanvas.draw_string(
             resources.font(),
-            self.left,
-            self.top + 28,
+            Self::MARGIN,
+            Self::MARGIN + 28,
             &format!("`{}'", image.tag().escape_default()),
         );
-        canvas.draw_string(
+        subcanvas.draw_string(
             resources.font(),
-            self.left,
-            self.top + 42,
+            Self::MARGIN,
+            Self::MARGIN + 42,
             &format!("{:?}", image.metadata()),
         );
     }

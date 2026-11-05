@@ -26,11 +26,11 @@ use sdl2::rect::{Point, Rect};
 
 //===========================================================================//
 
-pub struct ImagesScrollbar {
+pub struct ImagePicker {
     element: SubrectElement<AggregateElement<EditorState, ()>>,
 }
 
-impl ImagesScrollbar {
+impl ImagePicker {
     pub fn new(left: i32, top: i32, height: u32) -> Self {
         let elements: Vec<Box<dyn GuiElement<EditorState, ()>>> = vec![
             Self::arrow_button(2, -1, Keycode::Up),
@@ -61,13 +61,13 @@ impl ImagesScrollbar {
         height: u32,
     ) -> Box<dyn GuiElement<EditorState, ()>> {
         Box::new(SubrectElement::new(
-            ImageMultipicker::new(36, height),
+            Multipicker::new(36, height),
             Rect::new(1, y, 36, height),
         ))
     }
 }
 
-impl GuiElement<EditorState, ()> for ImagesScrollbar {
+impl GuiElement<EditorState, ()> for ImagePicker {
     fn draw(
         &self,
         state: &EditorState,
@@ -89,17 +89,17 @@ impl GuiElement<EditorState, ()> for ImagesScrollbar {
 
 //===========================================================================//
 
-struct ImageMultipicker {
+struct Multipicker {
     width: u32,
     height: u32,
 }
 
-impl ImageMultipicker {
+impl Multipicker {
     const BOX_MARGIN: i32 = 2;
     const BOX_SPACING: i32 = 2;
 
     fn new(width: u32, height: u32) -> Self {
-        ImageMultipicker { width, height }
+        Multipicker { width, height }
     }
 
     fn boxes(&self, state: &EditorState) -> Vec<(Rect, usize)> {
@@ -149,7 +149,7 @@ impl ImageMultipicker {
     }
 }
 
-impl GuiElement<EditorState, ()> for ImageMultipicker {
+impl GuiElement<EditorState, ()> for Multipicker {
     fn draw(
         &self,
         state: &EditorState,

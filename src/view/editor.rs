@@ -21,7 +21,7 @@ use super::menu::{MenuAction, MenuView};
 use super::metadata::MetadataView;
 use super::mirrors::Mirrors;
 use super::palette::{PaletteAction, PaletteView};
-use super::scrollbar::ImagesScrollbar;
+use super::picker::ImagePicker;
 use super::sizes::SizesToggle;
 use super::textbox::{ModalTextBox, Mode};
 use super::tiles::TileView;
@@ -54,11 +54,11 @@ impl EditorView {
             Box::new(UnsavedIndicator::new(4, 11)),
             Box::new(Toolbox::new(3, 34)),
             Box::new(Mirrors::new(3, 134)),
-            Box::new(ImagesScrollbar::new(439, 33, 262)),
+            Box::new(ImagePicker::new(439, 33, 262)),
             Box::new(ImageCanvas::new(80, 36, 256)),
-            Box::new(ImageCanvas::new(348, 36, 64)),
-            Box::new(TileView::new(341, 126, 96, 96)),
-            Box::new(MetadataView::new(348, 230)),
+            Box::new(ImageCanvas::new(366, 36, 64)),
+            Box::new(TileView::new(364, 106, 68, 124)),
+            Box::new(MetadataView::new(364, 236)),
             Box::new(SizesToggle::new(448, 298)),
         ];
         SubrectElement::new(
